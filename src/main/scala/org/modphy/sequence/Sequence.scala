@@ -3,17 +3,17 @@ package org.modphy.sequence
 abstract class BioEnum(names:String*) extends Enumeration(names: _*){
   def isReal(a:Value)=true
   def getNums(a:Value):List[Int]
-  val length:Int=filter{isReal}.toList.length
-  def fromString(s:String):BioSeq[Value]
+  val matlength:Int
+  def parseString(s:String):BioSeq[Value]
 }
 
 object DNA extends BioEnum("A","G","C","T","N","-"){
-  val A,G,C,T,N,GAP=Value
-  override def isReal(a:Base)=(a!=N && a!=GAP)
   type Base = Value
+  val A,G,C,T,N,GAP=Value
+  override def isReal(a:Base)=((a!=N) && (a!=GAP))
   def getNums(a:Base)=if (isReal(a)){List(a.id)}else{(A.id to T.id).toList}
-  def fromString(s:String)=new BioSeq(s.toList.map{i=> DNA valueOf i.toString getOrElse(DNA.N)})
-  override val length=4
+  def parseString(s:String)=new BioSeq(s.toList.map{i=> valueOf(i.toString).getOrElse(DNA.N)})
+  override val matlength=4
 }
 
 class BioSeq[A](seq:Seq[A]) extends Seq[A]{

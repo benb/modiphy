@@ -4,7 +4,7 @@ import org.modphy.sequence.DNA._
 
 class SeqSuite extends Suite{
     def testSequence{
-      assert(DNA.length==4) 
+      assert(DNA.matlength==4) 
     }
 }
 

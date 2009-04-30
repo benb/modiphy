@@ -10,7 +10,6 @@ class MathSuite extends Suite{
       val size=4
       val x = dense.make(size,size)
       (0 to size-1) foreach{i=> x(i,i)=i+1}
-      println(x)
       assert(x(3,3)==4)
     }
 
@@ -19,32 +18,35 @@ class MathSuite extends Suite{
       val sMat=dense.make(4,4)
       sMat.assign(0.1)
       val pi = Vector(4)
-      pi(A.id)=0.3
-      pi(C.id)=0.2
-      pi(G.id)=0.3
-      pi(T.id)=0.2
+      pi(A.id)=0.25
+      pi(C.id)=0.25
+      pi(G.id)=0.25
+      pi(T.id)=0.25
       val model = (sMat sToQ pi,pi)
-      println(model)
 
-      val fasta = List(">one","AGGT-A",">two","AGGTCC",">three","ATGT-A").elements
-      val tree="((one:0.1,two:0.2):0.12625,three:0.01281);"     
+      val fasta = List(">one","AGGT-A-",">two","AGGTCC-",">three","ATGT-A-").elements
+      //val tree="((one:0.1,two:0.2):0.12625,three:0.01281);"     
+      val tree="(one:0.1,two:0.2);"     
 
       val (rawtre,aln)=DataParse(tree,fasta,DNA)
-      val tre:INode[DNA.type,Node[DNA.type]] with LikelihoodNode[DNA.type] = rawtre.mkLkl(model)
+      assert(aln("one")=="AGGT-A-")
+      val tre = rawtre.mkLkl(model)
 
-      val leaf=tre.child(0).get.child(0).get
+      val leaf=tre.child(0).get.asInstanceOf[Leaf[DNA.type] with LikelihoodNode[DNA.type]]
       assert(leaf.name=="one")
       assert(leaf.lengthTo<0.1001 && leaf.lengthTo > 0.0999)
       assert(leaf.isInstanceOf[LikelihoodNode[DNA.type]])
 
-      println(leaf.likelihoods)
-      assert(leaf.likelihoods.length == "AGGT-A".length)
+      println("LEAF LKL " + leaf.likelihoods)
+      assert(leaf.likelihoods.length == "AGGT-A-".length)
 
-      println(leaf)
 
       val lkl = tre.mkLkl(model)
       println("HELLO")
       println(lkl.likelihoods)
+      println("REAL LKL " + lkl.realLikelihoods(pi.toArray.toList))
+      assert(lkl.realLikelihoods(pi.toArray).last < 1.00001 && lkl.realLikelihoods(pi.toArray).last > 0.9999)
+      println("LOG LKL " + lkl.logLikelihood(pi.toArray.toList))
       true
       
     }

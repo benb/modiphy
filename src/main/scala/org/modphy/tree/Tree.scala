@@ -22,7 +22,7 @@ object DataParse{
     val aln = new Fasta(alignment)
     val seqMap = aln.foldLeft(Map[String,String]()){_+_}
     val root = new TreeParser[A](seqMap,alphabet){def parseAll=parse(root,tree)}.parseAll.get
-    (root,aln)
+    (root,seqMap)
   }
 }
 
@@ -44,6 +44,14 @@ abstract class Node[A <: BioEnum]{
 trait LikelihoodNode[A <: BioEnum]{
   val alphabet:A
   def likelihoods:List[Vector]
+  def realLikelihoods(priors:Seq[Double])=
+    likelihoods.map{vec=>
+      priors.elements.zipWithIndex.map{t=>
+        val(p,i)=t
+        vec(i)*p
+      }.foldLeft(0.0D){_+_}
+    }
+    def logLikelihood(priors:Seq[Double])=realLikelihoods(priors).foldLeft(0.0D){(i,j)=>i+Math.log(j)}
 }
 
 trait CalcLikelihoodNode[A <: BioEnum] extends LikelihoodNode[A]{
@@ -61,34 +69,42 @@ trait CalcLikelihoodNode[A <: BioEnum] extends LikelihoodNode[A]{
     val childLkl = childElements.map{i=>(i.likelihoods,i.lengthTo)}
     val intermediates= childLkl.map{t=>
     val (siteVectorList,length)=t // list of vectors - 1 for each site
-    println("Q = " + qMatrix)
+    println ("siteVectorList " + siteVectorList)
+   // println("Q = " + qMatrix)
     val matrix = qMatrix exp length //e^Qt
-    println("e^Qt=" + matrix)
+   // println("e^Qt=" + matrix)
     siteVectorList.map{siteVector=>
-      val ret = DoubleFactory1D.dense.make(alphabet.length) 
-        (0 to alphabet.length-1).foreach{i=>
-          (0 to alphabet.length-1).foreach{j=>
+    
+     val ret = DoubleFactory1D.dense.make(alphabet.matlength) 
+        (0 to alphabet.matlength-1).foreach{i=>
+          (0 to alphabet.matlength-1).foreach{j=>
             ret(j)=ret(j) + siteVector(i) * matrix(i,j)
           }
         }
+        println("MAP => " +siteVector + " " + ret)
         ret
       }
-    }
-    intermediates.map{vecList=>
-      vecList.tail.foldLeft(vecList.head){(a,b)=>(0 to a.size-1).foreach{i=>a(i)*=b(i)};a}
     }.toList
+    println("INTER: " + intermediates)
+    val ans = intermediates.head
+    intermediates.tail.foreach{list2=>
+    ans.zip(list2).foreach{t=>
+          val (vec,vec2)=t
+          (0 to vec.size-1).foreach{base=>vec(base)=vec(base)*vec2(base)}
+      }
+    }
+    ans
   }
 }
 
 trait LeafLikelihoodNode[A <: BioEnum] extends LikelihoodNode[A]{
   val sequence:BioSeq[alphabet.Value]
   override lazy val likelihoods:List[Vector]={
-    val elements = alphabet.length
+    val elements = alphabet.matlength
     sequence.map{a=>
-      val vec = DoubleFactory1D.dense.make(alphabet.length)
-        println("Vector " + vec)
-        alphabet.getNums(a).foreach{i=>vec(i)=1.0D}
-        println(vec)
+      val vec = DoubleFactory1D.dense.make(alphabet.matlength)
+        alphabet.getNums(a).foreach{i=>
+        vec(i)=1.0D}
         vec
     }.toList
   }
@@ -105,7 +121,7 @@ class INode[A <: BioEnum,B <:Node[A]](children:List[B],val alphabet:A,val length
 }
 
 class Leaf[A <: BioEnum](val name:String,val seq:String,val alphabet:A,val lengthTo:Double) extends Node[A]{
-  def mkLkl(mod:Model):Leaf[A] with LikelihoodNode[A]=new Leaf[A](name,seq,alphabet,lengthTo) with LeafLikelihoodNode[A]{val sequence=alphabet.fromString(seq)}
+  def mkLkl(mod:Model):Leaf[A] with LikelihoodNode[A]=new Leaf[A](name,seq,alphabet,lengthTo) with LeafLikelihoodNode[A]{val sequence=alphabet.parseString(seq)}
   def child(i:Int)=None
   override def toString=name+":"+lengthTo
 }
