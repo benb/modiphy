@@ -5,6 +5,7 @@ abstract class BioEnum(names:String*) extends Enumeration(names: _*){
   def getNums(a:Value):List[Int]
   val matlength:Int
   def parseString(s:String):BioSeq[Value]
+  def matElements:List[Value]
 }
 
 object DNA extends BioEnum("A","G","C","T","N","-"){
@@ -14,6 +15,7 @@ object DNA extends BioEnum("A","G","C","T","N","-"){
   def getNums(a:Base)=if (isReal(a)){List(a.id)}else{(A.id to T.id).toList}
   def parseString(s:String)=new BioSeq(s.toList.map{i=> valueOf(i.toString).getOrElse(DNA.N)})
   override val matlength=4
+  def matElements=List(A,G,C,T)
 }
 
 class BioSeq[A](seq:Seq[A]) extends Seq[A]{
@@ -52,3 +54,37 @@ class Fasta(source:Iterator[String]) extends Iterator[(String,String)]{
     }
     def hasNext = iter.hasNext
   }
+
+class Maf(source:Iterator[String]) extends Iterator[MafAln]{
+  val iter = source.filter{x=> !(x startsWith "#")}.buffered
+  def next = {
+    new MafAln(iter)
+  }
+  def hasNext = {while (iter.hasNext && iter.head.matches("\\s+")){iter.next};iter.hasNext}
+}
+
+class MafAln(source:BufferedIterator[String]){
+  val aLine = {
+    val line = source.next
+    assert(line startsWith "a ")
+    line.split("\\s+").toList.tail.foldLeft(Map[String,String]()){(m,i)=>val s = i.split("="); m+((s(0),s(1)))}
+  }
+  var seqs=Map[String,String]()
+  def elements = seqs.elements
+  
+  while (source.hasNext && !(source.head.startsWith("a"))){
+    val line = source.next
+    if (line startsWith "s"){
+      val s = line.split("\\s+")
+      seqs=seqs+((s(1),s(6)))
+    }else if (line startsWith "i"){
+      true //ignore for now
+    }else if (line startsWith "q"){
+      true //ignore for now
+    }else {
+      true //ignore this line
+    }
+  }
+
+}
+

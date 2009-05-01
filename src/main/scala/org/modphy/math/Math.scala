@@ -15,6 +15,9 @@ object EnhancedMatrix{
 object Vector{
   def apply(i:Int)=cern.colt.matrix.DoubleFactory1D.dense.make(i)
 }
+object Matrix{
+  def apply(i:Int,j:Int)=dense.make(i,j)
+}
 
 import EnhancedMatrix._
 object MatExp{
@@ -24,18 +27,21 @@ object MatExp{
   def decomp(m:Matrix)=cache.getOrElseUpdate(m,{val e = new EigenvalueDecomposition(m); (e,algebra.inverse(e.getV))})
   def exp(m:Matrix,t:Double) = {
     val (eigen,vprime)=decomp(m)
-    println(eigen)
+    //println(eigen)
     val v = eigen.getV
-    println("M " + m)
+    //println("M " + m)
     v * (eigen.getD expVals t) * vprime
   }
 }
 class EnhancedMatrix(d:DoubleMatrix2D){
+  type ID={def id:Int}
   def exp(t:Double)=MatExp.exp(d,t)
   def expVals(t:Double)=sparse.diagonal(dense.diagonal(d).assign( new DoubleFunction(){def apply(arg:Double)={Math.exp(t * arg)}}))
   def *(m:Matrix)=algebra.mult(d,m)
-  def update(i:Int,j:Int,v:Double)=d.set(i,j,v)
-  def apply(i:Int,j:Int)=d.get(i,j)
+  def update(i:Int,j:Int,v:Double):Unit=d.set(i,j,v)
+  def update(i:ID,j:ID,v:Double):Unit=d.set(i.id,j.id,v)
+  def apply(i:Int,j:Int):Double=d.get(i,j)
+  def apply(i:ID,j:ID):Double=apply(i.id,j.id)
   def symmetrise(s:Matrix)={
     val s2 = s.copy
     (0 to d.columns-1).foreach{i=>
@@ -58,10 +64,17 @@ class EnhancedMatrix(d:DoubleMatrix2D){
     }
     q
   }
+  def normalize={
+    val normFact = -(dense.diagonal(d).zSum)
+    d.copy.assign(new DoubleFunction{def apply(d:Double)=d/normFact})
+  }
 
 }
 class EnhancedVector(d:DoubleMatrix1D){
+  type ID={def id:Int}
   def elements=d.toArray.elements
-  def apply(i:Int)=d.get(i)
-  def update(i:Int,v:Double)=d.set(i,v)
+  def apply(i:Int):Double=d.get(i)
+  def apply(i:ID):Double=apply(i.id)
+  def update(i:Int,v:Double):Unit=d.set(i,v)
+  def update(i:ID,v:Double):Unit=update(i.id,v)
 }

@@ -18,10 +18,10 @@ class MathSuite extends Suite{
       val sMat=dense.make(4,4)
       sMat.assign(0.1)
       val pi = Vector(4)
-      pi(A.id)=0.25
-      pi(C.id)=0.25
-      pi(G.id)=0.25
-      pi(T.id)=0.25
+      pi(A)=0.25
+      pi(C)=0.25
+      pi(G)=0.25
+      pi(T)=0.25
       val model = (sMat sToQ pi,pi)
 
       val fasta = List(">one","AGGT-A-",">two","AGGTCC-",">three","ATGT-A-").elements
@@ -44,9 +44,19 @@ class MathSuite extends Suite{
       val lkl = tre.mkLkl(model)
       println("HELLO")
       println(lkl.likelihoods)
-      println("REAL LKL " + lkl.realLikelihoods(pi.toArray.toList))
-      assert(lkl.realLikelihoods(pi.toArray).last < 1.00001 && lkl.realLikelihoods(pi.toArray).last > 0.9999)
-      println("LOG LKL " + lkl.logLikelihood(pi.toArray.toList))
+      println("REAL LKL " + lkl.realLikelihoods)
+      assert(lkl.realLikelihoods.last < 1.00001 && lkl.realLikelihoods.last > 0.9999)
+      println("LOG LKL " + lkl.logLikelihood)
+
+      val opt = Optimiser.optMatNelderMead((0 to 5).map{i=>1.0},pi,Optimiser.sMatMapper(sMat),tre) 
+      println("Opt mat " + opt._1)
+      println("Opt lkl " + opt._2)
+
+      //in alignment above, there are A->T and A->C but no A->G transitions
+      assert(opt._1(A,C)>opt._1(A,G))
+      assert(opt._1(A,T)>opt._1(A,G))
+
+
       true
       
     }
