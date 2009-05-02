@@ -38,7 +38,7 @@ object Optimiser{
       if (point.findIndexOf{i=> i < 0.0D} > -1){Math.NEG_INF_DOUBLE}
       else{
         val ans = tree.mkLkl(mapper(point).sToQ(pi).normalize,pi).logLikelihood
-        println("f("+ point.mkString(",") + ") = " + ans)
+        //println("f("+ point.mkString(",") + ") = " + ans)
         //if (ans.isNaN){throw new org.apache.commons.math.FunctionEvaluationException(point)}
         if (ans.isNaN){Math.NEG_INF_DOUBLE}else{ans}
       }

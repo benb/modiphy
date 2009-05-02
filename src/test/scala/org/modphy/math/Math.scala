@@ -40,9 +40,10 @@ class MathSuite extends Suite{
       println("LEAF LKL " + leaf.likelihoods)
       assert(leaf.likelihoods.length == "AGGT-A-".length)
 
-
       val lkl = tre.mkLkl(model)
       println("HELLO")
+      println("IS ROOT NODE? " + lkl.isRoot)
+      assert(lkl.isInstanceOf[RootNode[DNA.type]])
       println(lkl.likelihoods)
       println("REAL LKL " + lkl.realLikelihoods)
       assert(lkl.realLikelihoods.last < 1.00001 && lkl.realLikelihoods.last > 0.9999)

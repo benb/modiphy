@@ -56,6 +56,7 @@ import Likelihood._
 
 
 trait Node[A <: BioEnum]{
+  val isRoot=false
   def mkLkl(mod:Model):LikelihoodNode[A]
   def lengthTo:Double
   def child(i:Int):Option[Node[A]]
@@ -69,6 +70,7 @@ trait Node[A <: BioEnum]{
   def descendentNodes:List[Node[A]]
   def setBranchLengths(l:List[Double]):Node[A]
   def getBranchLengths:List[Double]
+  def branchTo:String
 }
 
 trait LikelihoodNode[A <: BioEnum] extends Node[A]{
@@ -81,7 +83,6 @@ class CalcLikelihoodNode[A <: BioEnum](children:List[LikelihoodNode[A]],alphabet
   //return a list of the lists of probabilties for each site
 
 
-  def factory(c:List[LikelihoodNode[A]],a:A,len:Double)=new CalcLikelihoodNode[A](c,a,len,model)
   override def childElements:Iterator[LikelihoodNode[A]] = children.elements
   val qMatrix=model._1
   val pi=model._2
@@ -139,24 +140,29 @@ class LeafLikelihoodNode[A <: BioEnum](name:String,seq:String,alpha:A,lengthTo:D
   }
 }
 
-trait RootNode[A <: BioEnum] extends Node[A]{
+trait RootNode[A <: BioEnum] extends INode[A]{
   val children:List[Node[A]]
+  override val isRoot=true
   override def toString="("+children.mkString(",")+");"
   //def factory(children:List[Node[A]],alphabet:A,lengthTo:Double)=new INode[A](children,alphabet,lengthTo) with RootNode[A]
 }
 
-
 class INode[A <: BioEnum](val children:List[Node[A]],val alphabet:A,val lengthTo:Double) extends Node[A]{
+  
   val name=""
 
-  def factory(c:List[Node[A]],al:A,len:Double)=new INode[A](c,al,len)
+  def factory(c:List[Node[A]],al:A,len:Double)=if (isRoot){new INode[A](c,al,len) with RootNode[A]}else {new INode[A](c,al,len)}
 
   def numChildren = children.size
   def childElements:Iterator[Node[A]] = children.elements
   def child(i:Int)=if (i < children.length){Some(children(i))}else{None}
   def length(i:Int):Double=children(i).lengthTo
   def length(n:Node[A]):Double=children.find{node=>node==n}.get.lengthTo
-  def mkLkl(mod:Model)=new CalcLikelihoodNode[A](children.map{t=>t.mkLkl(mod)}.toList,alphabet,lengthTo,mod)
+  def mkLkl(mod:Model):CalcLikelihoodNode[A]=if (isRoot){
+    new CalcLikelihoodNode[A](children.map{t=>t.mkLkl(mod)}.toList,alphabet,lengthTo,mod) with RootNode[A]
+  }else { 
+    new CalcLikelihoodNode[A](children.map{t=>t.mkLkl(mod)}.toList,alphabet,lengthTo,mod) 
+  }
   def restrictTo(allowed:Set[String])={
     val newChildren=children.filter{child=>child.descendents.exists{name=>allowed contains name}}map{_.restrictTo(allowed)}
     //println(children.toString + " => " + newChildren.toString)
@@ -203,6 +209,8 @@ class INode[A <: BioEnum](val children:List[Node[A]],val alphabet:A,val lengthTo
   def getBranchLengths={
     lengthTo :: children.map{c=>c.getBranchLengths}.flatten[Double]
   }
+
+  def branchTo=descendents.mkString(",")
 }
 
 class Leaf[A <: BioEnum](val name:String,val seq:String,val alphabet:A,val lengthTo:Double) extends Node[A]{
@@ -222,6 +230,7 @@ class Leaf[A <: BioEnum](val name:String,val seq:String,val alphabet:A,val lengt
   override def toString=name + ":" + lengthTo
   def getBranchLengths=List(lengthTo)
   def factory(n:String,s:String,a:A,len:Double)=new Leaf[A](n,s,a,len)
+  def branchTo=name
 }
 
 

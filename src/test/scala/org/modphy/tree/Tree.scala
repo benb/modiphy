@@ -39,19 +39,25 @@ petMar1:0.1);"""
   
   val tree = DataParse(treeTxt,DNA)
 
+
   assert(tree.descendents contains "cavPor3")
   assert(tree.descendents contains "oryLat2")
   println(tree.descendents)
+
+  assert(tree.isInstanceOf[RootNode[DNA.type]])
   
   true
 
   val treeTxt2="((one:0.1,two:0.1):0.2,three:0.1);"
   val tree2 = DataParse(treeTxt2,DNA)
   val tree3 = tree2.setBranchLengths({1 to 4}.map{i=>0.0}.toList)
+  assert(tree3.isInstanceOf[RootNode[DNA.type]])
 
 
   println(tree3)
   assert (tree3.child(0).get.lengthTo==0.0D)
+
+
   
 
 

@@ -98,10 +98,10 @@ petMar1:0.1);"""
           a:Array[Double]=>
           if (a.findIndexOf(i=> i < 0)> -1){Math.NEG_INF_DOUBLE}else{
             val tre =  data._1.setBranchLengths(a.toList).mkLkl(bestModel)
-              println(tre)
             val lkl = tre.logLikelihood
 
-            println(a.toList + " => " + lkl)
+            //println(a.toList.mkString("") + " => " + lkl)
+            //  println(tre)
             lkl 
           }
         }
