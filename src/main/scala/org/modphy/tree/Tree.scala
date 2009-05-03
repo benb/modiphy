@@ -116,9 +116,9 @@ class CalcLikelihoodNode[A <: BioEnum](children:List[LikelihoodNode[A]],alphabet
    // println("e^Qt=" + matrix)
     siteVectorList.map{siteVector=>
     
-     val ret = DoubleFactory1D.dense.make(alphabet.matlength) 
-        (0 to alphabet.matlength-1).foreach{i=>
-          (0 to alphabet.matlength-1).foreach{j=>
+     val ret = DoubleFactory1D.dense.make(alphabet.matLength) 
+        (0 to alphabet.matLength-1).foreach{i=>
+          (0 to alphabet.matLength-1).foreach{j=>
             ret(j)=ret(j) + siteVector(i) * matrix(i,j)
           }
         }
@@ -141,9 +141,9 @@ class CalcLikelihoodNode[A <: BioEnum](children:List[LikelihoodNode[A]],alphabet
 class LeafLikelihoodNode[A <: BioEnum](name:String,seq:String,alpha:A,lengthTo:Double) extends Leaf[A](name,seq,alpha,lengthTo) with LikelihoodNode[A]{
   val sequence=alphabet.parseString(seq)
   override lazy val likelihoods:List[Vector]={
-    val elements = alphabet.matlength
+    val elements = alphabet.matLength
     sequence.map{a=>
-      val vec = DoubleFactory1D.dense.make(alphabet.matlength)
+      val vec = DoubleFactory1D.dense.make(alphabet.matLength)
         alphabet.getNums(a).foreach{i=>
         vec(i)=1.0D}
         vec

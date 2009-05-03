@@ -3,20 +3,22 @@ package org.modphy.sequence
 abstract class BioEnum(names:String*) extends Enumeration(names: _*){
   def isReal(a:Value)=true
   def getNums(a:Value):List[Int]
-  val matlength:Int
+  val matLength:Int
   def parseString(s:String):BioSeq[Value]
   def matElements:List[Value]
 }
 
-object DNA extends BioEnum("A","G","C","T","N","-"){
+class SiteClassDNA(numClasses:Int) extends BioEnum("A","G","C","T","N","-"){
   type Base = Value
   val A,G,C,T,N,GAP=Value
+  override val matLength=numClasses*4
   override def isReal(a:Base)=((a!=N) && (a!=GAP))
-  def getNums(a:Base)=if (isReal(a)){List(a.id)}else{(A.id to T.id).toList}
-  def parseString(s:String)=new BioSeq(s.toList.map{i=> valueOf(i.toString).getOrElse(DNA.N)})
-  override val matlength=4
+  def getNums(a:Base)=if (isReal(a)){(a.id to (matLength-1) by 4).toList}else{(0 to matLength-1).toList}
+  def parseString(s:String)=new BioSeq(s.toList.map{i=> valueOf(i.toString).getOrElse(N)})
   def matElements=List(A,G,C,T)
 }
+
+object DNA extends SiteClassDNA(1)
 
 class BioSeq[A](seq:Seq[A]) extends Seq[A]{
   def length = seq.length
