@@ -6,6 +6,9 @@ import scala.collection.Set
 
 
 import scala.util.parsing.combinator._
+/**
+  Used internally for parsing trees
+*/
 class TreeParser[A <: BioEnum](m:String=>String,alphabet:A) extends JavaTokenParsers{
   def root: Parser[INode[A]] = "("~node~rep(","~>node)~");" ^^ {
     case "("~node1~nodeList~");" => new INode[A](node1::nodeList,alphabet,0.0)
@@ -18,17 +21,25 @@ class TreeParser[A <: BioEnum](m:String=>String,alphabet:A) extends JavaTokenPar
 }
 
 
-
+/**
+ Parses Newick format trees
+*/
 object DataParse{
-  type Tree[A <: BioEnum]=INode[A] with RootNode[A]
+  type Tree[A <: BioEnum]=Node[A] with RootNode[A]
   type Alignment=Map[String,String]
-  def cleanTree(t:String)=t.split("\\s+").mkString("").split("\n").mkString("")
+
+  private def cleanTree(t:String)=t.split("\\s+").mkString("").split("\n").mkString("")
+
+  /**
+   Produce a parsed Tree and alignment from a newick file and a fasta file
+  */
   def apply[A <: BioEnum](tree:String,alignment:Iterator[String],alphabet:A):(Tree[A],Alignment)={
     val aln = new Fasta(alignment)
     val seqMap = aln.foldLeft(Map[String,String]()){_+_}
     apply(tree,seqMap,alphabet)
   }
 
+  
   def apply[A <: BioEnum](tree:String,aln:Alignment,alphabet:A):(Tree[A],Alignment)={
     val root = new TreeParser[A](aln,alphabet){def parseAll=parse(root,cleanTree(tree))}.parseAll.get.setRoot
     (root,aln)

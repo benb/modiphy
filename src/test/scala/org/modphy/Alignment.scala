@@ -1,8 +1,11 @@
+package org.modphy.math
 import  org.modphy.sequence._
 import org.scalatest.Suite
 import org.modphy.tree._
 import org.modphy.math._
 import org.modphy.math.EnhancedMatrix._
+import org.apache.commons.math.optimization.direct._
+
 
 
 class AlignmentSuite extends Suite{
@@ -87,12 +90,26 @@ petMar1:0.1);"""
 
        println(best)
 
+
+
+     val bestBoth = Optimiser.optModel({new NelderMead})(
+         ((0 to 3).map{i=>0.25},(0 to 4).map{i=>1.0}),
+         (pi,sMat),
+         (Optimiser.piMapper(pi),Optimiser.sMatMapper(sMat)),
+         data._1
+       )
+
+     println(bestBoth)
+
+
+
        val startBL=data._1.getBranchLengths
 
        println(startBL)
        println(data._1)
 
-       val bestModel=(best._1.sToQ(pi).normalize,pi)
+       val bestModel=(bestBoth._2.sToQ(bestBoth._1).normalize,bestBoth._1)
+       println(bestModel)
 
        def f = {
           a:Array[Double]=>
@@ -105,9 +122,12 @@ petMar1:0.1);"""
             lkl 
           }
         }
+
+
        val best2 = Optimiser.nelderMead(startBL,f)
        println((best2._1.toList,best2._2))
        println(data._1.setBranchLengths(best2._1.toList))
+
        
        assert(mafReader.hasNext==false)
       }

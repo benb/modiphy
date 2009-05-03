@@ -4,6 +4,15 @@ import cern.colt.matrix.DoubleFactory2D._
 import cern.colt.function.DoubleFunction
 import cern.colt.matrix.linalg.{Algebra,EigenvalueDecomposition}
 
+object Model{
+  def GTR={
+    val vector = Vector(4)
+    vector assign 0.25
+    val matrix = Matrix(4,4)
+    matrix assign 1.0
+    (vector,matrix)
+  }
+}
 
 object EnhancedMatrix{
   type Matrix=DoubleMatrix2D
@@ -24,7 +33,9 @@ object MatExp{
   private lazy val algebra = new Algebra
   import scala.collection.jcl.WeakHashMap
   private lazy val cache:WeakHashMap[Matrix,(EigenvalueDecomposition,Matrix)] = new WeakHashMap()
-  def decomp(m:Matrix)=cache.getOrElseUpdate(m,{val e = new EigenvalueDecomposition(m); (e,algebra.inverse(e.getV))})
+  def decomp(m:Matrix)={
+    cache.getOrElseUpdate(m,{val e = new EigenvalueDecomposition(m); (e,algebra.inverse(e.getV))})
+  }
   def exp(m:Matrix,t:Double) = {
     val (eigen,vprime)=decomp(m)
     //println(eigen)
@@ -66,7 +77,7 @@ class EnhancedMatrix(d:DoubleMatrix2D){
   }
   def normalize={
     val normFact = -(dense.diagonal(d).zSum)
-    d.copy.assign(new DoubleFunction{def apply(d:Double)=d/normFact})
+    d.copy.assign(new DoubleFunction(){def apply(d:Double)=d/normFact})
   }
 
 }
