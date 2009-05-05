@@ -10,14 +10,22 @@ import scala.util.parsing.combinator._
   Used internally for parsing trees
 */
 class TreeParser[A <: BioEnum](m:String=>String,alphabet:A) extends JavaTokenParsers{
+  val treegen = new TreeGen[A]
+  import treegen._
   def root: Parser[INode[A]] = "("~node~rep(","~>node)~");" ^^ {
-    case "("~node1~nodeList~");" => new INode[A](node1::nodeList,alphabet,0.0)
+    case "("~node1~nodeList~");" => getINode(node1::nodeList,alphabet,0.0)
   }
   def node: Parser[Node[A]] = leaf | "("~node~rep(","~>node)~"):"~floatingPointNumber ^^ {
-    case "("~node1~nodeList~"):"~length => new INode[A](node1::nodeList,alphabet,length.toDouble)
+    case "("~node1~nodeList~"):"~length => getINode(node1::nodeList,alphabet,length.toDouble)
   } 
   def seqName: Parser[String] = regex(new scala.util.matching.Regex("[a-zA-Z0-9_.+-]+"))
-  def leaf: Parser[Leaf[A]] = seqName~":"~floatingPointNumber ^^ {case name~":"~length => new Leaf(name,m(name),alphabet,length.toDouble)}
+  def leaf: Parser[Leaf[A]] = seqName~":"~floatingPointNumber ^^ {case name~":"~length => getLeaf(name,m(name),alphabet,length.toDouble)}
+}
+
+class TreeGen[A <: BioEnum]{
+  var nodeCount:Int= -1
+  def getINode(children:List[Node[A]],alphabet:A, lengthTo:Double)={nodeCount += 1;new INode[A](children,alphabet,lengthTo,nodeCount)}
+  def getLeaf(name:String,seq:String, alphabet:A, lengthTo:Double)={nodeCount += 1;new Leaf[A](name,seq,alphabet,lengthTo,nodeCount)}
 }
 
 
@@ -67,6 +75,7 @@ import Likelihood._
 
 
 trait Node[A <: BioEnum]{
+  val id:Int
   val isRoot=false
   def mkLkl(mod:Model):LikelihoodNode[A]
   def lengthTo:Double
@@ -87,10 +96,9 @@ trait Node[A <: BioEnum]{
 trait LikelihoodNode[A <: BioEnum] extends Node[A]{
   val alphabet:A
   def likelihoods:List[Vector]
-
 }
 
-class CalcLikelihoodNode[A <: BioEnum](children:List[LikelihoodNode[A]],alphabet:A,lengthTo:Double,val model:Model) extends INode[A](children,alphabet,lengthTo) with LikelihoodNode[A]{
+class CalcLikelihoodNode[A <: BioEnum](children:List[LikelihoodNode[A]],alphabet:A,lengthTo:Double,val model:Model,id:Int) extends INode[A](children,alphabet,lengthTo,id) with LikelihoodNode[A]{
   //return a list of the lists of probabilties for each site
 
 
@@ -138,7 +146,7 @@ class CalcLikelihoodNode[A <: BioEnum](children:List[LikelihoodNode[A]],alphabet
   }
 }
 
-class LeafLikelihoodNode[A <: BioEnum](name:String,seq:String,alpha:A,lengthTo:Double) extends Leaf[A](name,seq,alpha,lengthTo) with LikelihoodNode[A]{
+class LeafLikelihoodNode[A <: BioEnum](name:String,seq:String,alpha:A,lengthTo:Double,id:Int) extends Leaf[A](name,seq,alpha,lengthTo,id) with LikelihoodNode[A]{
   val sequence=alphabet.parseString(seq)
   override lazy val likelihoods:List[Vector]={
     val elements = alphabet.matLength
@@ -158,11 +166,11 @@ trait RootNode[A <: BioEnum] extends INode[A]{
   //def factory(children:List[Node[A]],alphabet:A,lengthTo:Double)=new INode[A](children,alphabet,lengthTo) with RootNode[A]
 }
 
-class INode[A <: BioEnum](val children:List[Node[A]],val alphabet:A,val lengthTo:Double) extends Node[A]{
+class INode[A <: BioEnum](val children:List[Node[A]],val alphabet:A,val lengthTo:Double,val id:Int) extends Node[A]{
   
   val name=""
 
-  def factory(c:List[Node[A]],al:A,len:Double)=if (isRoot){new INode[A](c,al,len) with RootNode[A]}else {new INode[A](c,al,len)}
+  def factory(c:List[Node[A]],al:A,len:Double)=if (isRoot){new INode[A](c,al,len,id) with RootNode[A]}else {new INode[A](c,al,len,id)}
 
   def numChildren = children.size
   def childElements:Iterator[Node[A]] = children.elements
@@ -170,9 +178,9 @@ class INode[A <: BioEnum](val children:List[Node[A]],val alphabet:A,val lengthTo
   def length(i:Int):Double=children(i).lengthTo
   def length(n:Node[A]):Double=children.find{node=>node==n}.get.lengthTo
   def mkLkl(mod:Model):CalcLikelihoodNode[A]=if (isRoot){
-    new CalcLikelihoodNode[A](children.map{t=>t.mkLkl(mod)}.toList,alphabet,lengthTo,mod) with RootNode[A]
+    new CalcLikelihoodNode[A](children.map{t=>t.mkLkl(mod)}.toList,alphabet,lengthTo,mod,id) with RootNode[A]
   }else { 
-    new CalcLikelihoodNode[A](children.map{t=>t.mkLkl(mod)}.toList,alphabet,lengthTo,mod) 
+    new CalcLikelihoodNode[A](children.map{t=>t.mkLkl(mod)}.toList,alphabet,lengthTo,mod,id) 
   }
   def restrictTo(allowed:Set[String])={
     val newChildren=children.filter{child=>child.descendents.exists{name=>allowed contains name}}map{_.restrictTo(allowed)}
@@ -209,7 +217,7 @@ class INode[A <: BioEnum](val children:List[Node[A]],val alphabet:A,val lengthTo
     "("+children.mkString(",")+"):"+lengthTo
   }
 
-  def setRoot=new INode[A](children,alphabet,0.0D) with RootNode[A]
+  def setRoot=new INode[A](children,alphabet,0.0D,id) with RootNode[A]
 
   def setBranchLengths(l:List[Double])={
     var listPtr=l.tail
@@ -224,23 +232,23 @@ class INode[A <: BioEnum](val children:List[Node[A]],val alphabet:A,val lengthTo
   def branchTo=descendents.mkString(",")
 }
 
-class Leaf[A <: BioEnum](val name:String,val seq:String,val alphabet:A,val lengthTo:Double) extends Node[A]{
+class Leaf[A <: BioEnum](val name:String,val seq:String,val alphabet:A,val lengthTo:Double, val id:Int) extends Node[A]{
   def descendentNodes=List()
   def setBranchLengths(l:List[Double])={
   //   println("Node " + this + " setting branch length " + l.head)
-     new Leaf[A](name,seq,alphabet,l.head)
+     new Leaf[A](name,seq,alphabet,l.head,id)
  }
-  def mkLkl(mod:Model)=new LeafLikelihoodNode[A](name,seq,alphabet,lengthTo)
+  def mkLkl(mod:Model)=new LeafLikelihoodNode[A](name,seq,alphabet,lengthTo,id)
   def child(i:Int)=None
   def descendents=List(name)
-  def resize(bl:Double) = new Leaf[A](name,seq,alphabet,bl)
+  def resize(bl:Double) = new Leaf[A](name,seq,alphabet,bl,id)
   def numChildren=0
   def removeUseless=this
-  def setAlign(m:Map[String,String])=new Leaf[A](name,m(name),alphabet,lengthTo)
+  def setAlign(m:Map[String,String])=new Leaf[A](name,m(name),alphabet,lengthTo,id)
   def restrictTo(allowed:Set[String])=this
   override def toString=name + ":" + lengthTo
   def getBranchLengths=List(lengthTo)
-  def factory(n:String,s:String,a:A,len:Double)=new Leaf[A](n,s,a,len)
+  def factory(n:String,s:String,a:A,len:Double)=new Leaf[A](n,s,a,len,id)
   def branchTo=name
 }
 

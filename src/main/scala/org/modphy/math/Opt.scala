@@ -13,6 +13,23 @@ class MultFunction(f:Array[Double]=>Double) extends MultivariateRealFunction{
   def value(point:Array[Double])=f(point)
 }
 
+
+
+class Gamma{
+  import org.apache.commons.math.distribution.GammaDistributionImpl
+  val gamma = new GammaDistributionImpl(1.0,1.0)
+
+  def apply(numCat:Int)(shape:Double)={
+    gamma setAlpha shape
+    gamma setBeta shape
+
+    val inter = (0 to numCat-1).map{i => gamma inverseCumulativeProbability (i * 2.0 + 1.0)/(2.0 * numCat)}
+    val mean = inter.foldLeft(0.0){_+_}/numCat
+    inter.map{_/mean}
+  }
+
+}
+
 object Optimiser{
   def sMatMapper(original:Matrix)(array:Array[Double]):Matrix={
     val iter:Iterator[Double]=array.elements
@@ -28,6 +45,12 @@ object Optimiser{
     }
     newmat
   }
+
+  
+
+//  def gammaSMatMapper(original:Matrix)(alpha:Double)(array:Array[Double]):Matrix={
+
+//  }
 
   def piMapper(original:Vector)(array:Array[Double]):Vector={
     val newVec = original.like 
