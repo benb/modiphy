@@ -127,7 +127,7 @@ class CalcLikelihoodNode[A <: BioEnum](children:List[LikelihoodNode[A]],alphabet
      val ret = DoubleFactory1D.dense.make(alphabet.matLength) 
         (0 to alphabet.matLength-1).foreach{i=>
           (0 to alphabet.matLength-1).foreach{j=>
-            ret(j)=ret(j) + siteVector(i) * matrix(i,j)
+            ret(j)=ret(j) + siteVector(i) * matrix(j,i)
           }
         }
         //println("MAP => " +siteVector + " " + ret)
