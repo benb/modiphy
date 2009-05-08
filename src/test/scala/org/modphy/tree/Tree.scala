@@ -58,10 +58,12 @@ petMar1:0.1);"""
   println(tree3)
   assert (tree3.child(0).get.lengthTo==0.0D)
 
-
-  
-
-
+  val treeA=tree
+  val bl = tree.getBranchLengths
+  val treeB=treeA.setBranchLengths(bl)
+  println(treeA)
+  println(treeB)
+  assert(treeA == treeB)
 
   }
 

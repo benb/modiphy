@@ -46,6 +46,7 @@ object MatExp{
 }
 class EnhancedMatrix(d:DoubleMatrix2D){
   type ID={def id:Int}
+  def apply(i:Int)=d.viewRow(i)
   def exp(t:Double)=MatExp.exp(d,t)
   def expVals(t:Double)=sparse.diagonal(dense.diagonal(d).assign( new DoubleFunction(){def apply(arg:Double)={Math.exp(t * arg)}}))
   def *(m:Matrix)=algebra.mult(d,m)
@@ -62,7 +63,7 @@ class EnhancedMatrix(d:DoubleMatrix2D){
     }
     s2
   }
-  def sToQ(pi:Vector)={
+  def sToQ(pi:{def apply(i:Int):Double})={
     val q = symmetrise(d)
     (0 to d.columns-1).foreach{i=>
       q.viewColumn(i).assign(new DoubleFunction(){
@@ -75,14 +76,21 @@ class EnhancedMatrix(d:DoubleMatrix2D){
     }
     q
   }
-  def normalize={
+  def normalize:Matrix=normalize(1.0D)
+  
+  def normalize(i:Double):Matrix={
     val normFact = -(dense.diagonal(d).zSum)
-    d.copy.assign(new DoubleFunction(){def apply(d:Double)=d/normFact})
+    d.copy.assign(new DoubleFunction(){def apply(d:Double)= i * d/normFact})
+  }
+
+  def exists(f: Double=>Boolean):Boolean={
+   d.toArray.toList.exists{row:Array[Double] => row.toList.exists(f)}
   }
 
 }
 class EnhancedVector(d:DoubleMatrix1D){
   type ID={def id:Int}
+  def toList = (0 to d.size -1).map{i=>d.get(i)}.toList
   def elements=d.toArray.elements
   def apply(i:Int):Double=d.get(i)
   def apply(i:ID):Double=apply(i.id)

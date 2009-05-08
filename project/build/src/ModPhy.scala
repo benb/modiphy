@@ -1,6 +1,6 @@
 import sbt._
 
-class ELProject(info: ProjectInfo) extends DefaultProject(info)
+class ModPhyProject(info: ProjectInfo) extends DefaultProject(info)
 {
     //override def mainClass = Some("Test")
 

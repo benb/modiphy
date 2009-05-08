@@ -6,9 +6,10 @@ abstract class BioEnum(names:String*) extends Enumeration(names: _*){
   val matLength:Int
   def parseString(s:String):BioSeq[Value]
   def matElements:List[Value]
+  val numClasses=1
 }
 
-class SiteClassDNA(numClasses:Int) extends BioEnum("A","G","C","T","N","-"){
+class SiteClassDNA(override val numClasses:Int) extends BioEnum("A","G","C","T","N","-"){
   type Base = Value
   val A,G,C,T,N,GAP=Value
   override val matLength=numClasses*4

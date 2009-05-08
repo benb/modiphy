@@ -79,57 +79,91 @@ petMar1:0.1);"""
        import DNA._
 
        val aln = alignment1.seqs.foldLeft(Map[String,String]()){(i,j)=>i+((j._1.replaceAll("\\..*",""),j._2))} //get rid of chromosome info
-       val data = DataParse.dropNodes(tree,aln,DNA)
+       val data = DataParse.dropNodes[DNA.type](tree,aln,DNA)
+
+         println("TREE: " + data._1)
 
        val pi=Vector(4)
        for (i<-DNA.matElements){
          pi(i)=0.25
        }
-       val sMat = Matrix(4,4)
-       val best = Optimiser.optMatNelderMead((0 to 4).map{i=>1.0},pi,Optimiser.sMatMapper(sMat),data._1)
 
-       println(best)
+             val sMat = Matrix(4,4)
+       sMat assign 1
+       val model = new EnhancedModel[DNA.type](pi,sMat,data._1) with OptBranchLengths[DNA.type] 
 
+       val testModel1 = model.logLikelihood
+       println("__________________MODEL1")
+       println(model.pi)
+       println(model.sMat)
+       model.pi(0)=0.001
+       model.pi(1)=0.001
+       model.pi(2)=0.001
+       model.pi(3)=1.0-model.pi(0)-model.pi(1)-model.pi(2)
 
+       println("__________________MODEL2")
+       println(model.pi)
+       println(model.sMat)
 
-     val bestBoth = Optimiser.optModel({new NelderMead})(
-         ((0 to 3).map{i=>0.25},(0 to 4).map{i=>1.0}),
-         (pi,sMat),
-         (Optimiser.piMapper(pi),Optimiser.sMatMapper(sMat)),
-         data._1
-       )
+       val testModel2 = model.logLikelihood
+       println("Likelihoods " + testModel1 + " " + testModel2)
 
-     println(bestBoth)
-
-
-
-       val startBL=data._1.getBranchLengths
-
-       println(startBL)
-       println(data._1)
-
-       val bestModel=(bestBoth._2.sToQ(bestBoth._1).normalize,bestBoth._1)
-       println(bestModel)
-
-       def f = {
-          a:Array[Double]=>
-          if (a.findIndexOf(i=> i < 0)> -1){Math.NEG_INF_DOUBLE}else{
-            val tre =  data._1.setBranchLengths(a.toList).mkLkl(bestModel)
-            val lkl = tre.logLikelihood
-
-            //println(a.toList.mkString("") + " => " + lkl)
-            //  println(tre)
-            lkl 
-          }
-        }
+       assert(testModel2<testModel1)
 
 
-       val best2 = Optimiser.nelderMead(startBL,f)
-       println((best2._1.toList,best2._2))
-       println(data._1.setBranchLengths(best2._1.toList))
+
+       println("START "  + model)
+
+       println("FIT: " + model.toFit.toList.mkString(","))
+       assert (!model.toFit.contains{i:Double => i < -0.00001} && !model.toFit.contains{i:Double=> i < 0.00001})
+       val test = model.toFit.toArray
+       test(2)=1.0D
+       println("FIT2: " + test.mkString(","))
+       model setPi test
+       println("PI2: " + model.pi)
+       val pis = model.pi.toList.sort{_>_}
+       println("PI2B: " + pis.mkString(","))
+       assert(pis(0)>0.25)
+       assert(!(pis.tail.contains{i:Double=>i>0.25}))
+       
+
+       ModelOptimiser.nelderMead[DNA.type](model)
+
+       val lkl1=model.logLikelihood
+       val branchLengths = model.getParams(2)
+       model.setParams(2)(branchLengths)
+       assert((model.logLikelihood-lkl1).abs < 0.0000001)
+
+       println("OPIMISED " + model)
+
+        //alignment is AT biased
+       assert(model.pi(A) > 0.33)
+       assert(model.pi(T) > 0.33)
+
+       //GAMMA
+       object GammaDNA extends SiteClassDNA(4)
+       val gammaModel = new GammaModel[GammaDNA.type](model.pi.copy.assign(0.25),model.sMat.copy.assign(1),data._1.setNewDataType[GammaDNA.type](GammaDNA),1.0) with OptBranchLengths[GammaDNA.type]
+
+       println("BaseLkl " + model.logLikelihood)
+
+       ModelOptimiser.nelderMead[GammaDNA.type](gammaModel)
+
+       println("GammaLkl " + gammaModel.logLikelihood)
+
+       //gammaModel.alpha=0.1
+
+
+       println(model)
+       println(model.logLikelihood)
+       println(gammaModel)
+       println(gammaModel.logLikelihood)
+
+
+       assert(gammaModel.logLikelihood > model.logLikelihood)
 
        
        assert(mafReader.hasNext==false)
+
       }
     }
 

@@ -22,13 +22,13 @@ class MathSuite extends Suite{
       pi(C)=0.25
       pi(G)=0.25
       pi(T)=0.25
-      val model = (sMat sToQ pi,pi)
 
       val fasta = List(">one","AGGT-A-",">two","AGGTCC-",">three","ATGT-A-").elements
       //val tree="((one:0.1,two:0.2):0.12625,three:0.01281);"     
       val tree="(one:0.1,two:0.2);"     
 
       val (rawtre,aln)=DataParse(tree,fasta,DNA)
+      val model = new EnhancedModel(pi,sMat,rawtre)
       assert(aln("one")=="AGGT-A-")
       val tre = rawtre.mkLkl(model)
 
@@ -40,22 +40,21 @@ class MathSuite extends Suite{
       println("LEAF LKL " + leaf.likelihoods)
       assert(leaf.likelihoods.length == "AGGT-A-".length)
 
-      val lkl = tre.mkLkl(model)
+      val lkl = model.getTree
       println("HELLO")
       println("IS ROOT NODE? " + lkl.isRoot)
       assert(lkl.isInstanceOf[RootNode[DNA.type]])
-      println(lkl.likelihoods)
-      println("REAL LKL " + lkl.realLikelihoods)
       assert(lkl.realLikelihoods.last < 1.00001 && lkl.realLikelihoods.last > 0.9999)
       println("LOG LKL " + lkl.logLikelihood)
 
-      val opt = Optimiser.optMatNelderMead((0 to 5).map{i=>1.0},pi,Optimiser.sMatMapper(sMat),tre) 
-      println("Opt mat " + opt._1)
-      println("Opt lkl " + opt._2)
+    
+      ModelOptimiser.nelderMead(model) 
+      println("Opt mat " + model.sMat)
+      println("Opt lkl " + model.logLikelihood)
 
       //in alignment above, there are A->T and A->C but no A->G transitions
-      assert(opt._1(A,C)>opt._1(A,G))
-      assert(opt._1(A,T)>opt._1(A,G))
+      assert(model.sMat(A,C)>model.sMat(A,G))
+      assert(model.sMat(A,T)>model.sMat(A,G))
 
 
       true

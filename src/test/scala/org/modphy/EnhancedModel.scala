@@ -34,7 +34,7 @@ class ModelSuite extends Suite{
     println("Model " + model)
     assert(!model.cromulent)
     println("Cromulent " + model.cromulent)
-    true
+
 
   }
 }

@@ -7,121 +7,61 @@ import org.apache.commons.math.optimization.GoalType._
 import org.apache.commons.math.optimization._
 import org.apache.commons.math.optimization.direct._
 import cern.colt.function.DoubleFunction
+import DataParse._
+import tlf.Logging
 
 
 class MultFunction(f:Array[Double]=>Double) extends MultivariateRealFunction{
   def value(point:Array[Double])=f(point)
 }
 
+object ModelOptimiser extends Logging{
 
-
-class Gamma{
-  import org.apache.commons.math.distribution.GammaDistributionImpl
-  val gamma = new GammaDistributionImpl(1.0,1.0)
-
-  def apply(numCat:Int)(shape:Double)={
-    gamma setAlpha shape
-    gamma setBeta shape
-
-    val inter = (0 to numCat-1).map{i => gamma inverseCumulativeProbability (i * 2.0 + 1.0)/(2.0 * numCat)}
-    val mean = inter.foldLeft(0.0){_+_}/numCat
-    inter.map{_/mean}
-  }
-
-}
-
-object Optimiser{
-  def sMatMapper(original:Matrix)(array:Array[Double]):Matrix={
-    val iter:Iterator[Double]=array.elements
-    val newmat=original.like
-    (0 to newmat.rows-1).foreach{i=>
-      (i+1 to newmat.columns-1).foreach{j=>
-        if (iter.hasNext){
-          newmat(i,j)=iter.next
-        }else{ //by passing in a shorter array, remaining elements set to 1
-          newmat(i,j)=1
-        }
-      }
-    }
-    newmat
-  }
-
-  
-
-//  def gammaSMatMapper(original:Matrix)(alpha:Double)(array:Array[Double]):Matrix={
-
-//  }
-
-  def piMapper(original:Vector)(array:Array[Double]):Vector={
-    val newVec = original.like 
-    println("oldvec " + newVec)
-    newVec.assign(array)
-    println("newvec " + newVec)
-    val total = newVec.zSum
-    newVec.assign(new DoubleFunction(){def apply(x:Double)=x/total})
-    newVec
-  }
-
-  def opt(opt:MultivariateRealOptimizer)(start:Seq[Double],f:Array[Double]=>Double)={
-    val result = opt.optimize(new MultFunction(f),MAXIMIZE,start.toArray)
-    (result.getPoint,result.getValue)
-  }
-  def nelderMead=opt(new NelderMead)_
-
-  def optMat[A <: BioEnum](opt:MultivariateRealOptimizer)(start:Seq[Double],pi:Vector,mapper:Array[Double]=>Matrix,tree:INode[A])={
-    def func(point:Array[Double]) = {
-      if (point.findIndexOf{i=> i < 0.0D} > -1){Math.NEG_INF_DOUBLE}
-      else{
-        val ans = tree.mkLkl(mapper(point).sToQ(pi).normalize,pi).logLikelihood
-        //println("f("+ point.mkString(",") + ") = " + ans)
-        //if (ans.isNaN){throw new org.apache.commons.math.FunctionEvaluationException(point)}
-        if (ans.isNaN){Math.NEG_INF_DOUBLE}else{ans}
-      }
-    }
-    val result = opt.optimize(new MultFunction(func),MAXIMIZE,start.toArray)
-    (mapper(result.getPoint),result.getValue,result.getPoint)
-  }
-  def optPi[A <: BioEnum](opt:MultivariateRealOptimizer)(start:Seq[Double],sMat:Matrix,mapper:Array[Double]=>Vector,tree:INode[A])={
-    def func(point:Array[Double]) = {
-      if (point.findIndexOf{i=> i <= 0.0D} > -1){Math.NEG_INF_DOUBLE}
-      else{
-        val pi = mapper(point)
-        val ans = tree.mkLkl(sMat.sToQ(pi).normalize,pi).logLikelihood
-        //println("f("+ point.mkString(",") + ") = " + ans)
-        //if (ans.isNaN){throw new org.apache.commons.math.FunctionEvaluationException(point)}
-        if (ans.isNaN){Math.NEG_INF_DOUBLE}else{ans}
-      }
-    }
-    val result = opt.optimize(new MultFunction(func),MAXIMIZE,start.toArray)
-    (mapper(result.getPoint),result.getValue,result.getPoint)
-  }
-
-  def optModel[A <: BioEnum](optFactory: => MultivariateRealOptimizer)(start:(Seq[Double],Seq[Double]),model:(Vector,Matrix),mapper:(Array[Double]=>Vector,Array[Double]=>Matrix),tree:INode[A])={
-    var startPi = start._1.toArray
-    var startMat=start._2.toArray
-    def getPi=mapper._1(startPi)
-    def getQ=mapper._2(startMat).sToQ(getPi).normalize
-    println("Start Q " + getQ)
-    var newLkl=tree.mkLkl((getQ,getPi)).logLikelihood
-    var startLkl=Math.NEG_INF_DOUBLE
-    val cutoff=0.01
-   while (newLkl - startLkl > cutoff){
+  def optimise[A <: BioEnum](optFactory: => MultivariateRealOptimizer)(model:Model[A])={
+    var startLkl = model.logLikelihood
+    var newLkl=startLkl
+    do {
       startLkl = newLkl
-      println("Starting " + getPi + "\n" + getQ + "\n" + newLkl)
-      val ans = optPi(optFactory)(startPi,getQ,mapper._1,tree)
-      startPi = ans._3
-      println("Opt " + getPi + "\n" + getQ + "\n" + ans._2)
-      val ans2 = optMat(optFactory)(startMat,getPi,mapper._2,tree)
-      startMat=ans._3
-      newLkl=ans2._2
-      println("Opt " + getPi + "\n" + getQ + "\n" + ans2._2)
-    }
-    (mapper._1(startPi.toArray),mapper._2(startMat.toArray),newLkl,startPi,startMat)
+      val startModels = model.getParams
+      info{"START OPT" + model + "\n" + model.logLikelihood}
+      startModels.zipWithIndex.foreach{t=> 
+        val (start,index)=t
+        val result = optFactory.optimize(new MultFunction({ d:Array[Double]=>
+            model.setParams(index)(d)
+            val lkl = model.logLikelihood
+            debug{"f: " + d.toList.mkString(",") + " => " + lkl}
+            if (lkl.isNaN){Math.NEG_INF_DOUBLE}else{ lkl}
+        }
+        ),MAXIMIZE,start.toArray)
+        model.setParams(index)(result.getPoint)
+        info{"OPT " + index + "\n" +  model + "\n" + model.logLikelihood}
+        finest{model.likelihoods.mkString(" ")}
+        finest{model.realLikelihoods.mkString(" ")}
+        newLkl = result.getValue
+        true
+      }
+    } while (newLkl - startLkl > 0.03)
+    model
   }
+  def nelderMead[A <: BioEnum](model:Model[A])=optimise[A](getNelderMead)(model)
+  def multiDirectional[A <: BioEnum](model:Model[A])=optimise[A](getMultiDirectional)(model)
+  object DefaultConvergence extends RealConvergenceChecker{
+    import   org.apache.commons.math.optimization.RealPointValuePair
+    def converged(iter:Int,oldPt:RealPointValuePair,newPt:RealPointValuePair)={iter > 1000 || newPt.getValue - oldPt.getValue < 0.01} 
+  }
+  def getNelderMead={
+    val opt = new NelderMead
+    opt.setConvergenceChecker(DefaultConvergence)
+    opt
+    }
 
-  
+  def getMultiDirectional={
+    val opt = new MultiDirectional
+    opt.setConvergenceChecker(DefaultConvergence)
+    opt
 
-
-  def optMatNelderMead[A <: BioEnum] = optMat[A](new NelderMead)_
+    }
 
 }
+
+
