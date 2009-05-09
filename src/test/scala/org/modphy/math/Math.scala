@@ -27,8 +27,8 @@ class MathSuite extends Suite{
       //val tree="((one:0.1,two:0.2):0.12625,three:0.01281);"     
       val tree="(one:0.1,two:0.2);"     
 
-      val (rawtre,aln)=DataParse(tree,fasta,DNA)
-      val model = new EnhancedModel(pi,sMat,rawtre)
+      val (rawtre,aln)=DataParse[DNA.type](tree,fasta,DNA)
+      val model = new EnhancedModel[DNA.type](pi,sMat,rawtre)
       assert(aln("one")=="AGGT-A-")
       val tre = rawtre.mkLkl(model)
 
@@ -45,10 +45,10 @@ class MathSuite extends Suite{
       println("IS ROOT NODE? " + lkl.isRoot)
       assert(lkl.isInstanceOf[RootNode[DNA.type]])
       assert(lkl.realLikelihoods.last < 1.00001 && lkl.realLikelihoods.last > 0.9999)
-      println("LOG LKL " + lkl.logLikelihood)
+      println("LOG LKL " + model.logLikelihood)
 
     
-      ModelOptimiser.nelderMead(model) 
+      ModelOptimiser.nelderMead[DNA.type](model) 
       println("Opt mat " + model.sMat)
       println("Opt lkl " + model.logLikelihood)
 

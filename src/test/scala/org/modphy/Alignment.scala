@@ -142,9 +142,11 @@ petMar1:0.1);"""
 
        //GAMMA
        object GammaDNA extends SiteClassDNA(4)
-       val gammaModel = new GammaModel[GammaDNA.type](model.pi.copy.assign(0.25),model.sMat.copy.assign(1),data._1.setNewDataType[GammaDNA.type](GammaDNA),1.0) with OptBranchLengths[GammaDNA.type]
+       val gammaModel = new GammaModel[GammaDNA.type](model.pi.copy,model.sMat.copy,data._1.setNewDataType[GammaDNA.type](GammaDNA)) with OptBranchLengths[GammaDNA.type]
 
        println("BaseLkl " + model.logLikelihood)
+       println("GammaLkl(start) " + gammaModel.logLikelihood)
+       println("Gamma params " + gammaModel.getParams)
 
        ModelOptimiser.nelderMead[GammaDNA.type](gammaModel)
 

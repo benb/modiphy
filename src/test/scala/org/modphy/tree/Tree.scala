@@ -38,7 +38,7 @@ anoCar1:0.513962):0.093688):0.151358,xenTro2:0.778272):0.174596,
 petMar1:0.1);"""
 
   
-  val tree = DataParse(treeTxt,DNA)
+  val tree = DataParse[DNA.type](treeTxt,DNA)
 
 
   assert(tree.descendents contains "cavPor3")
@@ -47,15 +47,13 @@ petMar1:0.1);"""
 
   assert(tree.isInstanceOf[RootNode[DNA.type]])
   
-  true
-
   val treeTxt2="((one:0.1,two:0.1):0.2,three:0.1);"
-  val tree2 = DataParse(treeTxt2,DNA)
-  val tree3 = tree2.setBranchLengths({1 to 4}.map{i=>0.0}.toList)
+  val tree2 = DataParse[DNA.type](treeTxt2,DNA)
+  val tree3 = tree2.setBranchLengths(tree2.getBranchLengths.map{i=>0.0})
   assert(tree3.isInstanceOf[RootNode[DNA.type]])
 
 
-  println(tree3)
+  println("ZEROED TREE " + tree3)
   assert (tree3.child(0).get.lengthTo==0.0D)
 
   val treeA=tree
@@ -63,7 +61,7 @@ petMar1:0.1);"""
   val treeB=treeA.setBranchLengths(bl)
   println(treeA)
   println(treeB)
-  assert(treeA == treeB)
+  assert(treeA.getBranchLengths == treeB.getBranchLengths)
 
   }
 
