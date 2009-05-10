@@ -5,6 +5,8 @@ import org.modphy.tree._
 import org.modphy.math._
 import org.modphy.math.EnhancedMatrix._
 import org.apache.commons.math.optimization.direct._
+import tlf._
+import tlf.Level._
 
 
 
@@ -88,7 +90,7 @@ petMar1:0.1);"""
          pi(i)=0.25
        }
 
-             val sMat = Matrix(4,4)
+       val sMat = Matrix(4,4)
        sMat assign 1
        val model = new EnhancedModel[DNA.type](pi,sMat,data._1) with OptBranchLengths[DNA.type] 
 
@@ -144,24 +146,56 @@ petMar1:0.1);"""
        object GammaDNA extends SiteClassDNA(4)
        val gammaModel = new GammaModel[GammaDNA.type](model.pi.copy,model.sMat.copy,data._1.setNewDataType[GammaDNA.type](GammaDNA)) with OptBranchLengths[GammaDNA.type]
 
+       ModelOptimiser.nelderMead[GammaDNA.type](gammaModel)
+
+       val gammaPi = gammaModel.pi.copy
+       val gammaS = gammaModel.sMat.copy
+       val gammaTree = gammaModel.tree
+
+
        println("BaseLkl " + model.logLikelihood)
        println("GammaLkl(start) " + gammaModel.logLikelihood)
        println("Gamma params " + gammaModel.getParams)
 
-       ModelOptimiser.nelderMead[GammaDNA.type](gammaModel)
+
+       val nodeSet = data._1.nodes.filter{i=>i.descendents.size==2 && i.descendents.contains("panTro2") && i.descendents.contains("hg18")}.foldLeft(Set[Int]()){_+_.id}
+       assert(nodeSet.size==1)
+
+       val dualGammaModel = new GammaModel[GammaDNA.type](gammaPi,gammaS,gammaTree) with OptBranchLengths[GammaDNA.type] with AlternateModel[GammaDNA.type] {
+         val nodeIDs = {nodeSet}
+         val altModel = {new GammaModel[GammaDNA.type](gammaPi,gammaS,gammaTree)}
+       }
+       println("Optimising dualModel")
+       //Logging.toStdout
+       //ModelOptimiser.logLevel = Debug
+       //dualGammaModel.logLevel = Debug
+
+       ModelOptimiser.nelderMead[GammaDNA.type](dualGammaModel)
+
+
+       println(dualGammaModel)
+       println(dualGammaModel.logLikelihood)
 
        println("GammaLkl " + gammaModel.logLikelihood)
 
        //gammaModel.alpha=0.1
 
 
+       assert(dualGammaModel.getParams.length == gammaModel.getParams.length+1)
+       println(dualGammaModel.getParams.length)
+       ModelOptimiser.nelderMead[GammaDNA.type](dualGammaModel)
+
+
        println(model)
        println(model.logLikelihood)
        println(gammaModel)
        println(gammaModel.logLikelihood)
+       println(dualGammaModel)
+       println(dualGammaModel.logLikelihood)
 
 
        assert(gammaModel.logLikelihood > model.logLikelihood)
+       assert(dualGammaModel.logLikelihood > gammaModel.logLikelihood)
 
        
        assert(mafReader.hasNext==false)

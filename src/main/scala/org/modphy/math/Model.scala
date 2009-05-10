@@ -6,15 +6,21 @@ import org.modphy.sequence._
 import org.modphy.math.EnhancedMatrix._
 import org.modphy.tree.DataParse._
 import scala.collection.immutable.IntMap
+import tlf.Logging
 
 class UnknownParamException(i:Int) extends java.lang.RuntimeException("Unknown parameter " + i.toString)
-trait Model[A <: BioEnum]{
+trait Model[A <: BioEnum] extends Logging{
   def logLikelihood=if (cromulent){tree.mkLkl(this).logLikelihood}else{Math.NEG_INF_DOUBLE}
   def getParams:List[Array[Double]] = List()
   def setParams(paramSet:Int)(params:Array[Double]){}
   def cromulent = true
   var tree:Tree[A]
-  def getMat(node:CalcLikelihoodNode[A]):Matrix
+  def qMat(node:CalcLikelihoodNode[A])={
+    sMat.sToQ(pi).normalize
+
+  }
+
+  def getMat(node:CalcLikelihoodNode[A])={ qMat(node).exp(node.lengthTo) }
   def likelihoods(node:CalcLikelihoodNode[A])={
     val childLkl = node.childElements.map{i:LikelihoodNode[A]=>(i.likelihoods,i.lengthTo)}
     val intermediates= childLkl.map{t=>
@@ -60,9 +66,9 @@ trait Model[A <: BioEnum]{
 
 trait OptBranchLengths[A <: BioEnum] extends Model[A]{
   var tree:Tree[A]
-  val treeParamNum = super.getParams.length
+  private val paramNum = super.getParams.length
   override def setParams(i:Int)(a:Array[Double])={
-    if (i != treeParamNum){super.setParams(i)(a)}
+    if (i != paramNum){super.setParams(i)(a)}
     else {tree = tree.setBranchLengths(a.toList).setRoot}
   }
   override def getParams:List[Array[Double]]={
@@ -76,10 +82,10 @@ trait OptBranchLengths[A <: BioEnum] extends Model[A]{
 
 trait OptBranchScale[A <: BioEnum] extends Model[A]{
   var tree:Tree[A]
-  val treeScaleParamNum = super.getParams.length
+  private val paramNum = super.getParams.length
   val originalBranchLengths = tree.getBranchLengths
   override def setParams(i:Int)(a:Array[Double])={
-    if (i != treeScaleParamNum){super.setParams(i)(a)}
+    if (i != paramNum){super.setParams(i)(a)}
     else {tree = tree.setBranchLengths(originalBranchLengths.map{i=>i*a(0)}).setRoot}
   }
   def scale = tree.getBranchLengths.head/originalBranchLengths.head 
@@ -94,10 +100,11 @@ trait OptBranchScale[A <: BioEnum] extends Model[A]{
 
 trait CombineOpt[A <: BioEnum] extends Model[A]{
   def toCombine:List[Int]
+  //following params need to be lazy so they are not evaluated until the rest of the model is set up
   // a mapping from new indicies to old
-  val paramMap=super.getParams.zipWithIndex.filter{t=>val (p,i)=t;!(toCombine.exists{j=>j==i})}.map(_._2).zipWithIndex.foldLeft(IntMap[Int]():Map[Int,Int]){(m,t)=>m+((t._2,t._1))}
-  val thisParam = super.getParams.length
-  val paramLengths = super.getParams.zipWithIndex.filter{t=>toCombine.exists{j=>j==t._2}}.map{_._1.length}
+  lazy val paramMap=super.getParams.zipWithIndex.filter{t=>val (p,i)=t;!(toCombine.exists{j=>j==i})}.map(_._2).zipWithIndex.foldLeft(IntMap[Int]():Map[Int,Int]){(m,t)=>m+((t._2,t._1))}
+  private lazy val paramNum = super.getParams.length - toCombine.length
+  lazy val paramLengths = super.getParams.zipWithIndex.filter{t=>toCombine.exists{j=>j==t._2}}.map{_._1.length}
   override def getParams:List[Array[Double]]={
     val start = super.getParams
     //not super efficient but this should be rarely called
@@ -107,7 +114,7 @@ trait CombineOpt[A <: BioEnum] extends Model[A]{
     if (paramMap contains i){
       super.setParams(paramMap(i))(a)
     }else {
-      if (i==thisParam){
+      if (i==paramNum){
         var listPtr = a.toList
         paramLengths.zip(toCombine).foreach{t=>
           val (length,index)=t
@@ -130,23 +137,16 @@ object Gamma{
   val cache = new scala.collection.jcl.WeakHashMap[(Int,Double),Seq[Double]]()
 }
 class Gamma(numCat:Int){
-  import net.sf.doodleproject.numerics4j.statistics.distribution.GammaDistribution
+  import pal.substmodel.GammaRates
 
   import Gamma._
-  val gamma = new GammaDistribution(1.0,1.0)
 
+    val gamma = new GammaRates(numCat,1.0)
     def apply(shape:Double):Seq[Double]={
     if (shape < 150.0D){
       cache.getOrElseUpdate((numCat,shape),{
-        
-         
-          gamma setAlpha (shape + 1E-10)
-          gamma setBeta (shape + 1E-10)
-          //+ 1E-10 seems to avoid convergence exceptions!
-
-            val inter = (0 to numCat-1).map{i => gamma inverseCumulativeProbability (i * 2.0 + 1.0)/(2.0 * numCat)}
-            val mean = inter.foldLeft(0.0){_+_}/numCat
-            inter.map{_/mean}
+          gamma setParameter (shape,0)
+          gamma getRates
         }
         )
     }else {
@@ -156,6 +156,38 @@ class Gamma(numCat:Int){
   }
 }
 
+trait AlternateModel[A <: BioEnum] extends Model[A]{
+  val nodeIDs:Set[Int]
+  val altModel:Model[A]
+  def altModelParam:Int = altModel.getParams.length-1
+  private val paramNum=super.getParams.length
+  override def qMat(n:CalcLikelihoodNode[A])={
+    if (nodeIDs contains n.id){
+      debug{"Using altmodel as " + nodeIDs + " contains " + n.id}
+      altModel.qMat(n)
+    }else {
+      debug{"Using regular model as " + nodeIDs + " does not contain " + n.id}
+      super.qMat(n)
+    }
+  }
+  override def getParams:List[Array[Double]]={
+    //default to last parameter of altModel
+    super.getParams ++ List(altModel.getParams.last)
+  }
+  override def setParams(i:Int)(a:Array[Double])={
+    if (i==paramNum){
+      altModel.setParams(altModelParam)(a)
+    }else {
+      super.setParams(altModelParam)(a)
+    }
+  }
+  override def cromulent = super.cromulent && altModel.cromulent
+  override def toString = {
+    super.toString + "\n" + 
+    "alt: {\n " + altModel.toString + "\n"+
+    "} "
+  }
+}
 
 class GammaModel[A <: BioEnum](val pi:Vector,val sMat:Matrix,var tree:Tree[A]) extends SiteClassPiModel[A] with GammaSMat[A]
 
@@ -164,10 +196,12 @@ trait GammaSMat [A <: BioEnum] extends SMat[A]{
   var alpha=1.0
   val alphabet = tree.alphabet
   val numClasses = alphabet.numClasses
-  val gammaParamNum = super.getParams.length
+  private val paramNum = super.getParams.length
   val gamma = new Gamma(numClasses)
 
-  override def qMat(node:CalcLikelihoodNode[A]) = {
+  override def qMat(node:CalcLikelihoodNode[A]) = gammaQMat
+  def gammaQMat={
+    debug{"Gamma matrix with gamma value " + alpha}
     val gammaVals = gamma(alpha).toList
     val piCat = pi.toArray
     (0 to pi.size-1).foreach{i=> piCat(i)/=numClasses}
@@ -177,6 +211,14 @@ trait GammaSMat [A <: BioEnum] extends SMat[A]{
       val part = qStart.viewPart(i * numClasses,i*numClasses,pi.size,pi.size)
       part.assign(sMat.sToQ(piCat).normalize(rate))
     }
+    if (qStart exists {d=>d.isNaN}){
+      println("ERROR ")
+      println(getParams.map{_.toList}.mkString(","))
+      println("produces sMat " + sMat)
+      println("and pi " + piVals)
+      println("gamma Rates " + gammaVals)
+      println("qMat " + qStart)
+    }
     qStart
   }
   
@@ -185,15 +227,13 @@ trait GammaSMat [A <: BioEnum] extends SMat[A]{
   }
 
   override def cromulent  = {
-    import net.sf.doodleproject.numerics4j.exception.ConvergenceException 
-    val ok = super.cromulent && alpha > 0.0D && alpha < 200.0D 
-    val converges:Boolean = try{gamma(alpha);true}catch{case e: Exception => false}
-    ok && converges
+    super.cromulent && alpha > 0.0D && alpha < 200.0D && gamma(alpha).toList.find{_.isNaN}.isEmpty
     //no point having alpha go higher - count as infinity
   }
 
   override def setParams(i:Int)(a:Array[Double])={
-    if (i != gammaParamNum){super.setParams(i)(a)}
+    debug{"Setting main alpha => " + a(0)}
+    if (i != paramNum){super.setParams(i)(a)}
     else {alpha = a(0)}
   }
 
@@ -264,12 +304,6 @@ trait SMat[A <: BioEnum] extends Model[A]{
   import cern.colt.function.DoubleFunction
 
   override def cromulent = super.cromulent && !(sMat exists {i=> i < 0.0D}) 
-
-  def qMat(node:CalcLikelihoodNode[A])=sMat.sToQ(pi).normalize
-  def getMat(node:CalcLikelihoodNode[A])={
-    qMat(node).exp(node.lengthTo)
-  }
-
 
   def linearSMat:Seq[Double]={
     val list = (0 to sMat.rows -3).map{ i=> // skip last elment...

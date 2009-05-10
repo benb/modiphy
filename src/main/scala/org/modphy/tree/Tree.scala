@@ -90,6 +90,8 @@ trait Node[A <: BioEnum] extends Logging{
   def getBranchLengths:List[Double]
   def branchTo:String
   def setNewDataType[B <: BioEnum](alphabet:B):Node[B]
+
+  def nodes=this::descendentNodes
 }
 
 trait LikelihoodNode[A <: BioEnum] extends Node[A]{

@@ -29,7 +29,7 @@ object ModelOptimiser extends Logging{
         val result = optFactory.optimize(new MultFunction({ d:Array[Double]=>
             model.setParams(index)(d)
             val lkl = model.logLikelihood
-            debug{"f: " + d.toList.mkString(",") + " => " + lkl}
+            debug{"f" + index +": " + d.toList.mkString(",") + " => " + lkl}
             if (lkl.isNaN){Math.NEG_INF_DOUBLE}else{ lkl}
         }
         ),MAXIMIZE,start.toArray)
