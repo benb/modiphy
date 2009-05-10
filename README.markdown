@@ -12,13 +12,13 @@ can be declared by mixing in parameters.
 
 For instance, to declare models like:
 
-//standard model
-val model = new Model[DNA] with GTR
-//gamma model
-val model2 = new Model[DNA] with GTR with GammaRates
-//model where nodes 2,3 have different gamma rate
-val model3 = new Model[DNA] with GTR with GammaRates with AltModel{val altModel=new GammaRates;val altNodes=List(2,3)}
-
+    //standard model
+    val model = new Model[DNA] with GTR
+    //gamma model
+    val model2 = new Model[DNA] with GTR with GammaRates
+    //model where nodes 2,3 have different gamma rate
+    val model3 = new Model[DNA] with GTR with GammaRates with AltModel{val altModel=new GammaRates;val altNodes=List(2,3)}
+    
 It won't quite be that simple - but you get the idea.
 
 Status
@@ -39,13 +39,18 @@ Problems
 I periodically get a load of build errors, where scala can't tell that my model classes
 inherit from the base trait Model. Removing target/ and rebuilding seems to fix things.
 
+License
+=======
+
+Modiphy is licensed under the MIT/X license.
+
 Building:
 =========
 
 Dependencies:
 
 Put colt-1.2.0.jar in lib/ (can't get from MVN repo as they are mistagged!)
-You also need need a [commons-math-2.0-snapshot](http://commons.apache.org/math/).jar
+You also need need [commons-math-2.0-snapshot](http://commons.apache.org/math/).jar
 (I use the optimisation routines), as well as
 [pal-1.5.1](http://www.cebl.auckland.ac.nz/pal-project/download.html).jar (I use
 the Gamma Distribution routines) in lib/.
