@@ -1,0 +1,219 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+        <head><title>class TreeParser in org.modiphy.tree</title>
+        <meta http-equiv="content-type" content="text/html; charset=UTF8"></meta><meta content="scaladoc (version 2.7.4.final)" name="generator"></meta><link href="../../../style.css" type="text/css" rel="stylesheet"></link><script type="text/javascript" src="../../../script.js"></script>
+        </head>
+        <body onload="init()">
+        <table summary="" class="navigation">
+        <tr>
+          <td class="navigation-links" valign="top">
+            <!-- <table><tr></tr></table> -->
+          </td>
+          <td align="right" valign="top" style="white-space:nowrap;" rowspan="2">
+            <div class="doctitle-larger">Modiphy 0.2.0 API</div>
+          </td>
+        </tr>
+        <tr><td></td></tr>
+      </table>
+        
+      <div class="entity">
+        <a href="../../../org/modiphy/tree$package.html" target="_self">org.modiphy.tree</a>
+        <br></br>
+        <span class="entity">class  TreeParser</span>
+      </div><hr></hr>
+      <div class="source">
+        [source: <a href="" class="org/modiphy/tree/TreeParser"><code>org/modiphy/tree/TreeParser.scala</code></a>]
+      </div><hr></hr>
+      <a name="TreeParser"></a><dl>
+      <dt>
+        
+        <code></code>
+        <code>class</code>
+        <em>TreeParser</em>[<em>A</em> &lt;: <a href="../../../org/modiphy/sequence/BioEnum.html" target="_self">BioEnum</a>](<em>m</em> : (<a href="" target="contentFrame" class="java/lang/String">java.lang.String</a>) =&gt; <a href="" target="contentFrame" class="java/lang/String">java.lang.String</a>, <em>alphabet</em> : <a href="../../../org/modiphy/tree/TreeParser.html#A" target="_self">A</a>)
+      </dt>
+      <dd><code> extends </code><a href="" target="contentFrame" class="scala/util/parsing/combinator/JavaTokenParsers">scala.util.parsing.combinator.JavaTokenParsers</a></dd>
+    </dl>
+      <dl><dd>Used internally for parsing trees</dd></dl>
+      <dl></dl>
+    
+      
+
+<table summary="" cellpadding="3" class="member">
+      <tr><td class="title" colspan="2">Value Summary</td></tr>
+      <tr>
+      <td class="modifiers" valign="top"> 
+        <code> val</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../../org/modiphy/tree/TreeParser.html#treegen" target="_self">treegen</a></em>
+         : <a href="../../../org/modiphy/tree/TreeGen.html" target="_self">TreeGen</a>[<a href="../../../org/modiphy/tree/TreeParser.html#A" target="_self">A</a>]
+        
+        
+      </td>
+    </tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Values and Variables inherited from <a href="" target="contentFrame" class="scala/util/parsing/combinator/RegexParsers">scala.util.parsing.combinator.RegexParsers</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="#whiteSpace" target="contentFrame" class="scala/util/parsing/combinator/RegexParsers">scala.util.parsing.combinator.RegexParsers.whiteSpace</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Values and Variables inherited from <a href="" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="#lastNoSuccess" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.lastNoSuccess</a>
+        </td></tr>
+      </table>
+<table summary="" cellpadding="3" class="member">
+      <tr><td class="title" colspan="2">Method Summary</td></tr>
+      <tr>
+      <td class="modifiers" valign="top"> 
+        <code> def</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../../org/modiphy/tree/TreeParser.html#leaf" target="_self">leaf</a></em>
+         : <a href="" target="contentFrame" class="scala/util/parsing/combinator/Parsers/Parser">scala.util.parsing.combinator.Parsers.Parser</a>[<a href="../../../org/modiphy/tree/Leaf.html" target="_self">Leaf</a>[<a href="../../../org/modiphy/tree/TreeParser.html#A" target="_self">A</a>]]
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code> def</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../../org/modiphy/tree/TreeParser.html#node" target="_self">node</a></em>
+         : <a href="" target="contentFrame" class="scala/util/parsing/combinator/Parsers/Parser">scala.util.parsing.combinator.Parsers.Parser</a>[<a href="../../../org/modiphy/tree/Node.html" target="_self">Node</a>[<a href="../../../org/modiphy/tree/TreeParser.html#A" target="_self">A</a>]]
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code> def</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../../org/modiphy/tree/TreeParser.html#root" target="_self">root</a></em>
+         : <a href="" target="contentFrame" class="scala/util/parsing/combinator/Parsers/Parser">scala.util.parsing.combinator.Parsers.Parser</a>[<a href="../../../org/modiphy/tree/INode.html" target="_self">INode</a>[<a href="../../../org/modiphy/tree/TreeParser.html#A" target="_self">A</a>]]
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code> def</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../../org/modiphy/tree/TreeParser.html#seqName" target="_self">seqName</a></em>
+         : <a href="" target="contentFrame" class="scala/util/parsing/combinator/Parsers/Parser">scala.util.parsing.combinator.Parsers.Parser</a>[<a href="" target="contentFrame" class="java/lang/String">java.lang.String</a>]
+        
+        
+      </td>
+    </tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="" target="contentFrame" class="scala/util/parsing/combinator/JavaTokenParsers">scala.util.parsing.combinator.JavaTokenParsers</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="#ident" target="contentFrame" class="scala/util/parsing/combinator/JavaTokenParsers">scala.util.parsing.combinator.JavaTokenParsers.ident</a>, <a href="#wholeNumber" target="contentFrame" class="scala/util/parsing/combinator/JavaTokenParsers">scala.util.parsing.combinator.JavaTokenParsers.wholeNumber</a>, <a href="#decimalNumber" target="contentFrame" class="scala/util/parsing/combinator/JavaTokenParsers">scala.util.parsing.combinator.JavaTokenParsers.decimalNumber</a>, <a href="#stringLiteral" target="contentFrame" class="scala/util/parsing/combinator/JavaTokenParsers">scala.util.parsing.combinator.JavaTokenParsers.stringLiteral</a>, <a href="#floatingPointNumber" target="contentFrame" class="scala/util/parsing/combinator/JavaTokenParsers">scala.util.parsing.combinator.JavaTokenParsers.floatingPointNumber</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="" target="contentFrame" class="scala/util/parsing/combinator/RegexParsers">scala.util.parsing.combinator.RegexParsers</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="#skipWhitespace" target="contentFrame" class="scala/util/parsing/combinator/RegexParsers">scala.util.parsing.combinator.RegexParsers.skipWhitespace</a>, <a href="#handleWhiteSpace" target="contentFrame" class="scala/util/parsing/combinator/RegexParsers">scala.util.parsing.combinator.RegexParsers.handleWhiteSpace</a>, <a href="#literal" target="contentFrame" class="scala/util/parsing/combinator/RegexParsers">scala.util.parsing.combinator.RegexParsers.literal</a>, <a href="#regex" target="contentFrame" class="scala/util/parsing/combinator/RegexParsers">scala.util.parsing.combinator.RegexParsers.regex</a>, <a href="#phrase" target="contentFrame" class="scala/util/parsing/combinator/RegexParsers">scala.util.parsing.combinator.RegexParsers.phrase</a>, <a href="#parse" target="contentFrame" class="scala/util/parsing/combinator/RegexParsers">scala.util.parsing.combinator.RegexParsers.parse</a>, <a href="#parse" target="contentFrame" class="scala/util/parsing/combinator/RegexParsers">scala.util.parsing.combinator.RegexParsers.parse</a>, <a href="#parse" target="contentFrame" class="scala/util/parsing/combinator/RegexParsers">scala.util.parsing.combinator.RegexParsers.parse</a>, <a href="#parseAll" target="contentFrame" class="scala/util/parsing/combinator/RegexParsers">scala.util.parsing.combinator.RegexParsers.parseAll</a>, <a href="#parseAll" target="contentFrame" class="scala/util/parsing/combinator/RegexParsers">scala.util.parsing.combinator.RegexParsers.parseAll</a>, <a href="#parseAll" target="contentFrame" class="scala/util/parsing/combinator/RegexParsers">scala.util.parsing.combinator.RegexParsers.parseAll</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="#Parser" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.Parser</a>, <a href="#OnceParser" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.OnceParser</a>, <a href="#commit" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.commit</a>, <a href="#elem" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.elem</a>, <a href="#elem" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.elem</a>, <a href="#accept" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.accept</a>, <a href="#accept" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.accept</a>, <a href="#accept" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.accept</a>, <a href="#acceptIf" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.acceptIf</a>, <a href="#acceptMatch" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.acceptMatch</a>, <a href="#acceptSeq" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.acceptSeq</a>, <a href="#failure" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.failure</a>, <a href="#err" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.err</a>, <a href="#success" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.success</a>, <a href="#log" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.log</a>, <a href="#rep" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.rep</a>, <a href="#repsep" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.repsep</a>, <a href="#rep1" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.rep1</a>, <a href="#rep1" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.rep1</a>, <a href="#repN" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.repN</a>, <a href="#rep1sep" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.rep1sep</a>, <a href="#chainl1" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.chainl1</a>, <a href="#chainl1" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.chainl1</a>, <a href="#chainr1" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.chainr1</a>, <a href="#opt" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.opt</a>, <a href="#not" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.not</a>, <a href="#positioned" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.positioned</a>, <a href="#mkList" target="contentFrame" class="scala/util/parsing/combinator/Parsers">scala.util.parsing.combinator.Parsers.mkList</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html" target="_self">AnyRef</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#getClass%28%29" target="_self">getClass</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#hashCode%28%29" target="_self">hashCode</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#equals%28Any%29" target="_self">equals</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#clone%28%29" target="_self">clone</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#toString%28%29" target="_self">toString</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#notify%28%29" target="_self">notify</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#notifyAll%28%29" target="_self">notifyAll</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#wait%28Long%29" target="_self">wait</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#wait%28Long%2CInt%29" target="_self">wait</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#wait%28%29" target="_self">wait</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#finalize%28%29" target="_self">finalize</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#%3D%3D%28AnyRef%29" target="_self">==</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#%21%3D%28AnyRef%29" target="_self">!=</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#eq%28AnyRef%29" target="_self">eq</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#ne%28AnyRef%29" target="_self">ne</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#synchronized%28T0%29" target="_self">synchronized</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html" target="_self">Any</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html#%3D%3D%28Any%29" target="_self">==</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html#%21%3D%28Any%29" target="_self">!=</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html#isInstanceOf" target="_self">isInstanceOf</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html#asInstanceOf" target="_self">asInstanceOf</a>
+        </td></tr>
+      </table>
+
+
+      
+
+<table summary="" cellpadding="3" class="member-detail">
+          <tr><td class="title">Value Details</td></tr>
+        </table><div><a name="treegen"></a><dl>
+      <dt>
+        
+        <code></code>
+        <code>val</code>
+        <em>treegen</em> : <a href="../../../org/modiphy/tree/TreeGen.html" target="_self">TreeGen</a>[<a href="../../../org/modiphy/tree/TreeParser.html#A" target="_self">A</a>]
+      </dt>
+      <dd></dd>
+    </dl><hr></hr></div>
+<table summary="" cellpadding="3" class="member-detail">
+          <tr><td class="title">Method Details</td></tr>
+        </table><div><a name="root"></a><dl>
+      <dt>
+        
+        <code></code>
+        <code>def</code>
+        <em>root</em> : <a href="" target="contentFrame" class="scala/util/parsing/combinator/Parsers/Parser">scala.util.parsing.combinator.Parsers.Parser</a>[<a href="../../../org/modiphy/tree/INode.html" target="_self">INode</a>[<a href="../../../org/modiphy/tree/TreeParser.html#A" target="_self">A</a>]]
+      </dt>
+      <dd></dd>
+    </dl><hr></hr>
+<a name="node"></a><dl>
+      <dt>
+        
+        <code></code>
+        <code>def</code>
+        <em>node</em> : <a href="" target="contentFrame" class="scala/util/parsing/combinator/Parsers/Parser">scala.util.parsing.combinator.Parsers.Parser</a>[<a href="../../../org/modiphy/tree/Node.html" target="_self">Node</a>[<a href="../../../org/modiphy/tree/TreeParser.html#A" target="_self">A</a>]]
+      </dt>
+      <dd></dd>
+    </dl><hr></hr>
+<a name="seqName"></a><dl>
+      <dt>
+        
+        <code></code>
+        <code>def</code>
+        <em>seqName</em> : <a href="" target="contentFrame" class="scala/util/parsing/combinator/Parsers/Parser">scala.util.parsing.combinator.Parsers.Parser</a>[<a href="" target="contentFrame" class="java/lang/String">java.lang.String</a>]
+      </dt>
+      <dd></dd>
+    </dl><hr></hr>
+<a name="leaf"></a><dl>
+      <dt>
+        
+        <code></code>
+        <code>def</code>
+        <em>leaf</em> : <a href="" target="contentFrame" class="scala/util/parsing/combinator/Parsers/Parser">scala.util.parsing.combinator.Parsers.Parser</a>[<a href="../../../org/modiphy/tree/Leaf.html" target="_self">Leaf</a>[<a href="../../../org/modiphy/tree/TreeParser.html#A" target="_self">A</a>]]
+      </dt>
+      <dd></dd>
+    </dl><hr></hr></div>
+
+
+    <hr></hr>
+        <table summary="" class="navigation">
+        <tr>
+          <td class="navigation-links" valign="top">
+            <!-- <table><tr></tr></table> -->
+          </td>
+          <td align="right" valign="top" style="white-space:nowrap;" rowspan="2">
+            <div class="doctitle-larger">Modiphy 0.2.0 API</div>
+          </td>
+        </tr>
+        <tr><td></td></tr>
+      </table>
+      </body>
+      </html>

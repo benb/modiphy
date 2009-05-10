@@ -1,0 +1,217 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+        <head><title>class CalcLikelihoodNode in org.modiphy.tree</title>
+        <meta http-equiv="content-type" content="text/html; charset=UTF8"></meta><meta content="scaladoc (version 2.7.4.final)" name="generator"></meta><link href="../../../style.css" type="text/css" rel="stylesheet"></link><script type="text/javascript" src="../../../script.js"></script>
+        </head>
+        <body onload="init()">
+        <table summary="" class="navigation">
+        <tr>
+          <td class="navigation-links" valign="top">
+            <!-- <table><tr></tr></table> -->
+          </td>
+          <td align="right" valign="top" style="white-space:nowrap;" rowspan="2">
+            <div class="doctitle-larger">Modiphy 0.2.0 API</div>
+          </td>
+        </tr>
+        <tr><td></td></tr>
+      </table>
+        
+      <div class="entity">
+        <a href="../../../org/modiphy/tree$package.html" target="_self">org.modiphy.tree</a>
+        <br></br>
+        <span class="entity">class  CalcLikelihoodNode</span>
+      </div><hr></hr>
+      <div class="source">
+        [source: <a href="" class="org/modiphy/tree/CalcLikelihoodNode"><code>org/modiphy/tree/CalcLikelihoodNode.scala</code></a>]
+      </div><hr></hr>
+      <a name="CalcLikelihoodNode"></a><dl>
+      <dt>
+        
+        <code></code>
+        <code>class</code>
+        <em>CalcLikelihoodNode</em>[<em>A</em> &lt;: <a href="../../../org/modiphy/sequence/BioEnum.html" target="_self">BioEnum</a>](<em>children</em> : <a href="" target="contentFrame" class="scala/List">scala.List</a>[<a href="../../../org/modiphy/tree/LikelihoodNode.html" target="_self">LikelihoodNode</a>[<a href="../../../org/modiphy/tree/CalcLikelihoodNode.html#A" target="_self">A</a>]], <em>alphabet</em> : <a href="../../../org/modiphy/tree/CalcLikelihoodNode.html#A" target="_self">A</a>, <em>lengthTo</em> : <a href="http://www.scala-lang.org/docu/files/api/scala/Double.html" target="_self">Double</a>, <code>val </code><em>model</em> : <a href="../../../org/modiphy/math/Model.html" target="_self">Model</a>[<a href="../../../org/modiphy/tree/CalcLikelihoodNode.html#A" target="_self">A</a>], <em>id</em> : <a href="http://www.scala-lang.org/docu/files/api/scala/Int.html" target="_self">Int</a>)
+      </dt>
+      <dd><code> extends </code><a href="../../../org/modiphy/tree/INode.html" target="_self">INode</a>[<a href="../../../org/modiphy/tree/CalcLikelihoodNode.html#A" target="_self">A</a>]<code> with </code><a href="../../../org/modiphy/tree/LikelihoodNode.html" target="_self">LikelihoodNode</a>[<a href="../../../org/modiphy/tree/CalcLikelihoodNode.html#A" target="_self">A</a>]</dd>
+    </dl>
+      
+
+<table summary="" cellpadding="3" class="member">
+      <tr><td class="title" colspan="2">Value Summary</td></tr>
+      <tr>
+      <td class="modifiers" valign="top"> 
+        <code>override lazy val</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../../org/modiphy/tree/CalcLikelihoodNode.html#likelihoods" target="_self">likelihoods</a></em>
+         : <a href="" target="contentFrame" class="scala/List">scala.List</a>[<a href="" target="contentFrame" class="cern/colt/matrix/DoubleMatrix1D">cern.colt.matrix.DoubleMatrix1D</a>]
+        
+        
+      </td>
+    </tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Values and Variables inherited from <a href="../../../org/modiphy/tree/INode.html" target="_self">INode</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="../../../org/modiphy/tree/INode.html#name" target="_self">name</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Values and Variables inherited from <a href="../../../org/modiphy/tree/Node.html" target="_self">Node</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="../../../org/modiphy/tree/Node.html#isRoot" target="_self">isRoot</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Values and Variables inherited from <a href="" target="contentFrame" class="tlf/Logging">tlf.Logging</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="#logLevel" target="contentFrame" class="tlf/Logging">tlf.Logging.logLevel</a>
+        </td></tr>
+      </table>
+<table summary="" cellpadding="3" class="member">
+      <tr><td class="title" colspan="2">Method Summary</td></tr>
+      <tr>
+      <td class="modifiers" valign="top"> 
+        <code>override def</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../../org/modiphy/tree/CalcLikelihoodNode.html#childElements" target="_self">childElements</a></em>
+         : <a href="" target="contentFrame" class="scala/Iterator">scala.Iterator</a>[<a href="../../../org/modiphy/tree/LikelihoodNode.html" target="_self">LikelihoodNode</a>[<a href="../../../org/modiphy/tree/CalcLikelihoodNode.html#A" target="_self">A</a>]]
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code> def</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../../org/modiphy/tree/CalcLikelihoodNode.html#logLikelihood" target="_self">logLikelihood</a></em>
+         : <a href="http://www.scala-lang.org/docu/files/api/scala/Double.html" target="_self">Double</a>
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code> def</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../../org/modiphy/tree/CalcLikelihoodNode.html#realLikelihoods" target="_self">realLikelihoods</a></em>
+         : <a href="" target="contentFrame" class="scala/List">scala.List</a>[<a href="http://www.scala-lang.org/docu/files/api/scala/Double.html" target="_self">Double</a>]
+        
+        
+      </td>
+    </tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="../../../org/modiphy/tree/INode.html" target="_self">INode</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="../../../org/modiphy/tree/INode.html#setNewDataType%28B%29" target="_self">setNewDataType</a>, <a href="../../../org/modiphy/tree/INode.html#factory%28List%5Borg.modiphy.tree.Node%5BA%5D%5D%2CA%2CDouble%29" target="_self">factory</a>, <a href="../../../org/modiphy/tree/INode.html#numChildren" target="_self">numChildren</a>, <a href="../../../org/modiphy/tree/INode.html#child%28Int%29" target="_self">child</a>, <a href="../../../org/modiphy/tree/INode.html#length%28Int%29" target="_self">length</a>, <a href="../../../org/modiphy/tree/INode.html#length%28org.modiphy.tree.Node%5BA%5D%29" target="_self">length</a>, <a href="../../../org/modiphy/tree/INode.html#mkLkl%28org.modiphy.math.Model%5BA%5D%29" target="_self">mkLkl</a>, <a href="../../../org/modiphy/tree/INode.html#restrictTo%28scala.collection.Set%5BString%5D%29" target="_self">restrictTo</a>, <a href="../../../org/modiphy/tree/INode.html#descendents" target="_self">descendents</a>, <a href="../../../org/modiphy/tree/INode.html#descendentNodes" target="_self">descendentNodes</a>, <a href="../../../org/modiphy/tree/INode.html#removeUseless" target="_self">removeUseless</a>, <a href="../../../org/modiphy/tree/INode.html#setAlign%28Map%5BString%2CString%5D%29" target="_self">setAlign</a>, <a href="../../../org/modiphy/tree/INode.html#resize%28Double%29" target="_self">resize</a>, <a href="../../../org/modiphy/tree/INode.html#toString%28%29" target="_self">toString</a>, <a href="../../../org/modiphy/tree/INode.html#setRoot" target="_self">setRoot</a>, <a href="../../../org/modiphy/tree/INode.html#setBranchLengths%28List%5BDouble%5D%29" target="_self">setBranchLengths</a>, <a href="../../../org/modiphy/tree/INode.html#getBranchLengths" target="_self">getBranchLengths</a>, <a href="../../../org/modiphy/tree/INode.html#branchTo" target="_self">branchTo</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="../../../org/modiphy/tree/Node.html" target="_self">Node</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="../../../org/modiphy/tree/Node.html#nodes" target="_self">nodes</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="" target="contentFrame" class="tlf/Logging">tlf.Logging</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="#log" target="contentFrame" class="tlf/Logging">tlf.Logging.log</a>, <a href="#debug" target="contentFrame" class="tlf/Logging">tlf.Logging.debug</a>, <a href="#extra" target="contentFrame" class="tlf/Logging">tlf.Logging.extra</a>, <a href="#finest" target="contentFrame" class="tlf/Logging">tlf.Logging.finest</a>, <a href="#info" target="contentFrame" class="tlf/Logging">tlf.Logging.info</a>, <a href="#warning" target="contentFrame" class="tlf/Logging">tlf.Logging.warning</a>, <a href="#severe" target="contentFrame" class="tlf/Logging">tlf.Logging.severe</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html" target="_self">AnyRef</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#getClass%28%29" target="_self">getClass</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#hashCode%28%29" target="_self">hashCode</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#equals%28Any%29" target="_self">equals</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#clone%28%29" target="_self">clone</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#notify%28%29" target="_self">notify</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#notifyAll%28%29" target="_self">notifyAll</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#wait%28Long%29" target="_self">wait</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#wait%28Long%2CInt%29" target="_self">wait</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#wait%28%29" target="_self">wait</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#finalize%28%29" target="_self">finalize</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#%3D%3D%28AnyRef%29" target="_self">==</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#%21%3D%28AnyRef%29" target="_self">!=</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#eq%28AnyRef%29" target="_self">eq</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#ne%28AnyRef%29" target="_self">ne</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#synchronized%28T0%29" target="_self">synchronized</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html" target="_self">Any</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html#%3D%3D%28Any%29" target="_self">==</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html#%21%3D%28Any%29" target="_self">!=</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html#isInstanceOf" target="_self">isInstanceOf</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html#asInstanceOf" target="_self">asInstanceOf</a>
+        </td></tr>
+      </table>
+
+
+      
+
+<table summary="" cellpadding="3" class="member-detail">
+          <tr><td class="title">Value Details</td></tr>
+        </table><div><a name="likelihoods"></a><dl>
+      <dt>
+        
+        <code>override</code>
+        <code>lazy val</code>
+        <em>likelihoods</em> : <a href="" target="contentFrame" class="scala/List">scala.List</a>[<a href="" target="contentFrame" class="cern/colt/matrix/DoubleMatrix1D">cern.colt.matrix.DoubleMatrix1D</a>]
+      </dt>
+      <dd></dd>
+    </dl><dl>
+        <dt style="margin:10px 0 0 20px;">
+          <b>Overrides</b>
+        </dt>
+        <dd>
+        <a href="../../../org/modiphy/tree/LikelihoodNode.html" target="_self">LikelihoodNode</a>.<a href="../../../org/modiphy/tree/LikelihoodNode.html#likelihoods" target="_self">likelihoods</a>
+        </dd>
+      </dl><hr></hr></div>
+<table summary="" cellpadding="3" class="member-detail">
+          <tr><td class="title">Method Details</td></tr>
+        </table><div><a name="childElements"></a><dl>
+      <dt>
+        
+        <code>override</code>
+        <code>def</code>
+        <em>childElements</em> : <a href="" target="contentFrame" class="scala/Iterator">scala.Iterator</a>[<a href="../../../org/modiphy/tree/LikelihoodNode.html" target="_self">LikelihoodNode</a>[<a href="../../../org/modiphy/tree/CalcLikelihoodNode.html#A" target="_self">A</a>]]
+      </dt>
+      <dd></dd>
+    </dl><dl>
+        <dt style="margin:10px 0 0 20px;">
+          <b>Overrides</b>
+        </dt>
+        <dd>
+        <a href="../../../org/modiphy/tree/INode.html" target="_self">INode</a>.<a href="../../../org/modiphy/tree/INode.html#childElements" target="_self">childElements</a>
+        </dd>
+      </dl><hr></hr>
+<a name="realLikelihoods"></a><dl>
+      <dt>
+        
+        <code></code>
+        <code>def</code>
+        <em>realLikelihoods</em> : <a href="" target="contentFrame" class="scala/List">scala.List</a>[<a href="http://www.scala-lang.org/docu/files/api/scala/Double.html" target="_self">Double</a>]
+      </dt>
+      <dd></dd>
+    </dl><hr></hr>
+<a name="logLikelihood"></a><dl>
+      <dt>
+        
+        <code></code>
+        <code>def</code>
+        <em>logLikelihood</em> : <a href="http://www.scala-lang.org/docu/files/api/scala/Double.html" target="_self">Double</a>
+      </dt>
+      <dd></dd>
+    </dl><hr></hr></div>
+
+
+    <hr></hr>
+        <table summary="" class="navigation">
+        <tr>
+          <td class="navigation-links" valign="top">
+            <!-- <table><tr></tr></table> -->
+          </td>
+          <td align="right" valign="top" style="white-space:nowrap;" rowspan="2">
+            <div class="doctitle-larger">Modiphy 0.2.0 API</div>
+          </td>
+        </tr>
+        <tr><td></td></tr>
+      </table>
+      </body>
+      </html>

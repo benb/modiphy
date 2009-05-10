@@ -1,0 +1,122 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+        <head><title>All classes and objects in org.modiphy.tree</title>
+        <meta http-equiv="content-type" content="text/html; charset=UTF8"></meta><meta content="scaladoc (version 2.7.4.final)" name="generator"></meta><link href="../../style.css" type="text/css" rel="stylesheet"></link><script type="text/javascript" src="../../script.js"></script>
+        </head>
+        <body onload="init()"><div class="page-title"><div>Modiphy 0.2.0 API</div></div><p><div>This document is the API specification for Modiphy 0.2.0 API</div></p><table summary="" cellpadding="3" class="member">
+        <tr><td class="title" colspan="2">Class Summary</td></tr>
+        <tr>
+      <td class="modifiers" valign="top"> 
+        <code> class</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../org/modiphy/tree/CalcLikelihoodNode.html" target="_self">CalcLikelihoodNode</a></em>
+        [<em>A</em> &lt;: <a href="../../org/modiphy/sequence/BioEnum.html" target="_self">BioEnum</a>](<em>children</em> : <a href="" target="contentFrame" class="scala/List">scala.List</a>[<a href="../../org/modiphy/tree/LikelihoodNode.html" target="_self">LikelihoodNode</a>[<a href="../../org/modiphy/tree/CalcLikelihoodNode.html#A" target="_self">A</a>]], <em>alphabet</em> : <a href="../../org/modiphy/tree/CalcLikelihoodNode.html#A" target="_self">A</a>, <em>lengthTo</em> : <a href="http://www.scala-lang.org/docu/files/api/scala/Double.html" target="_self">Double</a>, <code>val </code><em>model</em> : <a href="../../org/modiphy/math/Model.html" target="_self">Model</a>[<a href="../../org/modiphy/tree/CalcLikelihoodNode.html#A" target="_self">A</a>], <em>id</em> : <a href="http://www.scala-lang.org/docu/files/api/scala/Int.html" target="_self">Int</a>)<code> extends </code><a href="../../org/modiphy/tree/INode.html" target="_self">INode</a>[<a href="../../org/modiphy/tree/CalcLikelihoodNode.html#A" target="_self">A</a>]<code> with </code><a href="../../org/modiphy/tree/LikelihoodNode.html" target="_self">LikelihoodNode</a>[<a href="../../org/modiphy/tree/CalcLikelihoodNode.html#A" target="_self">A</a>]
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code> class</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../org/modiphy/tree/INode.html" target="_self">INode</a></em>
+        [<em>A</em> &lt;: <a href="../../org/modiphy/sequence/BioEnum.html" target="_self">BioEnum</a>](<code>val </code><em>children</em> : <a href="" target="contentFrame" class="scala/List">scala.List</a>[<a href="../../org/modiphy/tree/Node.html" target="_self">Node</a>[<a href="../../org/modiphy/tree/INode.html#A" target="_self">A</a>]], <code>val </code><em>alphabet</em> : <a href="../../org/modiphy/tree/INode.html#A" target="_self">A</a>, <code>val </code><em>lengthTo</em> : <a href="http://www.scala-lang.org/docu/files/api/scala/Double.html" target="_self">Double</a>, <code>val </code><em>id</em> : <a href="http://www.scala-lang.org/docu/files/api/scala/Int.html" target="_self">Int</a>)<code> extends </code><a href="../../org/modiphy/tree/Node.html" target="_self">Node</a>[<a href="../../org/modiphy/tree/INode.html#A" target="_self">A</a>]
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code> class</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../org/modiphy/tree/Leaf.html" target="_self">Leaf</a></em>
+        [<em>A</em> &lt;: <a href="../../org/modiphy/sequence/BioEnum.html" target="_self">BioEnum</a>](<code>val </code><em>name</em> : <a href="" target="contentFrame" class="java/lang/String">java.lang.String</a>, <code>val </code><em>seq</em> : <a href="" target="contentFrame" class="java/lang/String">java.lang.String</a>, <code>val </code><em>alphabet</em> : <a href="../../org/modiphy/tree/Leaf.html#A" target="_self">A</a>, <code>val </code><em>lengthTo</em> : <a href="http://www.scala-lang.org/docu/files/api/scala/Double.html" target="_self">Double</a>, <code>val </code><em>id</em> : <a href="http://www.scala-lang.org/docu/files/api/scala/Int.html" target="_self">Int</a>)<code> extends </code><a href="../../org/modiphy/tree/Node.html" target="_self">Node</a>[<a href="../../org/modiphy/tree/Leaf.html#A" target="_self">A</a>]
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code> class</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../org/modiphy/tree/LeafLikelihoodNode.html" target="_self">LeafLikelihoodNode</a></em>
+        [<em>A</em> &lt;: <a href="../../org/modiphy/sequence/BioEnum.html" target="_self">BioEnum</a>](<em>name</em> : <a href="" target="contentFrame" class="java/lang/String">java.lang.String</a>, <em>seq</em> : <a href="" target="contentFrame" class="java/lang/String">java.lang.String</a>, <em>alpha</em> : <a href="../../org/modiphy/tree/LeafLikelihoodNode.html#A" target="_self">A</a>, <em>lengthTo</em> : <a href="http://www.scala-lang.org/docu/files/api/scala/Double.html" target="_self">Double</a>, <em>id</em> : <a href="http://www.scala-lang.org/docu/files/api/scala/Int.html" target="_self">Int</a>)<code> extends </code><a href="../../org/modiphy/tree/Leaf.html" target="_self">Leaf</a>[<a href="../../org/modiphy/tree/LeafLikelihoodNode.html#A" target="_self">A</a>]<code> with </code><a href="../../org/modiphy/tree/LikelihoodNode.html" target="_self">LikelihoodNode</a>[<a href="../../org/modiphy/tree/LeafLikelihoodNode.html#A" target="_self">A</a>]
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code> trait</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../org/modiphy/tree/LikelihoodNode.html" target="_self">LikelihoodNode</a></em>
+        [<em>A</em> &lt;: <a href="../../org/modiphy/sequence/BioEnum.html" target="_self">BioEnum</a>]<code> extends </code><a href="../../org/modiphy/tree/Node.html" target="_self">Node</a>[<a href="../../org/modiphy/tree/LikelihoodNode.html#A" target="_self">A</a>]
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code> trait</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../org/modiphy/tree/Node.html" target="_self">Node</a></em>
+        [<em>A</em> &lt;: <a href="../../org/modiphy/sequence/BioEnum.html" target="_self">BioEnum</a>]<code> extends </code><a href="" target="contentFrame" class="tlf/Logging">tlf.Logging</a>
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code> trait</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../org/modiphy/tree/RootNode.html" target="_self">RootNode</a></em>
+        [<em>A</em> &lt;: <a href="../../org/modiphy/sequence/BioEnum.html" target="_self">BioEnum</a>]<code> extends </code><a href="../../org/modiphy/tree/INode.html" target="_self">INode</a>[<a href="../../org/modiphy/tree/RootNode.html#A" target="_self">A</a>]
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code> class</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../org/modiphy/tree/TreeGen.html" target="_self">TreeGen</a></em>
+        [<em>A</em> &lt;: <a href="../../org/modiphy/sequence/BioEnum.html" target="_self">BioEnum</a>]<code> extends </code><a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html" target="_self">AnyRef</a>
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code> class</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../org/modiphy/tree/TreeParser.html" target="_self">TreeParser</a></em>
+        [<em>A</em> &lt;: <a href="../../org/modiphy/sequence/BioEnum.html" target="_self">BioEnum</a>](<em>m</em> : (<a href="" target="contentFrame" class="java/lang/String">java.lang.String</a>) =&gt; <a href="" target="contentFrame" class="java/lang/String">java.lang.String</a>, <em>alphabet</em> : <a href="../../org/modiphy/tree/TreeParser.html#A" target="_self">A</a>)<code> extends </code><a href="" target="contentFrame" class="scala/util/parsing/combinator/JavaTokenParsers">scala.util.parsing.combinator.JavaTokenParsers</a>
+        
+        <div>Used internally for parsing trees</div>
+      </td>
+    </tr>        
+        </table>
+<table summary="" cellpadding="3" class="member">
+        <tr><td class="title" colspan="2">Object Summary</td></tr>
+        <tr>
+      <td class="modifiers" valign="top"> 
+        <code> object</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../org/modiphy/tree/DataParse$object.html" target="_self">DataParse</a></em>
+        <code> extends </code><a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html" target="_self">AnyRef</a>
+        
+        <div>Parses Newick format trees</div>
+      </td>
+    </tr>        
+        </table></body>
+      </html>

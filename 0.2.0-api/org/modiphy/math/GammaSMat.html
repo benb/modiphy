@@ -1,0 +1,360 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+        <head><title>trait GammaSMat in org.modiphy.math</title>
+        <meta http-equiv="content-type" content="text/html; charset=UTF8"></meta><meta content="scaladoc (version 2.7.4.final)" name="generator"></meta><link href="../../../style.css" type="text/css" rel="stylesheet"></link><script type="text/javascript" src="../../../script.js"></script>
+        </head>
+        <body onload="init()">
+        <table summary="" class="navigation">
+        <tr>
+          <td class="navigation-links" valign="top">
+            <!-- <table><tr></tr></table> -->
+          </td>
+          <td align="right" valign="top" style="white-space:nowrap;" rowspan="2">
+            <div class="doctitle-larger">Modiphy 0.2.0 API</div>
+          </td>
+        </tr>
+        <tr><td></td></tr>
+      </table>
+        
+      <div class="entity">
+        <a href="../../../org/modiphy/math$package.html" target="_self">org.modiphy.math</a>
+        <br></br>
+        <span class="entity">trait  GammaSMat</span>
+      </div><hr></hr>
+      <div class="source">
+        [source: <a href="" class="org/modiphy/math/GammaSMat"><code>org/modiphy/math/GammaSMat.scala</code></a>]
+      </div><hr></hr>
+      <a name="GammaSMat"></a><dl>
+      <dt>
+        
+        <code></code>
+        <code>trait</code>
+        <em>GammaSMat</em>[<em>A</em> &lt;: <a href="../../../org/modiphy/sequence/BioEnum.html" target="_self">BioEnum</a>]
+      </dt>
+      <dd><code> extends </code><a href="../../../org/modiphy/math/SMat.html" target="_self">SMat</a>[<a href="../../../org/modiphy/math/GammaSMat.html#A" target="_self">A</a>]</dd>
+    </dl><dl>
+      <dt style="margin:10px 0 0 20px;"><b>Direct Known Subclasses:</b></dt>
+      <dd><a href="../../../org/modiphy/math/GammaModel.html" target="_self">GammaModel</a></dd>
+      </dl><hr></hr>
+      
+
+<table summary="" cellpadding="3" class="member">
+      <tr><td class="title" colspan="2">Value Summary</td></tr>
+      <tr>
+      <td class="modifiers" valign="top"> 
+        <code> var</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../../org/modiphy/math/GammaSMat.html#alpha" target="_self">alpha</a></em>
+         : <a href="http://www.scala-lang.org/docu/files/api/scala/Double.html" target="_self">Double</a>
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code> val</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../../org/modiphy/math/GammaSMat.html#alphabet" target="_self">alphabet</a></em>
+         : <a href="../../../org/modiphy/math/GammaSMat.html#A" target="_self">A</a>
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code> val</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../../org/modiphy/math/GammaSMat.html#gamma" target="_self">gamma</a></em>
+         : <a href="../../../org/modiphy/math/Gamma.html" target="_self">Gamma</a>
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code> val</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../../org/modiphy/math/GammaSMat.html#numClasses" target="_self">numClasses</a></em>
+         : <a href="http://www.scala-lang.org/docu/files/api/scala/Int.html" target="_self">Int</a>
+        
+        
+      </td>
+    </tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Values and Variables inherited from <a href="../../../org/modiphy/math/SMat.html" target="_self">SMat</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="../../../org/modiphy/math/SMat.html#sMat" target="_self">sMat</a> (abstract), <a href="../../../org/modiphy/math/SMat.html#sMatParam" target="_self">sMatParam</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Values and Variables inherited from <a href="../../../org/modiphy/math/Model.html" target="_self">Model</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="../../../org/modiphy/math/Model.html#tree" target="_self">tree</a> (abstract)
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Values and Variables inherited from <a href="" target="contentFrame" class="tlf/Logging">tlf.Logging</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="#logLevel" target="contentFrame" class="tlf/Logging">tlf.Logging.logLevel</a>
+        </td></tr>
+      </table>
+<table summary="" cellpadding="3" class="member">
+      <tr><td class="title" colspan="2">Method Summary</td></tr>
+      <tr>
+      <td class="modifiers" valign="top"> 
+        <code>override def</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../../org/modiphy/math/GammaSMat.html#cromulent" target="_self">cromulent</a></em>
+         : <a href="http://www.scala-lang.org/docu/files/api/scala/Boolean.html" target="_self">Boolean</a>
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code> def</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../../org/modiphy/math/GammaSMat.html#gammaQMat" target="_self">gammaQMat</a></em>
+         : <a href="" target="contentFrame" class="cern/colt/matrix/DoubleMatrix2D">cern.colt.matrix.DoubleMatrix2D</a>
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code>override def</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../../org/modiphy/math/GammaSMat.html#getParams" target="_self">getParams</a></em>
+         : <a href="" target="contentFrame" class="scala/List">scala.List</a>[<a href="" target="contentFrame" class="scala/Array">scala.Array</a>[<a href="http://www.scala-lang.org/docu/files/api/scala/Double.html" target="_self">Double</a>]]
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code>override def</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../../org/modiphy/math/GammaSMat.html#qMat%28org.modiphy.tree.CalcLikelihoodNode%5BA%5D%29" target="_self">qMat</a></em>
+        (<em>node</em> : <a href="../../../org/modiphy/tree/CalcLikelihoodNode.html" target="_self">CalcLikelihoodNode</a>[<a href="../../../org/modiphy/math/GammaSMat.html#A" target="_self">A</a>]) : <a href="" target="contentFrame" class="cern/colt/matrix/DoubleMatrix2D">cern.colt.matrix.DoubleMatrix2D</a>
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code>override def</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../../org/modiphy/math/GammaSMat.html#setParams%28Int%29" target="_self">setParams</a></em>
+        (<em>i</em> : <a href="http://www.scala-lang.org/docu/files/api/scala/Int.html" target="_self">Int</a>)(<em>a</em> : <a href="" target="contentFrame" class="scala/Array">scala.Array</a>[<a href="http://www.scala-lang.org/docu/files/api/scala/Double.html" target="_self">Double</a>]) : <a href="http://www.scala-lang.org/docu/files/api/scala/Unit.html" target="_self">Unit</a>
+        
+        
+      </td>
+    </tr>
+<tr>
+      <td class="modifiers" valign="top"> 
+        <code>override def</code>
+      </td>
+      <td class="signature">
+        <em><a href="../../../org/modiphy/math/GammaSMat.html#toString%28%29" target="_self">toString</a></em>
+         : <a href="" target="contentFrame" class="java/lang/String">java.lang.String</a>
+        
+        <div>Returns a string representation of the object.</div>
+      </td>
+    </tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="../../../org/modiphy/math/SMat.html" target="_self">SMat</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="../../../org/modiphy/math/SMat.html#linearSMat" target="_self">linearSMat</a>, <a href="../../../org/modiphy/math/SMat.html#setSMat%28Array%5BDouble%5D%29" target="_self">setSMat</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="../../../org/modiphy/math/Model.html" target="_self">Model</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="../../../org/modiphy/math/Model.html#pi" target="_self">pi</a> (abstract), <a href="../../../org/modiphy/math/Model.html#logLikelihood" target="_self">logLikelihood</a>, <a href="../../../org/modiphy/math/Model.html#getMat%28org.modiphy.tree.CalcLikelihoodNode%5BA%5D%29" target="_self">getMat</a>, <a href="../../../org/modiphy/math/Model.html#likelihoods%28org.modiphy.tree.CalcLikelihoodNode%5BA%5D%29" target="_self">likelihoods</a>, <a href="../../../org/modiphy/math/Model.html#likelihoods" target="_self">likelihoods</a>, <a href="../../../org/modiphy/math/Model.html#realLikelihoods" target="_self">realLikelihoods</a>, <a href="../../../org/modiphy/math/Model.html#piVals" target="_self">piVals</a>, <a href="../../../org/modiphy/math/Model.html#getTree" target="_self">getTree</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="" target="contentFrame" class="tlf/Logging">tlf.Logging</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="#log" target="contentFrame" class="tlf/Logging">tlf.Logging.log</a>, <a href="#debug" target="contentFrame" class="tlf/Logging">tlf.Logging.debug</a>, <a href="#extra" target="contentFrame" class="tlf/Logging">tlf.Logging.extra</a>, <a href="#finest" target="contentFrame" class="tlf/Logging">tlf.Logging.finest</a>, <a href="#info" target="contentFrame" class="tlf/Logging">tlf.Logging.info</a>, <a href="#warning" target="contentFrame" class="tlf/Logging">tlf.Logging.warning</a>, <a href="#severe" target="contentFrame" class="tlf/Logging">tlf.Logging.severe</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html" target="_self">AnyRef</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#getClass%28%29" target="_self">getClass</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#hashCode%28%29" target="_self">hashCode</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#equals%28Any%29" target="_self">equals</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#clone%28%29" target="_self">clone</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#notify%28%29" target="_self">notify</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#notifyAll%28%29" target="_self">notifyAll</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#wait%28Long%29" target="_self">wait</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#wait%28Long%2CInt%29" target="_self">wait</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#wait%28%29" target="_self">wait</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#finalize%28%29" target="_self">finalize</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#%3D%3D%28AnyRef%29" target="_self">==</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#%21%3D%28AnyRef%29" target="_self">!=</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#eq%28AnyRef%29" target="_self">eq</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#ne%28AnyRef%29" target="_self">ne</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#synchronized%28T0%29" target="_self">synchronized</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html" target="_self">Any</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html#%3D%3D%28Any%29" target="_self">==</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html#%21%3D%28Any%29" target="_self">!=</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html#isInstanceOf" target="_self">isInstanceOf</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html#asInstanceOf" target="_self">asInstanceOf</a>
+        </td></tr>
+      </table>
+
+
+      
+
+<table summary="" cellpadding="3" class="member-detail">
+          <tr><td class="title">Value Details</td></tr>
+        </table><div><a name="alpha"></a><dl>
+      <dt>
+        
+        <code></code>
+        <code>var</code>
+        <em>alpha</em> : <a href="http://www.scala-lang.org/docu/files/api/scala/Double.html" target="_self">Double</a>
+      </dt>
+      <dd></dd>
+    </dl><hr></hr>
+<a name="alphabet"></a><dl>
+      <dt>
+        
+        <code></code>
+        <code>val</code>
+        <em>alphabet</em> : <a href="../../../org/modiphy/math/GammaSMat.html#A" target="_self">A</a>
+      </dt>
+      <dd></dd>
+    </dl><hr></hr>
+<a name="numClasses"></a><dl>
+      <dt>
+        
+        <code></code>
+        <code>val</code>
+        <em>numClasses</em> : <a href="http://www.scala-lang.org/docu/files/api/scala/Int.html" target="_self">Int</a>
+      </dt>
+      <dd></dd>
+    </dl><hr></hr>
+<a name="gamma"></a><dl>
+      <dt>
+        
+        <code></code>
+        <code>val</code>
+        <em>gamma</em> : <a href="../../../org/modiphy/math/Gamma.html" target="_self">Gamma</a>
+      </dt>
+      <dd></dd>
+    </dl><hr></hr></div>
+<table summary="" cellpadding="3" class="member-detail">
+          <tr><td class="title">Method Details</td></tr>
+        </table><div><a name="qMat%28org.modiphy.tree.CalcLikelihoodNode%5BA%5D%29"></a><dl>
+      <dt>
+        
+        <code>override</code>
+        <code>def</code>
+        <em>qMat</em>(<em>node</em> : <a href="../../../org/modiphy/tree/CalcLikelihoodNode.html" target="_self">CalcLikelihoodNode</a>[<a href="../../../org/modiphy/math/GammaSMat.html#A" target="_self">A</a>]) : <a href="" target="contentFrame" class="cern/colt/matrix/DoubleMatrix2D">cern.colt.matrix.DoubleMatrix2D</a>
+      </dt>
+      <dd></dd>
+    </dl><hr></hr>
+<a name="gammaQMat"></a><dl>
+      <dt>
+        
+        <code></code>
+        <code>def</code>
+        <em>gammaQMat</em> : <a href="" target="contentFrame" class="cern/colt/matrix/DoubleMatrix2D">cern.colt.matrix.DoubleMatrix2D</a>
+      </dt>
+      <dd></dd>
+    </dl><hr></hr>
+<a name="getParams"></a><dl>
+      <dt>
+        
+        <code>override</code>
+        <code>def</code>
+        <em>getParams</em> : <a href="" target="contentFrame" class="scala/List">scala.List</a>[<a href="" target="contentFrame" class="scala/Array">scala.Array</a>[<a href="http://www.scala-lang.org/docu/files/api/scala/Double.html" target="_self">Double</a>]]
+      </dt>
+      <dd></dd>
+    </dl><dl>
+        <dt style="margin:10px 0 0 20px;">
+          <b>Overrides</b>
+        </dt>
+        <dd>
+        <a href="../../../org/modiphy/math/SMat.html" target="_self">SMat</a>.<a href="../../../org/modiphy/math/SMat.html#getParams" target="_self">getParams</a>
+        </dd>
+      </dl><hr></hr>
+<a name="cromulent"></a><dl>
+      <dt>
+        
+        <code>override</code>
+        <code>def</code>
+        <em>cromulent</em> : <a href="http://www.scala-lang.org/docu/files/api/scala/Boolean.html" target="_self">Boolean</a>
+      </dt>
+      <dd></dd>
+    </dl><dl>
+        <dt style="margin:10px 0 0 20px;">
+          <b>Overrides</b>
+        </dt>
+        <dd>
+        <a href="../../../org/modiphy/math/SMat.html" target="_self">SMat</a>.<a href="../../../org/modiphy/math/SMat.html#cromulent" target="_self">cromulent</a>
+        </dd>
+      </dl><hr></hr>
+<a name="setParams%28Int%29"></a><dl>
+      <dt>
+        
+        <code>override</code>
+        <code>def</code>
+        <em>setParams</em>(<em>i</em> : <a href="http://www.scala-lang.org/docu/files/api/scala/Int.html" target="_self">Int</a>)(<em>a</em> : <a href="" target="contentFrame" class="scala/Array">scala.Array</a>[<a href="http://www.scala-lang.org/docu/files/api/scala/Double.html" target="_self">Double</a>]) : <a href="http://www.scala-lang.org/docu/files/api/scala/Unit.html" target="_self">Unit</a>
+      </dt>
+      <dd></dd>
+    </dl><dl>
+        <dt style="margin:10px 0 0 20px;">
+          <b>Overrides</b>
+        </dt>
+        <dd>
+        <a href="../../../org/modiphy/math/SMat.html" target="_self">SMat</a>.<a href="../../../org/modiphy/math/SMat.html#setParams%28Int%29" target="_self">setParams</a>
+        </dd>
+      </dl><hr></hr>
+<a name="toString%28%29"></a><dl>
+      <dt>
+        
+        <code>override</code>
+        <code>def</code>
+        <em>toString</em> : <a href="" target="contentFrame" class="java/lang/String">java.lang.String</a>
+      </dt>
+      <dd></dd>
+    </dl>
+      <dl><dd>Returns a string representation of the object.  
+    <p>
+    The default representation is platform dependent.</dd></dl>
+      <dl><dt style="margin:10px 0 0 20px;">
+        <b>Returns</b></dt><dd>a string representation of the object.     </p></dd></dl>
+    <dl>
+        <dt style="margin:10px 0 0 20px;">
+          <b>Overrides</b>
+        </dt>
+        <dd>
+        <a href="../../../org/modiphy/math/SMat.html" target="_self">SMat</a>.<a href="../../../org/modiphy/math/SMat.html#toString%28%29" target="_self">toString</a>
+        </dd>
+      </dl><hr></hr></div>
+
+
+    <hr></hr>
+        <table summary="" class="navigation">
+        <tr>
+          <td class="navigation-links" valign="top">
+            <!-- <table><tr></tr></table> -->
+          </td>
+          <td align="right" valign="top" style="white-space:nowrap;" rowspan="2">
+            <div class="doctitle-larger">Modiphy 0.2.0 API</div>
+          </td>
+        </tr>
+        <tr><td></td></tr>
+      </table>
+      </body>
+      </html>
