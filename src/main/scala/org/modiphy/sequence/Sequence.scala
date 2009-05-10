@@ -1,4 +1,4 @@
-package org.modphy.sequence
+package org.modiphy.sequence
 
 abstract class BioEnum(names:String*) extends Enumeration(names: _*){
   def isReal(a:Value)=true

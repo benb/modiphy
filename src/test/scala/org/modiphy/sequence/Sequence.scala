@@ -1,6 +1,6 @@
-package org.modphy.sequence
+package org.modiphy.sequence
 import org.scalatest.Suite
-import org.modphy.sequence.DNA._
+import org.modiphy.sequence.DNA._
 
 class SeqSuite extends Suite{
     def testSequence{

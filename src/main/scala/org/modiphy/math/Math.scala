@@ -1,4 +1,4 @@
-package org.modphy.math
+package org.modiphy.math
 import cern.colt.matrix._
 import cern.colt.matrix.DoubleFactory2D._
 import cern.colt.function.DoubleFunction

@@ -1,9 +1,9 @@
-package org.modphy.math
-import  org.modphy.sequence._
+package org.modiphy.math
+import  org.modiphy.sequence._
 import org.scalatest.Suite
-import org.modphy.tree._
-import org.modphy.math._
-import org.modphy.math.EnhancedMatrix._
+import org.modiphy.tree._
+import org.modiphy.math._
+import org.modiphy.math.EnhancedMatrix._
 import org.apache.commons.math.optimization.direct._
 import tlf._
 import tlf.Level._

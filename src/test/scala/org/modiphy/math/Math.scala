@@ -1,9 +1,9 @@
-package org.modphy.math
-import  org.modphy.math.EnhancedMatrix._
+package org.modiphy.math
+import  org.modiphy.math.EnhancedMatrix._
 import cern.colt.matrix.DoubleFactory2D._
 import org.scalatest.Suite
-import org.modphy.tree._
-import org.modphy.sequence.DNA
+import org.modiphy.tree._
+import org.modiphy.sequence.DNA
 
 class MathSuite extends Suite{
     def testMatrix{

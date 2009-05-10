@@ -1,12 +1,12 @@
-package org.modphy.tree
+package org.modiphy.tree
 import org.scalatest.Suite
-import org.modphy.sequence.BioSeq._
-import org.modphy.sequence._
-import org.modphy.tree._
+import org.modiphy.sequence.BioSeq._
+import org.modiphy.sequence._
+import org.modiphy.tree._
 
 class TreeSuite extends Suite{
   def testNode{
-    import org.modphy.sequence.DNA
+    import org.modiphy.sequence.DNA
     val tb = new TreeGen[DNA.type]
     val l1=tb.getLeaf("l1","AGCT",DNA,0.1)
     val l2=tb.getLeaf("l2","ACCT",DNA,0.2)

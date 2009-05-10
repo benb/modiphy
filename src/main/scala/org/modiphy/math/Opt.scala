@@ -1,6 +1,6 @@
-package org.modphy.math
-import org.modphy.tree._
-import org.modphy.sequence._
+package org.modiphy.math
+import org.modiphy.tree._
+import org.modiphy.sequence._
 import EnhancedMatrix._
 import org.apache.commons.math.analysis._
 import org.apache.commons.math.optimization.GoalType._

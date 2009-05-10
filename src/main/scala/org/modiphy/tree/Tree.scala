@@ -1,9 +1,9 @@
-package org.modphy.tree
-import org.modphy.sequence._
-import org.modphy.math.EnhancedMatrix._
+package org.modiphy.tree
+import org.modiphy.sequence._
+import org.modiphy.math.EnhancedMatrix._
 import cern.colt.matrix.DoubleFactory1D
 import scala.collection.Set
-import org.modphy.math._
+import org.modiphy.math._
 import tlf.Logging
 
 

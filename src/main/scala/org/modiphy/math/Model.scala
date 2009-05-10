@@ -1,10 +1,10 @@
-package org.modphy.math
+package org.modiphy.math
 
 import cern.colt.matrix._
-import org.modphy.tree._
-import org.modphy.sequence._
-import org.modphy.math.EnhancedMatrix._
-import org.modphy.tree.DataParse._
+import org.modiphy.tree._
+import org.modiphy.sequence._
+import org.modiphy.math.EnhancedMatrix._
+import org.modiphy.tree.DataParse._
 import scala.collection.immutable.IntMap
 import tlf.Logging
 
