@@ -66,13 +66,27 @@ class Maf(source:Iterator[String]) extends Iterator[MafAln]{
   def hasNext = {while (iter.hasNext && iter.head.matches("\\s+")){iter.next};iter.hasNext}
 }
 
+/**
+ Represents a single entry of a MAF format alignment
+ http://genome.ucsc.edu/FAQ/FAQformat#format5
+*/
 class MafAln(source:BufferedIterator[String]){
+  /**
+   Key->Value pairs from the Alignment Block Line
+  */
   val aLine = {
     val line = source.next
     assert(line startsWith "a ")
     line.split("\\s+").toList.tail.foldLeft(Map[String,String]()){(m,i)=>val s = i.split("="); m+((s(0),s(1)))}
   }
+  /**
+   Map of (Name->aligned sequence) 
+  */
   var seqs=Map[String,String]()
+
+  /**
+   iterator over sequences
+  */
   def elements = seqs.elements
   
   while (source.hasNext && !(source.head.startsWith("a"))){
