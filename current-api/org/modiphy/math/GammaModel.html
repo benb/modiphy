@@ -1,0 +1,145 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+        <head><title>class GammaModel in org.modiphy.math</title>
+        <meta http-equiv="content-type" content="text/html; charset=UTF8"></meta><meta content="scaladoc (version 2.7.4.final)" name="generator"></meta><link href="../../../style.css" type="text/css" rel="stylesheet"></link><script type="text/javascript" src="../../../script.js"></script>
+        </head>
+        <body onload="init()">
+        <table summary="" class="navigation">
+        <tr>
+          <td class="navigation-links" valign="top">
+            <!-- <table><tr></tr></table> -->
+          </td>
+          <td align="right" valign="top" style="white-space:nowrap;" rowspan="2">
+            <div class="doctitle-larger">Modiphy 0.2.0 API</div>
+          </td>
+        </tr>
+        <tr><td></td></tr>
+      </table>
+        
+      <div class="entity">
+        <a href="../../../org/modiphy/math$package.html" target="_self">org.modiphy.math</a>
+        <br></br>
+        <span class="entity">class  GammaModel</span>
+      </div><hr></hr>
+      <div class="source">
+        [source: <a href="" class="org/modiphy/math/GammaModel"><code>org/modiphy/math/GammaModel.scala</code></a>]
+      </div><hr></hr>
+      <a name="GammaModel"></a><dl>
+      <dt>
+        
+        <code></code>
+        <code>class</code>
+        <em>GammaModel</em>[<em>A</em> &lt;: <a href="../../../org/modiphy/sequence/BioEnum.html" target="_self">BioEnum</a>](<code>val </code><em>pi</em> : <a href="" target="contentFrame" class="cern/colt/matrix/DoubleMatrix1D">cern.colt.matrix.DoubleMatrix1D</a>, <code>val </code><em>sMat</em> : <a href="" target="contentFrame" class="cern/colt/matrix/DoubleMatrix2D">cern.colt.matrix.DoubleMatrix2D</a>, <code>val </code><em>tree</em> : <a href="../../../org/modiphy/tree/DataParse$object.$amplt$u003Brefinement$ampgt$u003B.html" target="_self">&lt;refinement&gt;</a>[<a href="../../../org/modiphy/math/GammaModel.html#A" target="_self">A</a>], <code>val </code><em>alpha</em> : <a href="" target="contentFrame" class="scala/Array">scala.Array</a>[<a href="http://www.scala-lang.org/docu/files/api/scala/Double.html" target="_self">Double</a>])
+      </dt>
+      <dd><code> extends </code><a href="../../../org/modiphy/math/SiteClassPiModel.html" target="_self">SiteClassPiModel</a>[<a href="../../../org/modiphy/math/GammaModel.html#A" target="_self">A</a>]<code> with </code><a href="../../../org/modiphy/math/GammaSMat.html" target="_self">GammaSMat</a>[<a href="../../../org/modiphy/math/GammaModel.html#A" target="_self">A</a>]</dd>
+    </dl>
+      
+
+<table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Values and Variables inherited from <a href="../../../org/modiphy/math/GammaSMat.html" target="_self">GammaSMat</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="../../../org/modiphy/math/GammaSMat.html#alphabet" target="_self">alphabet</a>, <a href="../../../org/modiphy/math/GammaSMat.html#numClasses" target="_self">numClasses</a>, <a href="../../../org/modiphy/math/GammaSMat.html#gamma" target="_self">gamma</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Values and Variables inherited from <a href="../../../org/modiphy/math/SMat.html" target="_self">SMat</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="../../../org/modiphy/math/SMat.html#sMatParam" target="_self">sMatParam</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Values and Variables inherited from <a href="../../../org/modiphy/math/FullPiModel.html" target="_self">FullPiModel</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="../../../org/modiphy/math/FullPiModel.html#piParam" target="_self">piParam</a>, <a href="../../../org/modiphy/math/FullPiModel.html#medianIndex" target="_self">medianIndex</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Values and Variables inherited from <a href="" target="contentFrame" class="tlf/Logging">tlf.Logging</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="#logLevel" target="contentFrame" class="tlf/Logging">tlf.Logging.logLevel</a>
+        </td></tr>
+      </table>
+<table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="../../../org/modiphy/math/GammaSMat.html" target="_self">GammaSMat</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="../../../org/modiphy/math/GammaSMat.html#qMat%28org.modiphy.tree.CalcLikelihoodNode%5BA%5D%29" target="_self">qMat</a>, <a href="../../../org/modiphy/math/GammaSMat.html#gammaQMat" target="_self">gammaQMat</a>, <a href="../../../org/modiphy/math/GammaSMat.html#getParams" target="_self">getParams</a>, <a href="../../../org/modiphy/math/GammaSMat.html#cromulent" target="_self">cromulent</a>, <a href="../../../org/modiphy/math/GammaSMat.html#setParams%28Int%29" target="_self">setParams</a>, <a href="../../../org/modiphy/math/GammaSMat.html#toString%28%29" target="_self">toString</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="../../../org/modiphy/math/SMat.html" target="_self">SMat</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="../../../org/modiphy/math/SMat.html#linearSMat" target="_self">linearSMat</a>, <a href="../../../org/modiphy/math/SMat.html#setSMat%28Array%5BDouble%5D%29" target="_self">setSMat</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="../../../org/modiphy/math/SiteClassPiModel.html" target="_self">SiteClassPiModel</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="../../../org/modiphy/math/SiteClassPiModel.html#piVals" target="_self">piVals</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="../../../org/modiphy/math/FullPiModel.html" target="_self">FullPiModel</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="../../../org/modiphy/math/FullPiModel.html#setPi%28Array%5BDouble%5D%29" target="_self">setPi</a>, <a href="../../../org/modiphy/math/FullPiModel.html#toFit" target="_self">toFit</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="../../../org/modiphy/math/Model.html" target="_self">Model</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="../../../org/modiphy/math/Model.html#logLikelihood" target="_self">logLikelihood</a>, <a href="../../../org/modiphy/math/Model.html#getMat%28org.modiphy.tree.CalcLikelihoodNode%5BA%5D%29" target="_self">getMat</a>, <a href="../../../org/modiphy/math/Model.html#likelihoods%28org.modiphy.tree.CalcLikelihoodNode%5BA%5D%29" target="_self">likelihoods</a>, <a href="../../../org/modiphy/math/Model.html#likelihoods" target="_self">likelihoods</a>, <a href="../../../org/modiphy/math/Model.html#realLikelihoods" target="_self">realLikelihoods</a>, <a href="../../../org/modiphy/math/Model.html#getTree" target="_self">getTree</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="" target="contentFrame" class="tlf/Logging">tlf.Logging</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="#log" target="contentFrame" class="tlf/Logging">tlf.Logging.log</a>, <a href="#debug" target="contentFrame" class="tlf/Logging">tlf.Logging.debug</a>, <a href="#extra" target="contentFrame" class="tlf/Logging">tlf.Logging.extra</a>, <a href="#finest" target="contentFrame" class="tlf/Logging">tlf.Logging.finest</a>, <a href="#info" target="contentFrame" class="tlf/Logging">tlf.Logging.info</a>, <a href="#warning" target="contentFrame" class="tlf/Logging">tlf.Logging.warning</a>, <a href="#severe" target="contentFrame" class="tlf/Logging">tlf.Logging.severe</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html" target="_self">AnyRef</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#getClass%28%29" target="_self">getClass</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#hashCode%28%29" target="_self">hashCode</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#equals%28Any%29" target="_self">equals</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#clone%28%29" target="_self">clone</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#notify%28%29" target="_self">notify</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#notifyAll%28%29" target="_self">notifyAll</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#wait%28Long%29" target="_self">wait</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#wait%28Long%2CInt%29" target="_self">wait</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#wait%28%29" target="_self">wait</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#finalize%28%29" target="_self">finalize</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#%3D%3D%28AnyRef%29" target="_self">==</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#%21%3D%28AnyRef%29" target="_self">!=</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#eq%28AnyRef%29" target="_self">eq</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#ne%28AnyRef%29" target="_self">ne</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/AnyRef.html#synchronized%28T0%29" target="_self">synchronized</a>
+        </td></tr>
+      </table><table summary="" cellpadding="3" class="inherited">
+        <tr><td class="title" colspan="2">
+          Methods inherited from <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html" target="_self">Any</a>
+        </td></tr>
+        <tr><td class="signature" colspan="2">
+          <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html#%3D%3D%28Any%29" target="_self">==</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html#%21%3D%28Any%29" target="_self">!=</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html#isInstanceOf" target="_self">isInstanceOf</a>, <a href="http://www.scala-lang.org/docu/files/api/scala/Any.html#asInstanceOf" target="_self">asInstanceOf</a>
+        </td></tr>
+      </table>
+
+
+      
+
+
+
+
+
+    <hr></hr>
+        <table summary="" class="navigation">
+        <tr>
+          <td class="navigation-links" valign="top">
+            <!-- <table><tr></tr></table> -->
+          </td>
+          <td align="right" valign="top" style="white-space:nowrap;" rowspan="2">
+            <div class="doctitle-larger">Modiphy 0.2.0 API</div>
+          </td>
+        </tr>
+        <tr><td></td></tr>
+      </table>
+      </body>
+      </html>
