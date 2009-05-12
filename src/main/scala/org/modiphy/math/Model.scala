@@ -82,20 +82,22 @@ trait OptBranchLengths[A <: BioEnum] extends Model[A]{
 
 trait OptBranchScale[A <: BioEnum] extends Model[A]{
   var tree:Tree[A]
+  var treeScale:Double
+
+  override def getMat(node:CalcLikelihoodNode[A])={ qMat(node).exp(node.lengthTo * treeScale) }
   private val paramNum = super.getParams.length
-  val originalBranchLengths = tree.getBranchLengths
+
   override def setParams(i:Int)(a:Array[Double])={
     if (i != paramNum){super.setParams(i)(a)}
-    else {tree = tree.setBranchLengths(originalBranchLengths.map{i=>i*a(0)}).setRoot}
+    else {treeScale = a(0)}
   }
-  def scale = tree.getBranchLengths.head/originalBranchLengths.head 
   override def getParams:List[Array[Double]]={
-    super.getParams ++ List(Array(scale))
+    super.getParams ++ List(Array(treeScale))
   }
   override def toString={
-    super.toString + "\n" + tree.toString + " (scale: " + scale.toString + " )"
+    super.toString + "\n" + tree.toString + " (scale: " + treeScale.toString + " )"
   }
-  override def cromulent=super.cromulent && !(tree.getBranchLengths.exists{_<0.0D})
+  override def cromulent=super.cromulent && treeScale >= 0.0D
 }
 
 trait CombineOpt[A <: BioEnum] extends Model[A]{
@@ -131,6 +133,20 @@ trait CombineOpt[A <: BioEnum] extends Model[A]{
 
 }
 
+trait ExposeOpt[A <: BioEnum] extends Model[A]{
+  val exposed:List[Int]
+  override def getParams:List[Array[Double]]={
+    super.getParams.zipWithIndex.filter{t=>
+        val (p,i)=t
+        exposed contains i
+      }.sort{(i,j)=>exposed.find(_==i._2).get<exposed.find(_==j._2).get}.map{_._1}
+  }
+
+  override def setParams(i:Int)(a:Array[Double]){
+    super.setParams(exposed(i))(a)
+  }
+}
+
 
 
 object Gamma{
@@ -159,8 +175,8 @@ class Gamma(numCat:Int){
 trait AlternateModel[A <: BioEnum] extends Model[A]{
   val nodeIDs:Set[Int]
   val altModel:Model[A]
-  def altModelParam:Int = altModel.getParams.length-1
-  private val paramNum=super.getParams.length
+  private lazy val startParamNum=super.getParams.length
+  private lazy val endParamNum=startParamNum + altModel.getParams.length
   override def qMat(n:CalcLikelihoodNode[A])={
     if (nodeIDs contains n.id){
       debug{"Using altmodel as " + nodeIDs + " contains " + n.id}
@@ -172,13 +188,13 @@ trait AlternateModel[A <: BioEnum] extends Model[A]{
   }
   override def getParams:List[Array[Double]]={
     //default to last parameter of altModel
-    super.getParams ++ List(altModel.getParams.last)
+    super.getParams ++ altModel.getParams
   }
   override def setParams(i:Int)(a:Array[Double])={
-    if (i==paramNum){
-      altModel.setParams(altModelParam)(a)
+    if (i>=startParamNum && i < endParamNum){
+      altModel.setParams(i-startParamNum)(a)
     }else {
-      super.setParams(altModelParam)(a)
+      super.setParams(i)(a)
     }
   }
   override def cromulent = super.cromulent && altModel.cromulent
@@ -189,11 +205,11 @@ trait AlternateModel[A <: BioEnum] extends Model[A]{
   }
 }
 
-class GammaModel[A <: BioEnum](val pi:Vector,val sMat:Matrix,var tree:Tree[A]) extends SiteClassPiModel[A] with GammaSMat[A]
+class GammaModel[A <: BioEnum](val pi:Vector,val sMat:Matrix,var tree:Tree[A],val alpha:Array[Double]) extends SiteClassPiModel[A] with GammaSMat[A]
 
 trait GammaSMat [A <: BioEnum] extends SMat[A]{
 
-  var alpha=1.0
+  val alpha:Array[Double]
   val alphabet = tree.alphabet
   val numClasses = alphabet.numClasses
   private val paramNum = super.getParams.length
@@ -201,8 +217,8 @@ trait GammaSMat [A <: BioEnum] extends SMat[A]{
 
   override def qMat(node:CalcLikelihoodNode[A]) = gammaQMat
   def gammaQMat={
-    debug{"Gamma matrix with gamma value " + alpha}
-    val gammaVals = gamma(alpha).toList
+    debug{"Gamma matrix with gamma value " + alpha(0)}
+    val gammaVals = gamma(alpha(0)).toList
     val piCat = pi.toArray
     (0 to pi.size-1).foreach{i=> piCat(i)/=numClasses}
     val qStart = Matrix(pi.size * numClasses, pi.size * numClasses)
@@ -223,18 +239,18 @@ trait GammaSMat [A <: BioEnum] extends SMat[A]{
   }
   
   override def getParams:List[Array[Double]]={
-    super.getParams ++ List(Array(alpha))
+    super.getParams ++ List(alpha)
   }
 
   override def cromulent  = {
-    super.cromulent && alpha > 0.0D && alpha < 200.0D && gamma(alpha).toList.find{_.isNaN}.isEmpty
+    super.cromulent && alpha(0) > 0.0D && alpha(0) < 200.0D && gamma(alpha(0)).toList.find{_.isNaN}.isEmpty
     //no point having alpha go higher - count as infinity
   }
 
   override def setParams(i:Int)(a:Array[Double])={
     debug{"Setting main alpha => " + a(0)}
     if (i != paramNum){super.setParams(i)(a)}
-    else {alpha = a(0)}
+    else {alpha(0) = a(0)}
   }
 
   override def toString = {
