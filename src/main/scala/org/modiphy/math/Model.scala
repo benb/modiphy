@@ -239,8 +239,13 @@ trait GammaSMat [A <: BioEnum] extends SMat[A]{
     val qStart = Matrix(pi.size * numClasses, pi.size * numClasses)
     (0 to numClasses-1).toList.zip(gammaVals).foreach{t=>
       val (i,rate)=t
-      val part = qStart.viewPart(i * numClasses,i*numClasses,pi.size,pi.size)
-      part.assign(sMat.sToQ(piCat).normalize(pi,rate))
+      println("RATE " + rate)
+      val subQ=sMat.sToQ(piCat).normalize(pi,rate)
+      println("subQ " + subQ)
+      val part = qStart.viewPart(i * pi.size,i*pi.size,pi.size,pi.size)
+      println("QSTART before" + qStart)
+      part.assign(subQ)
+      println("QSTART after" + qStart)
     }
     if (qStart exists {d=>d.isNaN}){
       println("ERROR ")
@@ -250,6 +255,7 @@ trait GammaSMat [A <: BioEnum] extends SMat[A]{
       println("gamma Rates " + gammaVals)
       println("qMat " + qStart)
     }
+    println("QSTART" + qStart)
     qStart
   }
   
@@ -279,8 +285,11 @@ trait SiteClassPiModel[A <: BioEnum] extends FullPiModel[A]{
     val numClasses = tree.alphabet.numClasses
     val piStart = Vector(pi.size * numClasses)
     val piCat = pi.toArray
+    println(numClasses + " " + piStart + " " + pi)
     (0 to piCat.length-1).foreach{i=> piCat(i)/=numClasses}
-    (0 to piCat.length-1).foreach{i=> piStart.viewPart(i * pi.size,pi.size).assign(piCat)}
+    (0 to numClasses-1).foreach{i=> 
+      println("piStart.viewPart("+i+" * "+pi.size+","+pi.size+").assign("+piCat+")")
+      piStart.viewPart(i * pi.size,pi.size).assign(piCat)}
     piStart
   }
 }

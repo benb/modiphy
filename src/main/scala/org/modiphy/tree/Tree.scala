@@ -107,7 +107,6 @@ class CalcLikelihoodNode[A <: BioEnum](children:List[LikelihoodNode[A]],alphabet
   override def childElements:Iterator[LikelihoodNode[A]] = children.elements
   
   def realLikelihoods = {
-
     likelihoods.map{vec=>
       val ans = model.piVals.toArray.elements.zipWithIndex.map{t=>
         val(p,i)=t
@@ -115,7 +114,6 @@ class CalcLikelihoodNode[A <: BioEnum](children:List[LikelihoodNode[A]],alphabet
       }.foldLeft(0.0D){_+_}
       ans
     }
-
   }
   def logLikelihood={
     val lkl = realLikelihoods
