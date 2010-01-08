@@ -15,22 +15,38 @@ trait Model[A <: BioEnum] extends Logging{
   def setParams(paramSet:Int)(params:Array[Double]){}
   def cromulent = true
   var tree:Tree[A]
-  def qMat(node:CalcLikelihoodNode[A])={
-    sMat.sToQ(pi).normalize
+  lazy val qMat:Matrix=sMat.sToQ(pi).normalize(pi)
+  def qMat(node:LikelihoodNode[A]):Matrix=qMat //identical for all nodes in basic model, so cache
 
-  }
+  def getMat(node:LikelihoodNode[A])={ debug{"e^Qt: t==" + node.lengthTo}; qMat(node).exp(node.lengthTo) }
+  def likelihoods(node:CalcLikelihoodNode[A]):List[Vector]={
+    val childLkl = node.childElements.map{i:LikelihoodNode[A]=>(i.likelihoods,i.lengthTo)}.toList
 
-  def getMat(node:CalcLikelihoodNode[A])={ qMat(node).exp(node.lengthTo) }
-  def likelihoods(node:CalcLikelihoodNode[A])={
-    val childLkl = node.childElements.map{i:LikelihoodNode[A]=>(i.likelihoods,i.lengthTo)}
-    val intermediates= childLkl.map{t=>
-    val (siteVectorList,length)=t // list of vectors  1 for each site
+    val intermediates= childLkl.zip(node.childElements.toList).map{t=>
+    val ((siteVectorList,length),c)=t // list of vectors  1 for each site
     //println ("siteVectorList " + siteVectorList)
     //println("Q = " + qMat)
-    val matrix = getMat(node) //e^Qt
-    //println("e^Qt=" + matrix)
+    debug("Q = " + qMat(c))
     siteVectorList.map{siteVector=>
-      val alphabet = node.alphabet
+      val alphabet = c.alphabet
+
+    val matrix = getMat(c) //e^Qt
+    debug{"e^Qt=" + matrix}
+    if (matrix.exists{d=> d<0.0D}){
+      info("BAD MATRIX")
+      info("LENGTH=" + node.lengthTo)
+      info(node.name.toString)
+      info(node.toString)
+      info(node.isRoot.toString)
+      info(sMat.sToQ(pi).toString)
+      info(sMat.sToQ(pi).normalize(pi).toString)
+      info(sMat.sToQ(pi).normalize(pi).diagonal.zSum.toString)
+      info(sMat.sToQ(pi).normalize(pi).exp(1).toString)
+      info(sMat.sToQ(pi).normalize(pi).exp(node.lengthTo).toString)
+    }
+ 
+
+
 
       val ret = DoubleFactory1D.dense.make(alphabet.matLength) 
         (0 to alphabet.matLength - 1).foreach{i=>
@@ -50,10 +66,9 @@ trait Model[A <: BioEnum] extends Logging{
       }
     }
     ans
-
   }
 
-  def likelihoods=tree.mkLkl(this).likelihoods
+  def likelihoods:List[Vector]=tree.mkLkl(this).likelihoods
   def realLikelihoods=tree.mkLkl(this).realLikelihoods
 
   def pi:Vector
@@ -84,7 +99,7 @@ trait OptBranchScale[A <: BioEnum] extends Model[A]{
   var tree:Tree[A]
   var treeScale:Double
 
-  override def getMat(node:CalcLikelihoodNode[A])={ qMat(node).exp(node.lengthTo * treeScale) }
+  override def getMat(node:LikelihoodNode[A])={ qMat(node).exp(node.lengthTo * treeScale) }
   private val paramNum = super.getParams.length
 
   override def setParams(i:Int)(a:Array[Double])={
@@ -139,7 +154,7 @@ trait ExposeOpt[A <: BioEnum] extends Model[A]{
     super.getParams.zipWithIndex.filter{t=>
         val (p,i)=t
         exposed contains i
-      }.sort{(i,j)=>exposed.find(_==i._2).get<exposed.find(_==j._2).get}.map{_._1}
+      }.sort{(i,j)=>exposed.find(_==i._2).get < exposed.find(_==j._2).get}.map{_._1}
   }
 
   override def setParams(i:Int)(a:Array[Double]){
@@ -177,7 +192,7 @@ trait AlternateModel[A <: BioEnum] extends Model[A]{
   val altModel:Model[A]
   private lazy val startParamNum=super.getParams.length
   private lazy val endParamNum=startParamNum + altModel.getParams.length
-  override def qMat(n:CalcLikelihoodNode[A])={
+  override def qMat(n:LikelihoodNode[A])={
     if (nodeIDs contains n.id){
       debug{"Using altmodel as " + nodeIDs + " contains " + n.id}
       altModel.qMat(n)
@@ -215,8 +230,8 @@ trait GammaSMat [A <: BioEnum] extends SMat[A]{
   private val paramNum = super.getParams.length
   val gamma = new Gamma(numClasses)
 
-  override def qMat(node:CalcLikelihoodNode[A]) = gammaQMat
-  def gammaQMat={
+  override def qMat(node:LikelihoodNode[A]) = gammaQMat
+  lazy val gammaQMat={
     debug{"Gamma matrix with gamma value " + alpha(0)}
     val gammaVals = gamma(alpha(0)).toList
     val piCat = pi.toArray
@@ -225,7 +240,7 @@ trait GammaSMat [A <: BioEnum] extends SMat[A]{
     (0 to numClasses-1).toList.zip(gammaVals).foreach{t=>
       val (i,rate)=t
       val part = qStart.viewPart(i * numClasses,i*numClasses,pi.size,pi.size)
-      part.assign(sMat.sToQ(piCat).normalize(rate))
+      part.assign(sMat.sToQ(piCat).normalize(pi,rate))
     }
     if (qStart exists {d=>d.isNaN}){
       println("ERROR ")

@@ -35,30 +35,30 @@ class TreeGen[A <: BioEnum]{
 */
 object DataParse{
   type Tree[A <: BioEnum]=Node[A] with RootNode[A]
-  type Alignment=Map[String,String]
+  import sequence.Alignment
 
   private def cleanTree(t:String)=t.split("\\s+").mkString("").split("\n").mkString("")
 
   /**
    Produce a parsed Tree and alignment from a newick file and a fasta file
   */
-  def apply[A <: BioEnum](tree:String,alignment:Iterator[String],alphabet:A):(Tree[A],Alignment)={
+  def apply[A <: BioEnum](tree:String,alignment:Iterator[String],alphabet:A):(Tree[A],Alignment[A])={
     val aln = new Fasta(alignment)
     val seqMap = aln.foldLeft(Map[String,String]()){_+_}
-    apply(tree,seqMap,alphabet)
+    apply(tree,new Alignment(seqMap,alphabet),alphabet)
   }
 
   
-  def apply[A <: BioEnum](tree:String,aln:Alignment,alphabet:A):(Tree[A],Alignment)={
-    val root = new TreeParser[A](aln,alphabet){def parseAll=parse(root,cleanTree(tree))}.parseAll.get.setRoot
+  def apply[A <: BioEnum](tree:String,aln:Alignment[A],alphabet:A):(Tree[A],Alignment[A])={
+    val root = new TreeParser[A](aln.map,alphabet){def parseAll=parse(root,cleanTree(tree))}.parseAll.get.setRoot
     (root,aln)
   }
 
-  def dropNodes[A <: BioEnum](tree:String,aln:Alignment,alphabet:A):(Tree[A],Alignment)={
+  def dropNodes[A <: BioEnum](tree:String,aln:Alignment[A],alphabet:A):(Tree[A],Alignment[A])={
     val t1:Tree[A] = apply(tree,alphabet)
-    val t2 = t1.restrictTo(aln.keySet).setRoot
+    val t2 = t1.restrictTo(aln.map.keySet).setRoot
     //println(t2)
-    (t2.setAlign(aln).setRoot,aln)
+    (t2.setAlign(aln.map).setRoot,aln)
   }
 
   def apply[A <: BioEnum](tree:String,alphabet:A):Tree[A]={
@@ -201,7 +201,7 @@ class INode[A <: BioEnum](val children:List[Node[A]],val alphabet:A,val lengthTo
         //maybe need to remove if useless internal
       }
     }.map{_.removeUseless}
-    if (newChildren.length==1 && newChildren(0).isInstanceOf[INode[A]]){
+    if (newChildren.length==1){// This check can't be made because of erasure: && newChildren(0).isInstanceOf[INode[A]]){
         newChildren(0).asInstanceOf[INode[A]]
     }else{
       factory(newChildren,alphabet,lengthTo)

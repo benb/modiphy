@@ -21,14 +21,17 @@ object EnhancedMatrix{
   implicit def enhanceVector(m:Vector)=new EnhancedVector(m)
   private lazy val algebra = new Algebra
 }
+import EnhancedMatrix._
 object Vector{
-  def apply(i:Int)=cern.colt.matrix.DoubleFactory1D.dense.make(i)
+  def apply(i:Int):Vector=cern.colt.matrix.DoubleFactory1D.dense.make(i)
+  def apply(a:Double*):Vector=Vector(a.toArray)
+  def apply(a:Array[Double]):Vector=cern.colt.matrix.DoubleFactory1D.dense.make(a.toArray)
+  def apply(l:List[Double]):Vector=Vector(l.toArray)
 }
 object Matrix{
   def apply(i:Int,j:Int)=dense.make(i,j)
 }
 
-import EnhancedMatrix._
 object MatExp{
   private lazy val algebra = new Algebra
   import scala.collection.jcl.WeakHashMap
@@ -76,15 +79,26 @@ class EnhancedMatrix(d:DoubleMatrix2D){
     }
     q
   }
-  def normalize:Matrix=normalize(1.0D)
-  
-  def normalize(i:Double):Matrix={
-    val normFact = -(dense.diagonal(d).zSum)
-    d.copy.assign(new DoubleFunction(){def apply(d:Double)= i * d/normFact})
+  def normalize(v:Vector):Matrix=normalize(v,1.0D)
+  def normalize(v:Vector,overall:Double):Matrix={
+    val sum = -dense.diagonal(d).zDotProduct(v)
+    d.copy.assign(new DoubleFunction(){def apply(d:Double)= overall * d/sum})
   }
 
   def exists(f: Double=>Boolean):Boolean={
    d.toArray.toList.exists{row:Array[Double] => row.toList.exists(f)}
+  }
+
+  def diagonal=dense.diagonal(d)
+
+  def toUpper={
+    val s = d.like
+    (0 to d.rows-1).foreach{i=>
+      (i to d.columns-1).foreach{j=>
+        s(i,j)=d(j,i) 
+      }
+    }
+  s
   }
 
 }
@@ -96,4 +110,12 @@ class EnhancedVector(d:DoubleMatrix1D){
   def apply(i:ID):Double=apply(i.id)
   def update(i:Int,v:Double):Unit=d.set(i,v)
   def update(i:ID,v:Double):Unit=update(i.id,v)
+  def *(n:Double)=d.assign(new DoubleFunction(){def apply(v:Double)=v * n})
+  def /(n:Double)={*(1/n)}
+  def normalize(a:Double):Vector={
+    val sum = d.zSum
+    d.copy.assign(new DoubleFunction(){def apply(o:Double)=a*o/sum})
+  }
+
+  def normalize:Vector=normalize(1.0D)
 }
