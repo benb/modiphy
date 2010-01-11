@@ -4,7 +4,7 @@ import cern.colt.matrix.DoubleFactory2D._
 import cern.colt.function.DoubleFunction
 import cern.colt.matrix.linalg.{Algebra,EigenvalueDecomposition}
 
-object Model{
+object BasicModel{
   def GTR={
     val vector = Vector(4)
     vector assign 0.25
@@ -34,17 +34,27 @@ object Matrix{
 
 object MatExp{
   private lazy val algebra = new Algebra
+  private lazy val cacheAns = new scala.collection.jcl.WeakHashMap[(String,Double),Matrix]()
   import scala.collection.jcl.WeakHashMap
-  private lazy val cache:WeakHashMap[Matrix,(EigenvalueDecomposition,Matrix)] = new WeakHashMap()
+  private lazy val cache:WeakHashMap[String,(EigenvalueDecomposition,Matrix)] = new WeakHashMap()
   def decomp(m:Matrix)={
-    cache.getOrElseUpdate(m,{val e = new EigenvalueDecomposition(m); (e,algebra.inverse(e.getV))})
+    cache.getOrElseUpdate(m.toString,{val e = new EigenvalueDecomposition(m); (e,algebra.inverse(e.getV))})
   }
   def exp(m:Matrix,t:Double) = {
-    val (eigen,vprime)=decomp(m)
-    //println(eigen)
-    val v = eigen.getV
-    //println("M " + m)
-    v * (eigen.getD expVals t) * vprime
+    if (cacheAns.contains((m.toString,t))){
+      println("cache hit " + m(1,1) + " " + t)
+      cacheAns((m.toString,t))
+    }else{
+      println("cache miss" + m(1,1) + " " + t)
+      val (eigen,vprime)=decomp(m)
+      //println(eigen)
+      val v = eigen.getV
+      //println("M " + m)
+      println("EXP " + m(0,0))
+      val ans = v * (eigen.getD expVals t) * vprime
+      cacheAns.put((m.toString,t),ans)
+      ans
+    }
   }
 }
 class EnhancedMatrix(d:DoubleMatrix2D){

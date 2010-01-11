@@ -10,13 +10,14 @@ import tlf.Logging
 
 class UnknownParamException(i:Int) extends java.lang.RuntimeException("Unknown parameter " + i.toString)
 trait Model[A <: BioEnum] extends Logging{
-  def logLikelihood=if (cromulent){tree.mkLkl(this).logLikelihood}else{Math.NEG_INF_DOUBLE}
+  def likelihoodTree = tree.mkLkl(this)
+  def logLikelihood=if (cromulent){likelihoodTree.logLikelihood}else{Math.NEG_INF_DOUBLE}
   def getParams:List[Array[Double]] = List()
   def setParams(paramSet:Int)(params:Array[Double]){}
   def cromulent = true
   var tree:Tree[A]
-  lazy val qMat:Matrix=sMat.sToQ(pi).normalize(pi)
-  def qMat(node:LikelihoodNode[A]):Matrix=qMat //identical for all nodes in basic model, so cache
+  lazy val qMat:Matrix={sMat.sToQ(pi).normalize(pi)}
+  def qMat(node:LikelihoodNode[A]):Matrix=qMat //identical for all nodes in basic model, so can cache
 
   def getMat(node:LikelihoodNode[A])={ debug{"e^Qt: t==" + node.lengthTo}; qMat(node).exp(node.lengthTo) }
   def likelihoods(node:CalcLikelihoodNode[A]):List[Vector]={
@@ -27,10 +28,10 @@ trait Model[A <: BioEnum] extends Logging{
     //println ("siteVectorList " + siteVectorList)
     //println("Q = " + qMat)
     debug("Q = " + qMat(c))
+    val matrix = getMat(c) //e^Qt
     siteVectorList.map{siteVector=>
       val alphabet = c.alphabet
 
-    val matrix = getMat(c) //e^Qt
     debug{"e^Qt=" + matrix}
     if (matrix.exists{d=> d<0.0D}){
       info("BAD MATRIX")
@@ -68,13 +69,13 @@ trait Model[A <: BioEnum] extends Logging{
     ans
   }
 
-  def likelihoods:List[Vector]=tree.mkLkl(this).likelihoods
-  def realLikelihoods=tree.mkLkl(this).realLikelihoods
+  def likelihoods:List[Vector]=likelihoodTree.likelihoods
+  def realLikelihoods=likelihoodTree.realLikelihoods
 
   def pi:Vector
   def sMat:Matrix
   def piVals=pi
-  def getTree = tree.mkLkl(this)
+  def getTree = likelihoodTree
   override def toString ="Model:\n:"
   
 }
@@ -232,6 +233,8 @@ trait GammaSMat [A <: BioEnum] extends SMat[A]{
 
   override def qMat(node:LikelihoodNode[A]) = gammaQMat
   lazy val gammaQMat={
+    println("HELLO")
+    println("PI: " + pi)
     debug{"Gamma matrix with gamma value " + alpha(0)}
     val gammaVals = gamma(alpha(0)).toList
     val piCat = pi.toArray
@@ -239,13 +242,9 @@ trait GammaSMat [A <: BioEnum] extends SMat[A]{
     val qStart = Matrix(pi.size * numClasses, pi.size * numClasses)
     (0 to numClasses-1).toList.zip(gammaVals).foreach{t=>
       val (i,rate)=t
-      println("RATE " + rate)
       val subQ=sMat.sToQ(piCat).normalize(pi,rate)
-      println("subQ " + subQ)
       val part = qStart.viewPart(i * pi.size,i*pi.size,pi.size,pi.size)
-      println("QSTART before" + qStart)
       part.assign(subQ)
-      println("QSTART after" + qStart)
     }
     if (qStart exists {d=>d.isNaN}){
       println("ERROR ")
@@ -255,7 +254,6 @@ trait GammaSMat [A <: BioEnum] extends SMat[A]{
       println("gamma Rates " + gammaVals)
       println("qMat " + qStart)
     }
-    println("QSTART" + qStart)
     qStart
   }
   
@@ -276,7 +274,7 @@ trait GammaSMat [A <: BioEnum] extends SMat[A]{
 
   override def toString = {
     super.toString + "\n"+
-    "shape: " + alpha  
+    "shape: " + alpha(0)  
   }
 }
 
@@ -285,10 +283,10 @@ trait SiteClassPiModel[A <: BioEnum] extends FullPiModel[A]{
     val numClasses = tree.alphabet.numClasses
     val piStart = Vector(pi.size * numClasses)
     val piCat = pi.toArray
-    println(numClasses + " " + piStart + " " + pi)
+  //  println(numClasses + " " + piStart + " " + pi)
     (0 to piCat.length-1).foreach{i=> piCat(i)/=numClasses}
     (0 to numClasses-1).foreach{i=> 
-      println("piStart.viewPart("+i+" * "+pi.size+","+pi.size+").assign("+piCat+")")
+    //  println("piStart.viewPart("+i+" * "+pi.size+","+pi.size+").assign("+piCat+")")
       piStart.viewPart(i * pi.size,pi.size).assign(piCat)}
     piStart
   }
