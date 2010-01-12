@@ -120,6 +120,10 @@ class MafAln(source:BufferedIterator[String]){
 }
 
 class Alignment[A<:BioEnum](val map:Map[String,String],val alphabet:A){
+
+  val stateMap=map.map{t=>(t._1,t._2.split("").drop(1).map{alphabet.valueOf(_).getOrElse(alphabet.unknown)}.toList)}.foldLeft(Map[String,List[alphabet.Value]]()){_+_}
+  def get(a:String):List[alphabet.Value]=stateMap.get(a).getOrElse(Nil)
+
   def apply(a:String)=map(a)
   lazy val columns:List[List[String]] = new FlippedIterator(map.values.map{s=>s.split("").drop(1).elements}.toList).toList
   def getF={
