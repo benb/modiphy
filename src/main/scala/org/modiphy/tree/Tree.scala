@@ -75,9 +75,10 @@ import DataParse._
 trait Node[A <: BioEnum] extends Logging{
   val id:Int
   val isRoot=false
-  def mkLkl(mod:Model[A]):LikelihoodNode[A]
+  def alphabet:A
   def lengthTo:Double
   def child(i:Int):Option[Node[A]]
+  def children:List[Node[A]]
   def name:String
   def descendents:List[String]
   def numChildren:Int
@@ -92,49 +93,7 @@ trait Node[A <: BioEnum] extends Logging{
   def setNewDataType[B <: BioEnum](alphabet:B):Node[B]
 
   def nodes=this::descendentNodes
-}
-
-trait LikelihoodNode[A <: BioEnum] extends Node[A]{
-  val alphabet:A
-  def likelihoods:List[Vector]
-}
-
-class CalcLikelihoodNode[A <: BioEnum](children:List[LikelihoodNode[A]],alphabet:A,lengthTo:Double,val model:Model[A],id:Int) extends INode[A](children,alphabet,lengthTo,id) with LikelihoodNode[A]{
-  //return a list of the lists of probabilties for each site
-
-
-
-  override def childElements:Iterator[LikelihoodNode[A]] = children.elements
-  
-  def realLikelihoods = {
-    likelihoods.map{vec=>
-      val ans = model.piVals.toArray.elements.zipWithIndex.map{t=>
-        val(p,i)=t
-        vec(i)*p
-      }.foldLeft(0.0D){_+_}
-      ans
-    }
-  }
-  def logLikelihood={
-    val lkl = realLikelihoods
-    lkl.foldLeft(0.0D){(i,j)=>i+Math.log(j)}
-  }
-  override lazy val likelihoods:List[Vector]={
-    model.likelihoods(this)
-  }
-}
-
-class LeafLikelihoodNode[A <: BioEnum](name:String,seq:String,alpha:A,lengthTo:Double,id:Int) extends Leaf[A](name,seq,alpha,lengthTo,id) with LikelihoodNode[A]{
-  val sequence=alphabet.parseString(seq.toUpperCase)
-  override lazy val likelihoods:List[Vector]={
-    val elements = alphabet.matLength
-    sequence.map{a=>
-      val vec = DoubleFactory1D.dense.make(alphabet.matLength)
-        alphabet.getNums(a).foreach{i=>
-        vec(i)=1.0D}
-        vec
-    }.toList
-  }
+  def likelihoods(m:Model[A]):List[Vector]=m.likelihoods(this)
 }
 
 trait RootNode[A <: BioEnum] extends INode[A]{
@@ -158,6 +117,19 @@ trait RootNode[A <: BioEnum] extends INode[A]{
 }
 
 class INode[A <: BioEnum](val children:List[Node[A]],val alphabet:A,val lengthTo:Double,val id:Int) extends Node[A]{ 
+  def realLikelihoods(m:Model[A]) = {
+    likelihoods(m).map{vec=>
+      val ans = m.piVals.toArray.elements.zipWithIndex.map{t=>
+        val(p,i)=t
+        vec(i)*p
+      }.foldLeft(0.0D){_+_}
+      ans
+    }
+  }
+  def logLikelihood(m:Model[A])={
+    val lkl = realLikelihoods(m)
+    lkl.foldLeft(0.0D){(i,j)=>i+Math.log(j)}
+  }
   val name=""
 
   def setNewDataType[B <: BioEnum](alpha:B)=new INode[B](children.map{i=> i.setNewDataType(alpha)},alpha,lengthTo,id)
@@ -169,11 +141,6 @@ class INode[A <: BioEnum](val children:List[Node[A]],val alphabet:A,val lengthTo
   def child(i:Int)=if (i < children.length){Some(children(i))}else{None}
   def length(i:Int):Double=children(i).lengthTo
   def length(n:Node[A]):Double=children.find{node=>node==n}.get.lengthTo
-  def mkLkl(mod:Model[A]):CalcLikelihoodNode[A]=if (isRoot){
-    new CalcLikelihoodNode[A](children.map{t=>t.mkLkl(mod)}.toList,alphabet,lengthTo,mod,id) with RootNode[A]
-  }else { 
-    new CalcLikelihoodNode[A](children.map{t=>t.mkLkl(mod)}.toList,alphabet,lengthTo,mod,id) 
-  }
   def restrictTo(allowed:Set[String])={
     val newChildren=children.filter{child=>child.descendents.exists{name=>allowed contains name}}map{_.restrictTo(allowed)}
     //println(children.toString + " => " + newChildren.toString)
@@ -230,6 +197,19 @@ class INode[A <: BioEnum](val children:List[Node[A]],val alphabet:A,val lengthTo
 
 class Leaf[A <: BioEnum](val name:String,val seq:String,val alphabet:A,val lengthTo:Double, val id:Int) extends Node[A]{
 
+  def children:List[Node[A]]=Nil
+
+  val sequence=alphabet.parseString(seq.toUpperCase)
+  lazy val likelihoods:List[Vector]={
+    sequence.map{a=>
+      val vec = Vector(alphabet.matLength)
+        alphabet.getNums(a).foreach{i=>
+        vec(i)=1.0D}
+        vec
+    }.toList
+  }
+  override def likelihoods(m:Model[A]):List[Vector]=likelihoods
+
   def setNewDataType[B <: BioEnum](alpha:B)=new Leaf[B](name,seq,alpha,lengthTo,id)
 
   def descendentNodes=List()
@@ -237,7 +217,6 @@ class Leaf[A <: BioEnum](val name:String,val seq:String,val alphabet:A,val lengt
   //   println("Node " + this + " setting branch length " + l.head)
      new Leaf[A](name,seq,alphabet,l.head,id)
  }
-  def mkLkl(mod:Model[A])=new LeafLikelihoodNode[A](name,seq,alphabet,lengthTo,id)
   def child(i:Int)=None
   def descendents=List(name)
   def resize(bl:Double) = new Leaf[A](name,seq,alphabet,bl,id)

@@ -11,20 +11,20 @@ import tlf.Logging
 class UnknownParamException(i:Int) extends java.lang.RuntimeException("Unknown parameter " + i.toString)
 trait Model[A <: BioEnum] extends Logging{
   val careful=false
-  def likelihoodTree = tree.mkLkl(this)
-  def logLikelihood=if (cromulent){likelihoodTree.logLikelihood}else{Math.NEG_INF_DOUBLE}
+  def likelihoodTree = tree
+  def logLikelihood=if (cromulent){likelihoodTree.logLikelihood(this)}else{Math.NEG_INF_DOUBLE}
   def getParams:List[Array[Double]] = List()
   def setParams(paramSet:Int)(params:Array[Double]){}
   def cromulent = true
   var tree:Tree[A]
   def qMat:Matrix={sMat.sToQ(pi).normalize(pi)}
-  def qMat(node:LikelihoodNode[A]):Matrix=qMat //identical for all nodes in basic model, so can cache
+  def qMat(node:Node[A]):Matrix=qMat //identical for all nodes in basic model, so can cache
 
-  def getMat(node:LikelihoodNode[A])={ debug{"e^Qt: t==" + node.lengthTo}; qMat(node).exp(node.lengthTo) }
-  def likelihoods(node:CalcLikelihoodNode[A]):List[Vector]={
-    val childLkl = node.childElements.map{i:LikelihoodNode[A]=>(i.likelihoods,i.lengthTo)}.toList
+  def getMat(node:Node[A])={ debug{"e^Qt: t==" + node.lengthTo}; qMat(node).exp(node.lengthTo) }
+  def likelihoods(node:Node[A]):List[Vector]={
+    val childLkl = node.children.map{i:Node[A]=>(i.likelihoods(this),i.lengthTo)}.toList
 
-    val intermediates= childLkl.zip(node.childElements.toList).map{t=>
+    val intermediates= childLkl.zip(node.children.toList).map{t=>
     val ((siteVectorList,length),c)=t // list of vectors  1 for each site
     //println ("siteVectorList " + siteVectorList)
     //println("Q = " + qMat)
@@ -68,8 +68,8 @@ trait Model[A <: BioEnum] extends Logging{
     ans
   }
 
-  def likelihoods:List[Vector]=likelihoodTree.likelihoods
-  def realLikelihoods=likelihoodTree.realLikelihoods
+  def likelihoods:List[Vector]=likelihoodTree.likelihoods(this)
+  def realLikelihoods=likelihoodTree.realLikelihoods(this)
 
   def pi:Vector
   def sMat:Matrix
@@ -99,7 +99,7 @@ trait OptBranchScale[A <: BioEnum] extends Model[A]{
   var tree:Tree[A]
   var treeScale:Double
 
-  override def getMat(node:LikelihoodNode[A])={ qMat(node).exp(node.lengthTo * treeScale) }
+  override def getMat(node:Node[A])={ qMat(node).exp(node.lengthTo * treeScale) }
   private val paramNum = super.getParams.length
 
   override def setParams(i:Int)(a:Array[Double])={
@@ -192,7 +192,7 @@ trait AlternateModel[A <: BioEnum] extends Model[A]{
   val altModel:Model[A]
   private lazy val startParamNum=super.getParams.length
   private lazy val endParamNum=startParamNum + altModel.getParams.length
-  override def qMat(n:LikelihoodNode[A])={
+  override def qMat(n:Node[A])={
     if (nodeIDs contains n.id){
       debug{"Using altmodel as " + nodeIDs + " contains " + n.id}
       altModel.qMat(n)
@@ -230,7 +230,7 @@ trait GammaSMat [A <: BioEnum] extends SMat[A]{
   private val paramNum = super.getParams.length
   val gamma = new Gamma(numClasses)
 
-  override def qMat(node:LikelihoodNode[A]) = {
+  override def qMat(node:Node[A]) = {
     if (cachedQMat.isEmpty){
       cachedQMat=Some(gammaQMat)
     }
