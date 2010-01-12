@@ -25,7 +25,7 @@ import EnhancedMatrix._
 object Vector{
   def apply(i:Int):Vector=cern.colt.matrix.DoubleFactory1D.dense.make(i)
   def apply(a:Double*):Vector=Vector(a.toArray)
-  def apply(a:Array[Double]):Vector=cern.colt.matrix.DoubleFactory1D.dense.make(a.toArray)
+  def apply(a:Array[Double]):Vector=cern.colt.matrix.DoubleFactory1D.dense.make(a)
   def apply(l:List[Double]):Vector=Vector(l.toArray)
 }
 object Matrix{
