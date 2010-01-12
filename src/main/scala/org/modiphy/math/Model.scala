@@ -16,7 +16,7 @@ trait Model[A <: BioEnum] extends Logging{
   def setParams(paramSet:Int)(params:Array[Double]){}
   def cromulent = true
   var tree:Tree[A]
-  lazy val qMat:Matrix={sMat.sToQ(pi).normalize(pi)}
+  def qMat:Matrix={sMat.sToQ(pi).normalize(pi)}
   def qMat(node:LikelihoodNode[A]):Matrix=qMat //identical for all nodes in basic model, so can cache
 
   def getMat(node:LikelihoodNode[A])={ debug{"e^Qt: t==" + node.lengthTo}; qMat(node).exp(node.lengthTo) }
@@ -49,14 +49,12 @@ trait Model[A <: BioEnum] extends Logging{
 
 
 
-      val ret = DoubleFactory1D.dense.make(alphabet.matLength) 
+      val ret = new Array[Double](alphabet.matLength) 
         (0 to alphabet.matLength - 1).foreach{i=>
-          (0 to alphabet.matLength - 1).foreach{j=>
-            ret(j)=ret(j) + siteVector(i) * matrix(j,i)
-          }
+          ret(i)=siteVector.zDotProduct(matrix.viewRow(i))
         }
         //println("MAP => " +siteVector + " " + ret)
-        ret
+        Vector(ret)
       }
     }.toList
     val ans = intermediates.head
@@ -231,10 +229,18 @@ trait GammaSMat [A <: BioEnum] extends SMat[A]{
   private val paramNum = super.getParams.length
   val gamma = new Gamma(numClasses)
 
-  override def qMat(node:LikelihoodNode[A]) = gammaQMat
-  lazy val gammaQMat={
-    println("HELLO")
-    println("PI: " + pi)
+  override def qMat(node:LikelihoodNode[A]) = {
+    if (cachedQMat.isEmpty){
+      cachedQMat=Some(gammaQMat)
+    }
+    cachedQMat.get
+  }
+
+  var cachedQMat:Option[Matrix]=None
+
+  def gammaQMat={
+   // println("HELLO")
+   // println("PI: " + pi)
     debug{"Gamma matrix with gamma value " + alpha(0)}
     val gammaVals = gamma(alpha(0)).toList
     val piCat = pi.toArray
@@ -267,6 +273,7 @@ trait GammaSMat [A <: BioEnum] extends SMat[A]{
   }
 
   override def setParams(i:Int)(a:Array[Double])={
+    cachedQMat=None//wipe cache
     debug{"Setting main alpha => " + a(0)}
     if (i != paramNum){super.setParams(i)(a)}
     else {alpha(0) = a(0)}

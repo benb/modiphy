@@ -34,27 +34,15 @@ object Matrix{
 
 object MatExp{
   private lazy val algebra = new Algebra
-  private lazy val cacheAns = new scala.collection.jcl.WeakHashMap[(String,Double),Matrix]()
   import scala.collection.jcl.WeakHashMap
   private lazy val cache:WeakHashMap[String,(EigenvalueDecomposition,Matrix)] = new WeakHashMap()
   def decomp(m:Matrix)={
     cache.getOrElseUpdate(m.toString,{val e = new EigenvalueDecomposition(m); (e,algebra.inverse(e.getV))})
   }
   def exp(m:Matrix,t:Double) = {
-    if (cacheAns.contains((m.toString,t))){
-      println("cache hit " + m(1,1) + " " + t)
-      cacheAns((m.toString,t))
-    }else{
-      println("cache miss" + m(1,1) + " " + t)
-      val (eigen,vprime)=decomp(m)
-      //println(eigen)
-      val v = eigen.getV
-      //println("M " + m)
-      println("EXP " + m(0,0))
-      val ans = v * (eigen.getD expVals t) * vprime
-      cacheAns.put((m.toString,t),ans)
-      ans
-    }
+    val (eigen,vprime)=decomp(m)
+    val v = eigen.getV
+    v * (eigen.getD expVals t) * vprime
   }
 }
 class EnhancedMatrix(d:DoubleMatrix2D){
