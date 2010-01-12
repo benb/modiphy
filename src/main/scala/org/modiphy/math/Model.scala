@@ -10,6 +10,7 @@ import tlf.Logging
 
 class UnknownParamException(i:Int) extends java.lang.RuntimeException("Unknown parameter " + i.toString)
 trait Model[A <: BioEnum] extends Logging{
+  val careful=false
   def likelihoodTree = tree.mkLkl(this)
   def logLikelihood=if (cromulent){likelihoodTree.logLikelihood}else{Math.NEG_INF_DOUBLE}
   def getParams:List[Array[Double]] = List()
@@ -33,7 +34,7 @@ trait Model[A <: BioEnum] extends Logging{
       val alphabet = c.alphabet
 
     debug{"e^Qt=" + matrix}
-    if (matrix.exists{d=> d<0.0D}){
+    if (careful && matrix.exists{d=> d<0.0D}){ //probably don't want to do this - it is SLOW
       info("BAD MATRIX")
       info("LENGTH=" + node.lengthTo)
       info(node.name.toString)
