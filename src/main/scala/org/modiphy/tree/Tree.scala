@@ -126,7 +126,7 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
   }
   def logLikelihood(m:Model[A])={
     val lkl = realLikelihoods(m)
-    lkl.foldLeft(0.0D){(i,j)=>i+Math.log(j)}
+    lkl.zip(aln.pCount).foldLeft(0.0D){(i,j)=>i+Math.log(j._1)*j._2}
   }
   val name=""
 
@@ -195,7 +195,7 @@ class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Doubl
 
   def children:List[Node[A]]=Nil
 
-  val sequence:List[alphabet.Value]=aln.get(name).asInstanceOf[List[alphabet.Value]]
+  val sequence:List[alphabet.Value]=aln.getPatterns(name).asInstanceOf[List[alphabet.Value]]
   lazy val likelihoods:List[Vector]={
     sequence.map{a:alphabet.Value=>
     

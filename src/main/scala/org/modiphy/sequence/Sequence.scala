@@ -119,26 +119,51 @@ class MafAln(source:BufferedIterator[String]){
 
 }
 
-class Alignment[A<:BioEnum](val map:Map[String,String],val alphabet:A){
+class Alignment[A<:BioEnum](m:Map[String,String],val alphabet:A){
+  import scala.collection.immutable._
+  type Letter=alphabet.Value
+  val map = m.foldLeft(TreeMap[String,String]()){_+_} // use TreeMap to keep sorted
 
-  val stateMap=map.map{t=>(t._1,t._2.split("").drop(1).map{alphabet.valueOf(_).getOrElse(alphabet.unknown)}.toList)}.foldLeft(Map[String,List[alphabet.Value]]()){_+_}
-  def get(a:String):List[alphabet.Value]=stateMap.get(a).getOrElse(Nil)
+  val stateMap=map.map{t=>(t._1,t._2.split("").drop(1).map{alphabet.valueOf(_).getOrElse(alphabet.unknown)}.toList)}.foldLeft(Map[String,List[Letter]]()){_+_}
+  private def columns:List[List[String]] = new FlippedIterator(map.values.map{s=>s.split("").drop(1).elements}.toList).toList
+  val alphaList:List[List[Letter]] = columns.map(_.map{alphabet.valueOf(_).getOrElse(alphabet.unknown)}) //mapped to alphabet values
+  
+  def get(a:String):List[Letter]=stateMap.get(a).getOrElse(Nil)
+  def colPatterns=alphaList.foldLeft(Map[List[Letter],Int]()){(m,l)=>
+    m(l)=m.getOrElse(l,0)+1  
+  }.toList
+
+  val patterns={
+    val l=colPatterns
+    val i=new FlippedIterator(l.map{_._1.elements}).toList
+    (
+      map.keySet.toList.zip(i).foldLeft(TreeMap[String,List[Letter]]()){(m,t)=>m+((t._1,t._2.toList))}, 
+      l.map{_._2}
+    )
+  }
+  val pCount={
+    //println("PATTERNS") 
+    //println(patterns._1)
+    //println(patterns._2)
+    patterns._2
+  }
+
+
+  def getPatterns(a:String)=patterns._1(a)
 
   def apply(a:String)=map(a)
-  lazy val columns:List[List[String]] = new FlippedIterator(map.values.map{s=>s.split("").drop(1).elements}.toList).toList
   def getF={
-    val alphaList:List[List[alphabet.Value]] = columns.map(_.map{alphabet.valueOf(_).getOrElse(alphabet.unknown)}) //mapped to alphabet values
-    val countMaps:List[Map[alphabet.Value,Int]] = alphaList.map(_.foldLeft(Map[alphabet.Value,Int]()){(m,l)=>m.update(l,1+m.getOrElse(l,0))}) //mapped to count of each letter in column
+    val countTreeMaps:List[Map[Letter,Int]] = alphaList.map(_.foldLeft(Map[Letter,Int]()){(m,l)=>m.update(l,1+m.getOrElse(l,0))}) //mapped to count of each letter in column
 
-    val filteredCountMaps:List[Map[alphabet.Value,Int]] = countMaps.map{_.filter{t=>alphabet.isReal(t._1)}}//remove gaps/unknown
-    val freqMaps:List[Map[alphabet.Value,Double]] = filteredCountMaps.map{a=>(a.values.foldLeft(0.0D){_+_},a)}.map{a=>a._2.map{t=>(t._1,t._2.toDouble/a._1)}.foldLeft(Map[alphabet.Value,Double]()){_+_}} //convert to frequencies at each column
-    val (total,totalFreqMap) = freqMaps.foldLeft((0,Map[alphabet.Value,Double]())){(a,b)=>
+    val filteredCountTreeMaps:List[Map[Letter,Int]] = countTreeMaps.map{_.filter{t=>alphabet.isReal(t._1)}}//remove gaps/unknown
+    val freqMaps:List[Map[Letter,Double]] = filteredCountTreeMaps.map{a=>(a.values.foldLeft(0.0D){_+_},a)}.map{a=>a._2.map{t=>(t._1,t._2.toDouble/a._1)}.foldLeft(Map[Letter,Double]()){_+_}} //convert to frequencies at each column
+    val (total,totalFreqMap) = freqMaps.foldLeft((0,Map[Letter,Double]())){(a,b)=>
       (a._1+1,b.foldLeft(a._2){(c,d)=>
         c+((d._1,c.getOrElse(d._1,0.0D)+d._2))
       })
     }//total frequencies
     
-    val ans = totalFreqMap.map(t=>(t._1,t._2/total)).foldLeft(Map[alphabet.Value,Double]()){_+_}
+    val ans = totalFreqMap.map(t=>(t._1,t._2/total)).foldLeft(Map[Letter,Double]()){_+_}
     ans
     }
 
