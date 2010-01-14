@@ -49,13 +49,8 @@ Building:
 
 Dependencies:
 
-Put colt-1.2.0.jar in lib/ (can't get from MVN repo as they are mistagged!)
-You also need need [commons-math-2.0-snapshot](http://commons.apache.org/math/).jar
-(I use the optimisation routines), as well as
-[pal-1.5.1](http://www.cebl.auckland.ac.nz/pal-project/download.html).jar (I use
-the Gamma Distribution routines) in lib/.
-
-You need [Simple Built Tool](http://code.google.com/p/simple-build-tool/)
+You need [Simple Build Tool](http://code.google.com/p/simple-build-tool/)
+Dependencies should be automatically handled by SBT.
 You also need Apache Ivy in the classpath for SBT:
 
     sbt update # to pull in latest jars
