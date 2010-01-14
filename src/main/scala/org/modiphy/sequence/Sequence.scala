@@ -8,6 +8,7 @@ abstract class BioEnum(names:String*) extends Enumeration(names: _*){
   def parseString(s:String):BioSeq[Value]
   def matElements:List[Value]
   val numClasses=1
+  val numAlpha=matElements.length
   def unknown:Value
 }
 
@@ -16,7 +17,7 @@ class SiteClassDNA(override val numClasses:Int) extends BioEnum("A","G","C","T",
   val A,G,C,T,N,GAP=Value
   override val matLength=numClasses*4
   override def isReal(a:Base)=((a!=N) && (a!=GAP))
-  def getNums(a:Base)=if (isReal(a)){(a.id to (matLength-1) by 4).toList}else{(0 to matLength-1).toList}
+  def getNums(a:Base)=if (isReal(a)){(a.id to (matLength-1) by numAlpha).toList}else{(0 to matLength-1).toList}
   def parseString(s:String)=new BioSeq(s.toList.map{i=> valueOf(i.toString).getOrElse(N)})
   def matElements=List(A,G,C,T)
   val unknown=N
@@ -28,7 +29,7 @@ class SiteClassAA(override val numClasses:Int) extends BioEnum("A","R","N","D","
   val A,R,N,D,C,Q,E,G,H,I,L,K,M,F,P,S,T,W,Y,V,X,GAP=Value
   override val matLength=numClasses*20
   override def isReal(a:AminoAcid)=((a!=X) && (a!=GAP))
-  def getNums(a:AminoAcid)=if (isReal(a)){(a.id to (matLength-1) by 20).toList}else{(0 to matLength-1).toList}
+  def getNums(a:AminoAcid)=if (isReal(a)){(a.id to (matLength-1) by numAlpha).toList}else{(0 to matLength-1).toList}
   def parseString(s:String)=new BioSeq(s.toList.map{i=> valueOf(i.toString).getOrElse(N)})
   def matElements=List(A,R,N,D,C,Q,E,G,H,I,L,K,M,F,P,S,T,W,Y,V)
   val unknown=X

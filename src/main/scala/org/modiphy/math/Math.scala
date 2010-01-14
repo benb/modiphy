@@ -99,6 +99,18 @@ class EnhancedMatrix(d:DoubleMatrix2D){
   s
   }
 
+  def fixDiag={
+    rowElements.toList.zipWithIndex.foreach{t=>
+      val (v,i)=t
+      v(i)=0
+      v(i)= -v.zSum
+    }
+    d 
+  }
+  def rowElements={
+    for (i <- 0 until d.rows) yield d.viewRow(i)
+  }
+
 }
 class EnhancedVector(d:DoubleMatrix1D){
   type ID={def id:Int}

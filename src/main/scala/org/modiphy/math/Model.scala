@@ -15,6 +15,14 @@ trait Model[A <: BioEnum] extends Logging{
   def logLikelihood=if (cromulent){likelihoodTree.logLikelihood(this)}else{Math.NEG_INF_DOUBLE}
   def getParams:List[Array[Double]] = List()
   def setParams(paramSet:Int)(params:Array[Double]){}
+  /**
+   Assumes that model m is nested in this model, otherwise things won't make sense!
+  */
+  def setParams(m:Model[A]){
+    m.getParams.zipWithIndex.foreach{t=>
+      setParams(t._2)(t._1)
+    }
+  }
   def cromulent = true
   var tree:Tree[A]
   def qMat:Matrix={sMat.sToQ(pi).normalize(pi)}
@@ -77,6 +85,28 @@ trait Model[A <: BioEnum] extends Logging{
   def getTree = likelihoodTree
   override def toString ="Model:\n:"
   
+  def linearSMat(sMatInst:Matrix):Seq[Double]={
+    val list = (0 to sMatInst.rows -3).map{ i=> // skip last elment...
+       val list1 = sMatInst(i).viewPart(i+1,sMatInst.columns - i - 1).toList
+       list1
+    }.toList.flatten[Double]
+    list
+  }
+
+  def setSMat(array:Array[Double],sMatInst:Matrix){
+    val iter:Iterator[Double]=array.elements
+    (0 to sMatInst.rows-1).foreach{i=>
+      (i+1 to sMatInst.columns-1).foreach{j=>
+        if (iter.hasNext){
+          sMatInst(i,j)=iter.next
+        }else{ //by passing in a shorter array, remaining elements set to 1
+          sMatInst(i,j)=1
+        }
+      }
+    }
+    sMatInst
+  }
+
 }
 
 trait OptBranchLengths[A <: BioEnum] extends Model[A]{
@@ -221,6 +251,95 @@ trait AlternateModel[A <: BioEnum] extends Model[A]{
 }
 
 class GammaModel[A <: BioEnum](val pi:Vector,val sMat:Matrix,var tree:Tree[A],val alpha:Array[Double]) extends SiteClassPiModel[A] with GammaSMat[A]
+trait SiteClassSubstitutionsScaled[A <: BioEnum] extends SiteClassSubstitutions[A]{
+  private val paramNum=super.getParams.length
+
+  override def getParams:List[Array[Double]]={
+    super.getParams ++ List(Array(norm))
+  }
+  
+  override def setParams(i:Int)(a:Array[Double]){
+    if (i==paramNum){norm=a(0)}
+    else{super.setParams(i)(a)}
+  }
+
+  override def cromulent=super.cromulent && norm>0.0D
+}
+
+trait SiteClassSubstitutions[A <: BioEnum] extends GammaSMat[A]{ //do not use directly, use a descenent
+  val rateChangeS:Matrix
+  val priors:Vector
+
+  var norm=1.0D
+  
+  def getSCQMat(node:Node[A])={
+    val scQ = rateChangeS.sToQ(priors)
+    scQ.normalize(priors,norm)
+  }
+
+  override def qMat(node:Node[A])={
+   val qStart=super.qMat(node) // we assume a nice, scaled to 1 qMat
+   val scQ = getSCQMat(node)
+   val numClasses = tree.alphabet.numClasses
+    val numAlpha = tree.alphabet.numAlpha
+    (0 until numClasses).foreach{i:Int=>
+      (0 until numClasses).foreach{j:Int =>
+        (0 until numAlpha).foreach{k:Int =>
+          if (i!=j){
+            val realI = i * numAlpha + k
+            val realJ = j * numAlpha + k
+
+            qStart(realI,realJ)=scQ(i,j) * pi(k)
+          }
+        }
+      }
+    }
+    qStart.fixDiag
+  }
+
+  private val paramNum=super.getParams.length
+
+  override def getParams:List[Array[Double]]={
+    super.getParams ++ List(linearSMat(rateChangeS).toArray)
+  }
+  
+  override def setParams(i:Int)(a:Array[Double]){
+    if (i==paramNum){setSMat(a,rateChangeS)}
+    else{super.setParams(i)(a)}
+  }
+
+  override def cromulent=super.cromulent && !(rateChangeS.exists{i=>i<0})
+}
+trait SiteClassSubstitutionsSeparateBranchLength[A <: BioEnum] extends SiteClassSubstitutions[A]{
+  private val paramNum=super.getParams.length
+  
+  var bl2:Array[Double] = tree.descendentNodes.map{_.lengthTo}.toArray // initialize to branch lengths
+  var nodeMap = recalculateNodeMap
+  def recalculateNodeMap = tree.descendentNodes.zip(bl2.toList).foldLeft(Map[Node[A],Double]()){_+_}
+  override def getParams:List[Array[Double]]={
+    super.getParams ++ List(bl2)
+  }
+  
+  override def setParams(i:Int)(a:Array[Double]){
+    if (i==paramNum){bl2=a;nodeMap = recalculateNodeMap}
+    else{super.setParams(i)(a)}
+  }
+  
+
+  override def getSCQMat(node:Node[A])={
+    val scQ = rateChangeS.sToQ(priors)
+    scQ.normalize(priors,nodeMap(node)/node.lengthTo) // so if the parameter is set to double the 'real' branch length then the sc changes take place at twice the rate
+  }
+  override def cromulent=super.cromulent && bl2.foldLeft(true){_ && _>0}
+}
+
+class THMM[A <: BioEnum](pi:Vector, sMat:Matrix,tree:Tree[A],alpha:Array[Double], val rateChangeS:Matrix) extends GammaModel[A](pi,sMat,tree,alpha) with SiteClassSubstitutionsScaled[A]{
+  val priors = Vector((for (i <- 0 until tree.alphabet.numClasses) yield 1.0D/tree.alphabet.numClasses).toList)
+}
+
+class THMM2[A <: BioEnum](pi:Vector, sMat:Matrix,tree:Tree[A],alpha:Array[Double],val rateChangeS:Matrix)  extends GammaModel[A](pi,sMat,tree,alpha) with SiteClassSubstitutionsSeparateBranchLength[A]{
+  val priors = Vector((for (i <- 0 until tree.alphabet.numClasses) yield 1.0D/tree.alphabet.numClasses).toList)
+  }
 
 trait GammaSMat [A <: BioEnum] extends SMat[A]{
 
@@ -351,13 +470,8 @@ trait SMat[A <: BioEnum] extends Model[A]{
 
   override def cromulent = super.cromulent && !(sMat exists {i=> i < 0.0D}) 
 
-  def linearSMat:Seq[Double]={
-    val list = (0 to sMat.rows -3).map{ i=> // skip last elment...
-       val list1 = sMat(i).viewPart(i+1,sMat.columns - i - 1).toList
-       list1
-    }.toList.flatten[Double]
-    list
-  }
+  def linearSMat:Seq[Double]=linearSMat(sMat)
+ 
 
   override def getParams:List[Array[Double]]={
     super.getParams ++ List(linearSMat.toArray)
@@ -367,20 +481,9 @@ trait SMat[A <: BioEnum] extends Model[A]{
     if (i==sMatParam){setSMat(a)}
     else{super.setParams(i)(a)}
   }
+  def setSMat(array:Array[Double]){setSMat(array,sMat)}
 
-  def setSMat(array:Array[Double]){
-    val iter:Iterator[Double]=array.elements
-    (0 to sMat.rows-1).foreach{i=>
-      (i+1 to sMat.columns-1).foreach{j=>
-        if (iter.hasNext){
-          sMat(i,j)=iter.next
-        }else{ //by passing in a shorter array, remaining elements set to 1
-          sMat(i,j)=1
-        }
-      }
-    }
-    sMat
-  }
 }
+
 
 
