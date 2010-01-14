@@ -34,7 +34,7 @@ object ModelOptimiser extends Logging{
         }
         ),MAXIMIZE,start.toArray)
         model.setParams(index)(result.getPoint)
-        println("OPT " + index + "  " +  t._2 + "  " + model.logLikelihood)
+        println("OPT " + model.getParamName(t._2) + " " + index + "  " +  t._2 + "  " + model.logLikelihood)
         println(model)
         finest{model.likelihoods.mkString(" ")}
         finest{model.realLikelihoods.mkString(" ")}

@@ -15,6 +15,7 @@ trait Model[A <: BioEnum] extends Logging{
   def logLikelihood=if (cromulent){likelihoodTree.logLikelihood(this)}else{Math.NEG_INF_DOUBLE}
   def getParams:List[Array[Double]] = List()
   def setParams(paramSet:Int)(params:Array[Double]){}
+  def getParamName(i:Int):String=""
   /**
    Assumes that model m is nested in this model, otherwise things won't make sense!
   */
@@ -112,6 +113,10 @@ trait Model[A <: BioEnum] extends Logging{
 trait OptBranchLengths[A <: BioEnum] extends Model[A]{
   var tree:Tree[A]
   private val paramNum = super.getParams.length
+  override def getParamName(i:Int)={
+    if (i != paramNum){super.getParamName(i)}
+    else{"Branch Lengths"}
+  }
   override def setParams(i:Int)(a:Array[Double])={
     if (i != paramNum){super.setParams(i)(a)}
     else {tree = tree.setBranchLengths(a.toList).setRoot}
@@ -132,6 +137,10 @@ trait OptBranchScale[A <: BioEnum] extends Model[A]{
   override def getMat(node:Node[A])={ qMat(node).exp(node.lengthTo * treeScale) }
   private val paramNum = super.getParams.length
 
+  override def getParamName(i:Int)={
+    if (i != paramNum){super.getParamName(i)}
+    else{"Branch Scale"}
+  }
   override def setParams(i:Int)(a:Array[Double])={
     if (i != paramNum){super.setParams(i)(a)}
     else {treeScale = a(0)}
@@ -157,6 +166,12 @@ trait CombineOpt[A <: BioEnum] extends Model[A]{
     //not super efficient but this should be rarely called
     start.zipWithIndex.filter{t=>val (array,i)=t; !toCombine.exists{j=>j==i}}.map{_._1} ++ List(start.zipWithIndex.filter{t=>toCombine.exists{j=>j==t._2}}.map{_._1.toList}.flatten[Double].toArray)
   }
+
+  override def getParamName(i:Int)={
+    if (i != paramNum){super.getParamName(i)}
+    else{"Combined: " + toCombine.map{super.getParamName(_)}}
+  }
+
   override def setParams(i:Int)(a:Array[Double]){
     if (paramMap contains i){
       super.setParams(paramMap(i))(a)
@@ -177,7 +192,7 @@ trait CombineOpt[A <: BioEnum] extends Model[A]{
   }
 
 }
-
+/*
 trait ExposeOpt[A <: BioEnum] extends Model[A]{
   val exposed:List[Int]
   override def getParams:List[Array[Double]]={
@@ -187,11 +202,17 @@ trait ExposeOpt[A <: BioEnum] extends Model[A]{
       }.sort{(i,j)=>exposed.find(_==i._2).get < exposed.find(_==j._2).get}.map{_._1}
   }
 
+  override def getParamName(i:Int)={
+    if (i != paramNum){super.getParamName(i)}
+    else{"Expose: " + toCombine.map{getParamName}}
+  }
+
   override def setParams(i:Int)(a:Array[Double]){
     super.setParams(exposed(i))(a)
   }
 }
 
+*/
 
 
 object Gamma{
@@ -235,6 +256,12 @@ trait AlternateModel[A <: BioEnum] extends Model[A]{
     //default to last parameter of altModel
     super.getParams ++ altModel.getParams
   }
+
+  override def getParamName(i:Int)={
+    if (i>=startParamNum && i < endParamNum){"Alternate Model " + altModel.getParamName(i-startParamNum)}
+    else {super.getParamName(i)}
+
+  }
   override def setParams(i:Int)(a:Array[Double])={
     if (i>=startParamNum && i < endParamNum){
       altModel.setParams(i-startParamNum)(a)
@@ -257,6 +284,12 @@ trait SiteClassSubstitutionsScaled[A <: BioEnum] extends SiteClassSubstitutions[
   override def getParams:List[Array[Double]]={
     super.getParams ++ List(Array(norm))
   }
+
+  override def getParamName(i:Int)={
+    if (i==paramNum){"SC Substitution Scale "}
+    else {super.getParamName(i)}
+  }
+
   
   override def setParams(i:Int)(a:Array[Double]){
     if (i==paramNum){norm=a(0)}
@@ -303,6 +336,10 @@ trait SiteClassSubstitutions[A <: BioEnum] extends GammaSMat[A]{ //do not use di
     super.getParams ++ List(linearSMat(rateChangeS).toArray)
   }
   
+  override def getParamName(i:Int)={
+    if (i==paramNum){"SC Substitution SMat "}
+    else {super.getParamName(i)}
+  }
   override def setParams(i:Int)(a:Array[Double]){
     if (i==paramNum){setSMat(a,rateChangeS)}
     else{super.setParams(i)(a)}
@@ -320,6 +357,10 @@ trait SiteClassSubstitutionsSeparateBranchLength[A <: BioEnum] extends SiteClass
     super.getParams ++ List(bl2)
   }
   
+  override def getParamName(i:Int)={
+    if (i==paramNum){"SC Substitution Per Branch Rate "}
+    else {super.getParamName(i)}
+  }
   override def setParams(i:Int)(a:Array[Double]){
     if (i==paramNum){bl2=a;nodeMap = recalculateNodeMap}
     else{super.setParams(i)(a)}
@@ -392,6 +433,10 @@ trait GammaSMat [A <: BioEnum] extends SMat[A]{
     //no point having alpha go higher - count as infinity
   }
 
+  override def getParamName(i:Int)={
+    if (i==paramNum){"GammaSMat"}
+    else {super.getParamName(i)}
+  }
   override def setParams(i:Int)(a:Array[Double])={
     cachedQMat=None//wipe cache
     debug{"Setting main alpha => " + a(0)}
@@ -439,6 +484,11 @@ trait FullPiModel[A <: BioEnum] extends Model[A]{
     super.getParams ++ List(toFit.toArray)
   }
 
+  override def getParamName(i:Int)={
+    if (i==piParam){"Pi Values"}
+    else {super.getParamName(i)}
+  }
+
   def setPi(array:Array[Double]){
     val exponentiated =  array.map{i=>Math.exp(i)}
     val total = (0.0D /: exponentiated){_+_} + Math.exp(0.0D)
@@ -472,6 +522,10 @@ trait SMat[A <: BioEnum] extends Model[A]{
 
   def linearSMat:Seq[Double]=linearSMat(sMat)
  
+  override def getParamName(i:Int)={
+    if (i==sMatParam){"S Values"}
+    else {super.getParamName(i)}
+  }
 
   override def getParams:List[Array[Double]]={
     super.getParams ++ List(linearSMat.toArray)
