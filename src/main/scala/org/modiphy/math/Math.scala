@@ -51,6 +51,7 @@ class EnhancedMatrix(d:DoubleMatrix2D){
   def exp(t:Double)=MatExp.exp(d,t)
   def expVals(t:Double)=sparse.diagonal(dense.diagonal(d).assign( new DoubleFunction(){def apply(arg:Double)={Math.exp(t * arg)}}))
   def *(m:Matrix)=algebra.mult(d,m)
+  def *(n:Double)=d.assign(new DoubleFunction(){def apply(v:Double)=v * n}) 
   def update(i:Int,j:Int,v:Double):Unit=d.set(i,j,v)
   def update(i:ID,j:ID,v:Double):Unit=d.set(i.id,j.id,v)
   def apply(i:Int,j:Int):Double=d.get(i,j)
@@ -120,8 +121,8 @@ class EnhancedVector(d:DoubleMatrix1D){
   def apply(i:ID):Double=apply(i.id)
   def update(i:Int,v:Double):Unit=d.set(i,v)
   def update(i:ID,v:Double):Unit=update(i.id,v)
-  def *(n:Double)=d.assign(new DoubleFunction(){def apply(v:Double)=v * n})
-  def /(n:Double)={*(1/n)}
+  def *(n:Double)=d.assign(new DoubleFunction(){def apply(v:Double)=v * n}) 
+  def /(n:Double)={*(1/n)} 
   def normalize(a:Double):Vector={
     val sum = d.zSum
     d.copy.assign(new DoubleFunction(){def apply(o:Double)=a*o/sum})

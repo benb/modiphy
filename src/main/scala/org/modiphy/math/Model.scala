@@ -8,28 +8,215 @@ import org.modiphy.tree.DataParse._
 import scala.collection.immutable.IntMap
 import tlf.Logging
 
-class UnknownParamException(i:Int) extends java.lang.RuntimeException("Unknown parameter " + i.toString)
-trait Model[A <: BioEnum] extends Logging{
-  val careful=false
-  def likelihoodTree = tree
-  def logLikelihood=if (cromulent){likelihoodTree.logLikelihood(this)}else{Math.NEG_INF_DOUBLE}
-  def getParams:List[Array[Double]] = List()
-  def setParams(paramSet:Int)(params:Array[Double]){}
-  def getParamName(i:Int):String=""
-  /**
-   Assumes that model m is nested in this model, otherwise things won't make sense!
-  */
-  def setParams(m:Model[A]){
-    m.getParams.zipWithIndex.foreach{t=>
-      setParams(t._2)(t._1)
+trait Subject {
+  type Observer = { def receiveUpdate(subject:Subject) }
+  private var observers = List[Observer]()
+  def addObserver(o:Observer){observers=o::observers}
+  def notifyObservers{observers.foreach{_.receiveUpdate(this)}}
+}
+
+abstract class ParamControl extends Subject{
+  def getParams:Array[Double]
+  def setParams(a:Array[Double]):Unit
+}
+class BasicParamControl(a:Array[Double]) extends ParamControl{
+  def getParams=a.toArray//copy
+  def setParams(x:Array[Double]){
+    x.copyToArray(a,0)
+    notifyObservers
+  }
+}
+/**
+ The basic model, composed of an sMatrix, a pi matrix, and the MathComponent that converts the S into a Q matrix.
+*/
+class ComposeModel[A <: BioEnum](pi:PiComponent,s:SComponent,maths:MathComponent,var tree:Tree[A]) extends Model[A]{
+  val alphabet = tree.alphabet
+  val params = (s.getParams ++ pi.getParams ++ maths.getParams).toArray
+  override def qMat(node:Node[A])={ maths.sToQ(node)(s(node),pi(node)) }
+  override def cromulent=pi.cromulent && s.cromulent && maths.cromulent
+  def getParams=params.map{_.getParams}.toList
+  def setParams(i:Int)(a:Array[Double]){params(i).setParams(a)}
+  def getParams(i:Int)=params(i).getParams
+
+
+
+  def sMat=s(tree)
+  def sMat(node:Node[A])=s(node)
+  def getParamName=""
+  def getParamName(i:Int)=""
+
+  def piVals(node:Node[A])=pi(node)
+}
+
+/**
+ A building block for a model
+*/
+abstract class MComponent extends Subject{
+  def getParams:List[ParamControl]
+  def receiveUpdate(s:Subject)=changedParam(s)
+  def changedParam(s:Subject)={notifyObservers}//by default fire up the chain
+  def cromulent=true
+}
+
+abstract class SComponent extends MComponent{
+  def paramName:String
+  def apply(node:Node[_]):Matrix
+}
+
+class BasicSMatComponent(sMat:Matrix) extends SComponent with SMatUtil{
+  def apply(node:Node[_])=sMat
+  val paramName="S Matrix"
+  def getParams=List() // don't expose to optimiser
+}
+
+abstract class MathComponent extends MComponent{
+  def sToQ(node:Node[_])(start:Matrix,pi:Vector):Matrix 
+}
+
+class DefaultMathComponent extends MathComponent{
+  def sToQ(node:Node[_])(sMat:Matrix,pi:Vector)={sMat.sToQ(pi).normalize(pi)}
+  def getParams=List()
+}
+object PiComponent{
+  def makeSensible(startPi:Vector)={
+    val smallestPi=0.001D
+    val initial = startPi.copy
+    (0 until initial.size).foreach{i=> 
+      if (initial(i)<smallestPi){
+        initial(i)=smallestPi
+      }
+    }
+    initial.normalize(1)
+
+  }
+}
+
+abstract class PiComponent extends MComponent{
+  def apply(node:Node[_]):Vector
+  def nodeDependent:Boolean
+}
+
+class PiParam(pi:Vector) extends ParamControl{
+  def fromFit(array:Array[Double],medianIndex:Int)={
+    val exponentiated =  array.map{i=>Math.exp(i)}
+    val total = (0.0D /: exponentiated){_+_} + Math.exp(0.0D)
+    ((0 to medianIndex-1 ).map{i=> exponentiated(i)/total}.toList ++ List(Math.exp(0.0D)/total) ++ (medianIndex to array.length-1).map{i=> exponentiated(i)/total}).toArray
+  }
+
+  def toFit(pi:Vector):(List[Double],Int)={                                                                   
+    val t  = (pi.toList.zipWithIndex.toList.sort{_._1<_._1})(pi.size/2)
+    medianIndex = t._2
+    def toFitness={i:Int=>Math.log(pi(i)/pi(medianIndex))}
+    ((0 to medianIndex-1).map{toFitness}.toList ++ (medianIndex+1 to pi.size-1).map{toFitness}.toList,
+     medianIndex)
+  }
+
+  var medianIndex=0
+  def getParams:Array[Double]={
+    val (l,m)=toFit(pi)
+    medianIndex=m
+    l.toArray
+  }
+
+  def setParams(a:Array[Double])={
+    pi assign fromFit(a,medianIndex)
+  }
+}
+
+class BasicPiComponent(startPi:Vector) extends PiComponent{
+  val pi = PiComponent.makeSensible(startPi)
+  val param = new PiParam(pi)
+  param.addObserver(this)
+  val getParams=List(param)
+  def apply(node:Node[_])=pi
+  override val cromulent=true // should not be possible to get completely awful pis
+  val paramName="Pi Values"
+  val nodeDependent=false
+}
+
+class FlatPriorPiComponent(startPi:PiComponent,alphabet:BioEnum) extends PiComponent{
+  assert(startPi.nodeDependent==false)//not implemented node-dependent pis here
+  val nodeDependent=false
+
+  var clean=false
+  val pi=Vector(alphabet.matLength)
+  startPi.addObserver(this)
+  val numClasses = alphabet.numClasses
+  val prior = (0 until numClasses).map{i=> 1.0D/numClasses}.toArray
+  def apply(node:Node[_]) = {
+    if (!clean){
+      recaluclatePi
+      clean=true
+    }
+    pi
+  }
+  def recaluclatePi{
+    (0 until numClasses).foreach{i=>
+      pi.viewPart(i * alphabet.numAlpha ,alphabet.numAlpha).assign(startPi(null))*prior(i)
+      println("Added class " + i + "\n" + pi)
     }
   }
-  def cromulent = true
-  var tree:Tree[A]
-  def qMat:Matrix={sMat.sToQ(pi).normalize(pi)}
-  def qMat(node:Node[A]):Matrix=qMat //identical for all nodes in basic model, so can cache
+  def getParams=startPi.getParams
+}
 
+abstract class SMatComponent extends MComponent with SMatUtil{
+  def sMat:Matrix
+  override def cromulent = !(sMat exists {i=> i < 0.0D}) 
+  def linearSMat:Seq[Double]=linearSMat(sMat)
+  def apply(node:Node[_]):Matrix
+}
+
+class GammaMathComponent(a:Double,alphabet:BioEnum) extends MathComponent{
+  val alpha = Array(a)
+  def gMath = new Gamma(alphabet.numClasses)
+  val param=new BasicParamControl(alpha)
+  def getParams=List(param)
+  val internalS=Matrix(alphabet.matLength,alphabet.matLength)
+  val numAlpha = alphabet.numAlpha
+  
+  def sToQ(node:Node[_])(sMat:Matrix,pi:Vector)={
+    val rates = gMath(alpha(0))
+    (0 until alphabet.numClasses).foreach{i=>
+      internalS.viewPart(i * numAlpha,i * numAlpha,numAlpha,numAlpha).assign(sMat)*rates(i)
+    }
+    internalS.sToQ(pi).normalize(pi)
+  }
+}
+
+object ModelFact{
+  def basic[A <: BioEnum](pi:Vector,s:Matrix,tree:Tree[A])={
+    val sC=new BasicSMatComponent(s)
+    val piC = new BasicPiComponent(pi)
+    new ComposeModel(piC,sC,new DefaultMathComponent,tree)
+  }
+  def gamma[A <: BioEnum](pi:Vector,s:Matrix,alpha:Double,tree:Tree[A])={
+    val sC=new BasicSMatComponent(s)
+    val gammaC=new GammaMathComponent(alpha,tree.alphabet)
+    //val cC=new SMatComponent(cC)
+    val piC = new FlatPriorPiComponent(new BasicPiComponent(pi),tree.alphabet)
+    new ComposeModel(piC,sC,gammaC,tree)
+  }
+}
+
+
+
+class UnknownParamException(i:Int) extends java.lang.RuntimeException("Unknown parameter " + i.toString)
+trait Model[A <: BioEnum] extends Logging{
+  var tree:Tree[A]
+  def cromulent:Boolean
+
+  def setParams(i:Int)(a:Array[Double]):Unit
+
+  def piVals(node:Node[A]):Vector
+  def piVals:Vector=piVals(tree) //assume we want pi at root unless specified
+  def qMat(node:Node[A]):Matrix
+  def sMat:Matrix
   def getMat(node:Node[A])={ debug{"e^Qt: t==" + node.lengthTo}; qMat(node).exp(node.lengthTo) }
+
+  def getParamName(i:Int):String
+
+  def sMat(node:Node[A]):Matrix
+
   def likelihoods(node:Node[A]):List[Vector]={
     val childLkl = node.children.map{i:Node[A]=>(i.likelihoods(this),i.lengthTo)}.toList
 
@@ -43,22 +230,6 @@ trait Model[A <: BioEnum] extends Logging{
       val alphabet = c.alphabet
 
     debug{"e^Qt=" + matrix}
-    if (careful && matrix.exists{d=> d<0.0D}){ //probably don't want to do this - it is SLOW
-      info("BAD MATRIX")
-      info("LENGTH=" + node.lengthTo)
-      info(node.name.toString)
-      info(node.toString)
-      info(node.isRoot.toString)
-      info(sMat.sToQ(pi).toString)
-      info(sMat.sToQ(pi).normalize(pi).toString)
-      info(sMat.sToQ(pi).normalize(pi).diagonal.zSum.toString)
-      info(sMat.sToQ(pi).normalize(pi).exp(1).toString)
-      info(sMat.sToQ(pi).normalize(pi).exp(node.lengthTo).toString)
-    }
- 
-
-
-
       val ret = new Array[Double](alphabet.matLength) 
         (0 to alphabet.matLength - 1).foreach{i=>
           ret(i)=siteVector.zDotProduct(matrix.viewRow(i))
@@ -77,15 +248,34 @@ trait Model[A <: BioEnum] extends Logging{
     ans
   }
 
-  def likelihoods:List[Vector]=likelihoodTree.likelihoods(this)
-  def realLikelihoods=likelihoodTree.realLikelihoods(this)
+  def likelihoods:List[Vector]=tree.likelihoods(this)
+  def realLikelihoods=tree.realLikelihoods(this)
+  def logLikelihood=if (cromulent){tree.logLikelihood(this)}else{Math.NEG_INF_DOUBLE}
+  def getParams(i:Int):Array[Double]
+  def getParams:List[Array[Double]]
+}
+
+trait TraitModel[A <: BioEnum] extends Model[A] with SMatUtil{
+  def getParams(i:Int):Array[Double]={Array()}
+  def sMat(node:Node[A]):Matrix=sMat
+  val careful=false
+  def likelihoodTree = tree
+  def getParams:List[Array[Double]] = List()
+  def setParams(paramSet:Int)(params:Array[Double]){}
+  def getParamName(i:Int):String=""
+
+  def cromulent = true
+  def piVals(node:Node[A])=piVals
+  def qMat(node:Node[A]):Matrix={sMat(node).sToQ(pi).normalize(pi)}
+  def qMat:Matrix=qMat(tree) //identical for all nodes in basic model, so can cache
 
   def pi:Vector
-  def sMat:Matrix
-  def piVals=pi
   def getTree = likelihoodTree
   override def toString ="Model:\n:"
-  
+ 
+}
+
+trait SMatUtil{
   def linearSMat(sMatInst:Matrix):Seq[Double]={
     val list = (0 to sMatInst.rows -3).map{ i=> // skip last elment...
        val list1 = sMatInst(i).viewPart(i+1,sMatInst.columns - i - 1).toList
@@ -107,10 +297,9 @@ trait Model[A <: BioEnum] extends Logging{
     }
     sMatInst
   }
-
 }
 
-trait OptBranchLengths[A <: BioEnum] extends Model[A]{
+trait OptBranchLengths[A <: BioEnum] extends TraitModel[A]{
   var tree:Tree[A]
   private val paramNum = super.getParams.length
   override def getParamName(i:Int)={
@@ -130,7 +319,7 @@ trait OptBranchLengths[A <: BioEnum] extends Model[A]{
   override def cromulent=super.cromulent && !(tree.getBranchLengths.exists{_<0.0D})
 }
 
-trait OptBranchScale[A <: BioEnum] extends Model[A]{
+trait OptBranchScale[A <: BioEnum] extends TraitModel[A]{
   var tree:Tree[A]
   var treeScale:Double
 
@@ -154,7 +343,7 @@ trait OptBranchScale[A <: BioEnum] extends Model[A]{
   override def cromulent=super.cromulent && treeScale >= 0.0D
 }
 
-trait CombineOpt[A <: BioEnum] extends Model[A]{
+trait CombineOpt[A <: BioEnum] extends TraitModel[A]{
   def toCombine:List[Int]
   //following params need to be lazy so they are not evaluated until the rest of the model is set up
   // a mapping from new indicies to old
@@ -193,7 +382,7 @@ trait CombineOpt[A <: BioEnum] extends Model[A]{
 
 }
 /*
-trait ExposeOpt[A <: BioEnum] extends Model[A]{
+trait ExposeOpt[A <: BioEnum] extends TraitModel[A]{
   val exposed:List[Int]
   override def getParams:List[Array[Double]]={
     super.getParams.zipWithIndex.filter{t=>
@@ -216,29 +405,48 @@ trait ExposeOpt[A <: BioEnum] extends Model[A]{
 
 
 object Gamma{
-  val cache = new scala.collection.jcl.WeakHashMap[(Int,Double),Seq[Double]]()
+  val cache = new scala.collection.jcl.HashMap[(Int,Double),Array[Double]]()
 }
+
 class Gamma(numCat:Int){
-  import pal.substmodel.GammaRates
-
+  import org.apache.commons.math.distribution.ChiSquaredDistributionImpl
+  import cern.jet.stat.Gamma.incompleteGamma
   import Gamma._
+  val chi2=new ChiSquaredDistributionImpl(1.0D)
+  def chiSquareInverseCDF(prob:Double,df:Double)={
+     chi2.setDegreesOfFreedom(df)
+     chi2.inverseCumulativeProbability(prob)
+  }
+  def gammaInverseCDF(prob:Double,alpha:Double,beta:Double)=chiSquareInverseCDF(prob,2.0*(alpha))/(2.0*(beta))
 
-    val gamma = new GammaRates(numCat,1.0)
-    def apply(shape:Double):Seq[Double]={
-    if (shape < 150.0D){
-      cache.getOrElseUpdate((numCat,shape),{
-          gamma setParameter (shape,0)
-          gamma getRates
+
+  def apply(shape:Double):Array[Double]={
+    cache.getOrElseUpdate((numCat,shape),gamma(shape))
+  }
+  def gamma(shape:Double):Array[Double]={
+      val alpha = shape
+      val beta = shape
+      val factor=alpha/beta*numCat
+      val freqK=new Array[Double](numCat)
+      val rK=new Array[Double](numCat)
+
+        (0 until numCat-1).foreach{i=>
+          freqK(i)=gammaInverseCDF((i+1.0)/numCat, alpha, beta);
+          freqK(i) = incompleteGamma(alpha+1,freqK(i)*beta)
         }
-        )
-    }else {
-      (1 to numCat).map(i=> 1.0D).toList // assume alpha => inf
-    }
 
+        rK(0) = freqK(0)*factor;
+        rK(numCat-1) = (1-freqK(numCat-2))*factor;
+        (1 until numCat-1).foreach{i=>
+          rK(i) = (freqK(i)-freqK(i-1))*factor;
+        }
+        println("RATES " + rK.toList)
+        rK
   }
 }
 
-trait AlternateModel[A <: BioEnum] extends Model[A]{
+
+trait AlternateModel[A <: BioEnum] extends TraitModel[A]{
   val nodeIDs:Set[Int]
   val altModel:Model[A]
   private lazy val startParamNum=super.getParams.length
@@ -361,16 +569,17 @@ trait SiteClassSubstitutionsSeparateBranchLength[A <: BioEnum] extends SiteClass
     if (i==paramNum){"SC Substitution Per Branch Rate "}
     else {super.getParamName(i)}
   }
+
   override def setParams(i:Int)(a:Array[Double]){
     if (i==paramNum){bl2=a;nodeMap = recalculateNodeMap}
     else{super.setParams(i)(a)}
   }
-  
 
   override def getSCQMat(node:Node[A])={
     val scQ = rateChangeS.sToQ(priors)
     scQ.normalize(priors,nodeMap(node)/node.lengthTo) // so if the parameter is set to double the 'real' branch length then the sc changes take place at twice the rate
   }
+
   override def cromulent=super.cromulent && bl2.foldLeft(true){_ && _>0}
 }
 
@@ -417,7 +626,7 @@ trait GammaSMat [A <: BioEnum] extends SMat[A]{
       println("ERROR ")
       println(getParams.map{_.toList}.mkString(","))
       println("produces sMat " + sMat)
-      println("and pi " + piVals)
+      println("and pi " + piVals(tree))
       println("gamma Rates " + gammaVals)
       println("qMat " + qStart)
     }
@@ -464,7 +673,7 @@ trait SiteClassPiModel[A <: BioEnum] extends FullPiModel[A]{
   }
 }
 
-trait FullPiModel[A <: BioEnum] extends Model[A]{
+trait FullPiModel[A <: BioEnum] extends TraitModel[A]{
   val pi:Vector
   final val piParam = super.getParams.length
 
@@ -505,9 +714,9 @@ trait FullPiModel[A <: BioEnum] extends Model[A]{
   }
 }
 
-class EnhancedModel[A <: BioEnum](val pi:Vector,val sMat:Matrix, var tree:Tree[A]) extends Model[A] with FullPiModel[A] with SMat[A]
+class EnhancedModel[A <: BioEnum](val pi:Vector,val sMat:Matrix, var tree:Tree[A]) extends TraitModel[A] with FullPiModel[A] with SMat[A]
 
-trait SMat[A <: BioEnum] extends Model[A]{
+trait SMat[A <: BioEnum] extends TraitModel[A]{
   val sMat:Matrix
   final val sMatParam=super.getParams.length
 

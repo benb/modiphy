@@ -7,7 +7,6 @@ class ModiphyProject(info: ProjectInfo) extends DefaultProject(info)
   val logspace = "Logspace maven repo" at "http://www.logspace.co.uk/maven/"
   val tlf = "uk.co.logspace.tlf" % "tlf" % "1.0.1"
   val colt = "coltjar" % "colt" % "1.2.0" from "http://repo1.maven.org/maven2/colt/colt/1.2.0/colt-1.2.0.jar"
-  val pal = "pal" % "pal" % "1.5.1" from "http://www.cebl.auckland.ac.nz/pal-project/bin/pal-1.5.1.jar"
   val commonsMath = "org.apache.commons" % "commons-math" % "2.0"
   
 }
