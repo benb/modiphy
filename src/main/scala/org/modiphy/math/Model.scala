@@ -258,10 +258,11 @@ trait Model[A <: BioEnum] extends Logging{
       }
     }.toList
     val ans = intermediates.head
+    val func = new cern.colt.function.DoubleDoubleFunction{def apply(x:Double,y:Double)=x*y}
     intermediates.tail.foreach{list2=>
       ans.zip(list2).foreach{t=>
         val (vec,vec2)=t
-        vec.assign(vec2,new cern.colt.function.DoubleDoubleFunction{def apply(x:Double,y:Double)=x*y})
+        vec.assign(vec2,func)
       }
     }
     ans
