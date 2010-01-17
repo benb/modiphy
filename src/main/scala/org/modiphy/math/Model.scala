@@ -33,7 +33,22 @@ class BasicParamControl(a:Array[Double]) extends ParamControl{
 class ComposeModel[A <: BioEnum](pi:PiComponent,s:SComponent,maths:MathComponent,var tree:Tree[A]) extends Model[A]{
   val alphabet = tree.alphabet
   val params = (s.getParams ++ pi.getParams ++ maths.getParams).toArray
-  override def qMat(node:Node[A])={ maths.sToQ(node)(s(node),pi(node)) }
+  List(pi,s,maths).foreach{m =>
+    m.addObserver(this)
+  }
+  def receiveUpdate(s:Subject){clean=false}
+  val nodeDependent = pi.nodeDependent || s.nodeDependent || maths.nodeDependent
+  assert(nodeDependent==false,"Components must be node independent to be used with ComposeModel")
+  var clean=false
+  var qMatCache:Matrix=null
+  override def qMat(node:Node[A])={
+    if (!(clean)){
+      qMatCache = maths.sToQ(node)(s(node),pi(node)) 
+      clean=true
+    }
+    qMatCache
+  }
+
   override def cromulent=pi.cromulent && s.cromulent && maths.cromulent
   def getParams=params.map{_.getParams}.toList
   def setParams(i:Int)(a:Array[Double]){params(i).setParams(a)}
@@ -53,10 +68,12 @@ class ComposeModel[A <: BioEnum](pi:PiComponent,s:SComponent,maths:MathComponent
  A building block for a model
 */
 abstract class MComponent extends Subject{
+  var clean=false
   def getParams:List[ParamControl]
-  def receiveUpdate(s:Subject)=changedParam(s)
-  def changedParam(s:Subject)={notifyObservers}//by default fire up the chain
+  def receiveUpdate(s:Subject)={changedParam(s)}
+  def changedParam(s:Subject)={notifyObservers; clean=false}//by default fire up the chain
   def cromulent=true
+  val nodeDependent=true
 }
 
 abstract class SComponent extends MComponent{
@@ -68,6 +85,7 @@ class BasicSMatComponent(sMat:Matrix) extends SComponent with SMatUtil{
   def apply(node:Node[_])=sMat
   val paramName="S Matrix"
   def getParams=List() // don't expose to optimiser
+  override val nodeDependent=false
 }
 
 abstract class MathComponent extends MComponent{
@@ -77,6 +95,7 @@ abstract class MathComponent extends MComponent{
 class DefaultMathComponent extends MathComponent{
   def sToQ(node:Node[_])(sMat:Matrix,pi:Vector)={sMat.sToQ(pi).normalize(pi)}
   def getParams=List()
+  override val nodeDependent=false
 }
 object PiComponent{
   def makeSensible(startPi:Vector)={
@@ -94,7 +113,6 @@ object PiComponent{
 
 abstract class PiComponent extends MComponent{
   def apply(node:Node[_]):Vector
-  def nodeDependent:Boolean
 }
 
 class PiParam(pi:Vector) extends ParamControl{
@@ -132,14 +150,13 @@ class BasicPiComponent(startPi:Vector) extends PiComponent{
   def apply(node:Node[_])=pi
   override val cromulent=true // should not be possible to get completely awful pis
   val paramName="Pi Values"
-  val nodeDependent=false
+  override val nodeDependent=false
 }
 
 class FlatPriorPiComponent(startPi:PiComponent,alphabet:BioEnum) extends PiComponent{
   assert(startPi.nodeDependent==false)//not implemented node-dependent pis here
-  val nodeDependent=false
+  override val nodeDependent=false
 
-  var clean=false
   val pi=Vector(alphabet.matLength)
   startPi.addObserver(this)
   val numClasses = alphabet.numClasses
@@ -174,6 +191,7 @@ class GammaMathComponent(a:Double,alphabet:BioEnum) extends MathComponent{
   def getParams=List(param)
   val internalS=Matrix(alphabet.matLength,alphabet.matLength)
   val numAlpha = alphabet.numAlpha
+  override val nodeDependent = false
   
   def sToQ(node:Node[_])(sMat:Matrix,pi:Vector)={
     val rates = gMath(alpha(0))
