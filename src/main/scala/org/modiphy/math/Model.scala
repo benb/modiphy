@@ -5,6 +5,7 @@ import org.modiphy.tree._
 import org.modiphy.sequence._
 import org.modiphy.math.EnhancedMatrix._
 import org.modiphy.tree.DataParse._
+import org.modiphy.util._
 import scala.collection.immutable.IntMap
 import tlf.Logging
 
@@ -405,7 +406,7 @@ trait ExposeOpt[A <: BioEnum] extends TraitModel[A]{
 
 
 object Gamma{
-  val cache = new scala.collection.jcl.HashMap[(Int,Double),Array[Double]]()
+  val cache = new CacheMap[(Int,Double),Array[Double]](100)
 }
 
 class Gamma(numCat:Int){
