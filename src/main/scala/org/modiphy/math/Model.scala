@@ -8,6 +8,7 @@ import org.modiphy.tree.DataParse._
 import org.modiphy.util._
 import scala.collection.immutable.IntMap
 import tlf.Logging
+import org.modiphy.util.PList._
 
 trait Subject {
   type Observer = { def receiveUpdate(subject:Subject) }
@@ -36,17 +37,13 @@ class ComposeModel[A <: BioEnum](pi:PiComponent,s:SComponent,maths:MathComponent
   List(pi,s,maths).foreach{m =>
     m.addObserver(this)
   }
+  var clean=false
   def receiveUpdate(s:Subject){clean=false}
   val nodeDependent = pi.nodeDependent || s.nodeDependent || maths.nodeDependent
   assert(nodeDependent==false,"Components must be node independent to be used with ComposeModel")
-  var clean=false
   var qMatCache:Matrix=null
   override def qMat(node:Node[A])={
-    if (!(clean)){
-      qMatCache = maths.sToQ(node)(s(node),pi(node)) 
-      clean=true
-    }
-    qMatCache
+    maths.sToQ(node)(s(node),pi(node)) 
   }
 
   override def cromulent=pi.cromulent && s.cromulent && maths.cromulent
@@ -93,7 +90,13 @@ abstract class MathComponent extends MComponent{
 }
 
 class DefaultMathComponent extends MathComponent{
-  def sToQ(node:Node[_])(sMat:Matrix,pi:Vector)={sMat.sToQ(pi).normalize(pi)}
+  var cacheQ:Matrix=null
+  def sToQ(node:Node[_])(sMat:Matrix,pi:Vector)={
+    if (!clean){
+      cacheQ=sMat.sToQ(pi).normalize(pi)
+    }
+    cacheQ
+  }
   def getParams=List()
   override val nodeDependent=false
 }
@@ -139,6 +142,12 @@ class PiParam(pi:Vector) extends ParamControl{
 
   def setParams(a:Array[Double])={
     pi assign fromFit(a,medianIndex)
+    notifyObservers
+  }
+  
+  def setPi(a:Array[Double])={
+    pi assign a
+    notifyObservers
   }
 }
 
@@ -243,17 +252,16 @@ trait Model[A <: BioEnum] extends Logging{
     val ((siteVectorList,length),c)=t // list of vectors  1 for each site
     //println ("siteVectorList " + siteVectorList)
     //println("Q = " + qMat)
-    debug("Q = " + qMat(c))
-    val matrix = getMat(c) //e^Qt
-    siteVectorList.map{siteVector=>
-      val alphabet = c.alphabet
+      debug{"Q = " + qMat(c)}
+      val matrix = getMat(c) //e^Qt
+      siteVectorList.map{siteVector=>
+        val alphabet = c.alphabet
 
-    debug{"e^Qt=" + matrix}
-      val ret = new Array[Double](alphabet.matLength) 
+        debug{"e^Qt=" + matrix}
+        val ret = new Array[Double](alphabet.matLength) 
         (0 to alphabet.matLength - 1).foreach{i=>
           ret(i)=siteVector.zDotProduct(matrix.viewRow(i))
         }
-        //println("MAP => " +siteVector + " " + ret)
         Vector(ret)
       }
     }.toList
