@@ -92,6 +92,8 @@ trait Node[A <: BioEnum] extends Logging{
   def likelihoods(m:Model[A]):List[Vector]=m.likelihoods(this)
 
   def iNode:Option[INode[A]]=None
+
+  def cromulent:Boolean= lengthTo > -Math.EPS_DOUBLE && children.foldLeft(true){(a,b)=>a && b.cromulent}
 }
 
 trait RootNode[A <: BioEnum] extends INode[A]{
@@ -111,6 +113,7 @@ trait RootNode[A <: BioEnum] extends INode[A]{
   }
   override def removeUseless:INode[A] with RootNode[A]=super.removeUseless.iNode.get.setRoot
   override def restrictTo(allowed:Set[String]):INode[A] with RootNode[A]=super.restrictTo(allowed).iNode.get.setRoot
+  override val cromulent = children.foldLeft(true){(a,b) => a && b.cromulent}
 }
 
 class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val lengthTo:Double,val id:Int) extends Node[A]{ 

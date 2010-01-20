@@ -10,6 +10,9 @@ import scala.collection.immutable.IntMap
 import tlf.Logging
 import org.modiphy.util.PList._
 
+/**
+ Observer pattern. Anything that implements receiveUpdate(subject) can observe a Subject
+*/
 trait Subject {
   type Observer = { def receiveUpdate(subject:Subject) }
   private var observers = List[Observer]()
@@ -21,6 +24,7 @@ abstract class ParamControl extends Subject{
   def getParams:Array[Double]
   def setParams(a:Array[Double]):Unit
 }
+
 class BasicParamControl(a:Array[Double]) extends ParamControl{
   def getParams=a.toArray//copy
   def setParams(x:Array[Double]){
@@ -28,17 +32,42 @@ class BasicParamControl(a:Array[Double]) extends ParamControl{
     notifyObservers
   }
 }
+
+trait LogParamControl extends ParamControl{
+  abstract override def getParams=super.getParams.map{Math.log}
+  abstract override def setParams(a:Array[Double])=super.setParams(a.map{Math.exp})
+}
+
+class TreeParamControl[A <: BioEnum](t:Tree[A]) extends ParamControl{
+  var params = t.getBranchLengths
+  def getParams=params.toArray
+  def setParams(a:Array[Double]){
+    params = a.toList
+    notifyObservers
+  }
+  def getLatestTree:Tree[A] = t.setBranchLengths(params)
+  
+}
+class LogTreeParamControl[A <: BioEnum](t:Tree[A]) extends TreeParamControl[A](t) with LogParamControl
 /**
  The basic model, composed of an sMatrix, a pi matrix, and the MathComponent that converts the S into a Q matrix.
 */
 class ComposeModel[A <: BioEnum](pi:PiComponent,s:SComponent,maths:MathComponent,var tree:Tree[A]) extends Model[A]{
   val alphabet = tree.alphabet
-  val params = (s.getParams ++ pi.getParams ++ maths.getParams).toArray
+  val treeParamControl = new LogTreeParamControl(tree)
+  treeParamControl.addObserver(this)
+  val params = (s.getParams ++ pi.getParams ++ maths.getParams ++ List(treeParamControl)).toArray
   List(pi,s,maths).foreach{m =>
     m.addObserver(this)
   }
+
   var clean=false
-  def receiveUpdate(s:Subject){clean=false}
+  def receiveUpdate(s:Subject){
+    clean=false
+    if (s==treeParamControl){
+      tree = treeParamControl.getLatestTree
+    }
+  }
   val nodeDependent = pi.nodeDependent || s.nodeDependent || maths.nodeDependent
   assert(nodeDependent==false,"Components must be node independent to be used with ComposeModel")
   var qMatCache:Matrix=null
@@ -46,7 +75,7 @@ class ComposeModel[A <: BioEnum](pi:PiComponent,s:SComponent,maths:MathComponent
     maths.sToQ(node)(s(node),pi(node)) 
   }
 
-  override def cromulent=pi.cromulent && s.cromulent && maths.cromulent
+  override def cromulent=pi.cromulent && s.cromulent && maths.cromulent && tree.cromulent
   def getParams=params.map{_.getParams}.toList
   def setParams(i:Int)(a:Array[Double]){params(i).setParams(a)}
   def getParams(i:Int)=params(i).getParams
@@ -164,13 +193,13 @@ class BasicPiComponent(startPi:Vector) extends PiComponent{
   override val nodeDependent=false
 }
 
-class PriorPiComponent(startPi:PiComponent,alphabet:BioEnum) extends PiComponent{
+class PriorPiComponent(startPi:PiComponent,numClasses:Int,numAlpha:Int) extends PiComponent{
+  def this(startPi:PiComponent,alphabet:BioEnum)=this(startPi,alphabet.numClasses,alphabet.numAlpha)
   assert(startPi.nodeDependent==false)//not implemented node-dependent pis here
   override val nodeDependent=false
 
-  val pi=Vector(alphabet.matLength)
+  val pi=Vector(numAlpha * numClasses)
   startPi.addObserver(this)
-  val numClasses = alphabet.numClasses
   var prior = Vector((0 until numClasses).map{i=> 1.0D/numClasses}.toArray)
   val param = new PiParam(prior)
   param.addObserver(this)
@@ -183,13 +212,28 @@ class PriorPiComponent(startPi:PiComponent,alphabet:BioEnum) extends PiComponent
   }
   def recaluclatePi{
     (0 until numClasses).foreach{i=>
-      pi.viewPart(i * alphabet.numAlpha ,alphabet.numAlpha).assign(startPi(null))*prior(i)
+      pi.viewPart(i * numAlpha ,numAlpha).assign(startPi(null))*prior(i)
       //println("Added class " + i + "\n" + pi)
     }
   }
   def getParams=param :: startPi.getParams
+
+  def getView(start:Int):PiComponent=getView(start,numAlpha*numClasses)
+  def getView(start:Int,stop:Int):PiComponent={
+    val outer=this
+    new PiComponent{
+      def apply(node:Node[_])=outer.apply(node).viewPart(start,stop-start)
+      def getParams=List()
+      def setParams(array:Array[Double])={throw new IllegalArgumentException("Can't optimise PriorPiView")
+      outer.addObserver(this)
+    }
+  }
 }
-class FlatPriorPiComponent(startPi:PiComponent,alphabet:BioEnum) extends PriorPiComponent(startPi,alphabet){
+  
+}
+
+class FlatPriorPiComponent(startPi:PiComponent,numClasses:Int,numAlpha:Int) extends PriorPiComponent(startPi,numClasses,numAlpha){
+  def this(startPi:PiComponent,alphabet:BioEnum)=this(startPi,alphabet.numClasses,alphabet.numAlpha)
   override def getParams = startPi.getParams
 }
 
@@ -249,7 +293,7 @@ class InvariantMathComponent(numAlpha:Int,pi:PiComponent,s:SComponent,base:Gamma
   override val nodeDependent=false
 }
 
-class THMMGammaMathComponent(gMath:GammaMathComponent,cMat:Matrix,alphabet:BioEnum) extends MathComponent{
+class THMMGammaMathComponent(gMath:MathComponent,cMat:Matrix,alphabet:BioEnum) extends MathComponent{
   override val nodeDependent = false
   var cachedQ:Matrix=null
   val param = new FullSMatParam(cMat)
@@ -298,6 +342,17 @@ object ModelFact{
     val gammaC = new GammaMathComponent(alpha,tree.alphabet,piC2,sC)
     val thmmMath = new THMMGammaMathComponent(gammaC,cMat,tree.alphabet)
     new ComposeModel(piC2,sC,thmmMath,tree)
+  }
+  def invarThmm[A <: BioEnum](pi:Vector,s:Matrix,alpha:Double,cMat:Matrix,tree:Tree[A])={
+    val sC = new BasicSMatComponent(s)
+    val piC = new BasicPiComponent(pi)
+    val piC2 = new FlatPriorPiComponent(piC,tree.alphabet)
+    val view = piC2.getView(tree.alphabet.numAlpha)
+    val gammaC = new GammaMathComponent(alpha,tree.alphabet.numClasses-1,tree.alphabet.numAlpha,view,sC)
+    val invariantMath = new InvariantMathComponent(tree.alphabet.numAlpha,piC2,sC,gammaC)
+    val thmmMath = new THMMGammaMathComponent(invariantMath,cMat,tree.alphabet)
+    new ComposeModel(piC2,sC,thmmMath,tree)
+
   }
 }
 

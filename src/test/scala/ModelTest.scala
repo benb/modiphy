@@ -45,26 +45,28 @@ class ModelSuite extends FunSuite {
   }
   test("gamma model should have the right param controls"){
     val params = model2.params
-    params.length should be (3)//pi + sMat + gamma(shape)
+    params.length should be (4)//pi + sMat + gamma(shape) + branches
     val pSorted = params.toList.sort{(a,b)=>a.getParams.length<b.getParams.length}
     pSorted(0).getParams.length should be (1)
     pSorted(1).getParams.length should be (19)
-    pSorted(2).getParams.length should be (189)
+    pSorted(2).getParams.length should be (19) // branch lengths
+    pSorted(3).getParams.length should be (189)
   }
   test("thmm model should have the right param controls"){
     val params = model3.params
-    params.length should be (4)//pi + sMat + gamma(shape) + cmat
+    params.length should be (5)//pi + sMat + gamma(shape) + cmat + branches
     val pSorted = params.toList.sort{(a,b)=>a.getParams.length<b.getParams.length}
     pSorted(0).getParams.length should be (1)
     pSorted(1).getParams.length should be (6)
     pSorted(2).getParams.length should be (19)
-    pSorted(3).getParams.length should be (189)
+    pSorted(3).getParams.length should be (19) //branch lengths
+    pSorted(4).getParams.length should be (189)
   }
   test("Gamma + Invariant model should match phyml"){
     val (tree5,aln5) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(5))
     val piMe = new BasicPiComponent(WAG.pi)
-    val gammaMe=new GammaMathComponent(0.5,4,20,piCG,sC)
     val pi = new PriorPiComponent(piMe,tree5.alphabet)
+    val gammaMe=new GammaMathComponent(0.5,4,20,pi.getView(20,100),sC)
     val model4 = new ComposeModel(pi,sC,new InvariantMathComponent(20,pi,sC,gammaMe),tree5)
     model4.logLikelihood should be (-5824.746968 plusOrMinus 0.01) // phyml -d aa -o n -i png1-aln.phy -u png1.tre -a 0.5 -m WAG -v 0.2
     var priorInv = 0.4D
@@ -74,6 +76,17 @@ class ModelSuite extends FunSuite {
     priorInv = 0.3D
     model4.params(1).asInstanceOf[PiParam].setPi(Array(priorInv,priorGamma,priorGamma,priorGamma,priorGamma))
     model4.logLikelihood should be (-5841.318438 plusOrMinus 0.01) // phyml -d aa -o n -i png1-aln.phy -u png1.tre -a 0.5 -m WAG -v 0.4
-
+  }
+  test("Branch Length changes"){
+    val param = model3.params(4)
+    val bls = param.getParams
+    val bl = bls(0)
+    bls(0)=1.0
+    val start=model3.logLikelihood
+    param.setParams(bls)
+    model3.logLikelihood should be < (start) // artificially setting a branch length to exp(1.0) should be bad for the likelihood
+    bls(0)=bl
+    param.setParams(bls)
+    model3.logLikelihood should be (start)
   }
 }
