@@ -3,6 +3,7 @@ import cern.colt.matrix._
 import cern.colt.matrix.DoubleFactory2D._
 import cern.colt.function.DoubleFunction
 import cern.colt.matrix.linalg.{Algebra,EigenvalueDecomposition}
+import org.modiphy.util._
 
 object BasicModel{
   def GTR={
@@ -34,8 +35,7 @@ object Matrix{
 
 object MatExp{
   private lazy val algebra = new Algebra
-  import scala.collection.jcl.WeakHashMap
-  private lazy val cache:WeakHashMap[String,(EigenvalueDecomposition,Matrix)] = new WeakHashMap()
+  private lazy val cache:SoftCacheMap[String,(EigenvalueDecomposition,Matrix)] = new SoftCacheMap(10)
   def decomp(m:Matrix)={
     cache.getOrElseUpdate(m.toString,{val e = new EigenvalueDecomposition(m); (e,algebra.inverse(e.getV))})
   }

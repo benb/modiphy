@@ -17,24 +17,24 @@ class MultFunction(f:Array[Double]=>Double) extends MultivariateRealFunction{
 
 object ModelOptimiser extends Logging{
 
-  def optimise[A <: BioEnum](paramSet:Int=>Boolean,optFactory: => MultivariateRealOptimizer)(model:Model[A])={
+  def optimise[A <: BioEnum](paramList:Seq[ParamControl],optFactory: => MultivariateRealOptimizer)(model:ComposeModel[A])={
     var startLkl = model.logLikelihood
     var newLkl=startLkl
     do {
       startLkl = newLkl
-      val startModels = model.getParams
+      val startModels = paramList
       info{"START OPT" + model + "\n" + model.logLikelihood}
-      startModels.zipWithIndex.filter{t=>paramSet(t._2)}.foreach{t=> 
-        val (start,index)=t
+      startModels.foreach{start=> 
+        val startP=start.getParams
         val result = optFactory.optimize(new MultFunction({ d:Array[Double]=>
-            model.setParams(index)(d)
+            start.setParams(d)
             val lkl = model.logLikelihood
-            extra{"f" + index +": " + d.toList.mkString(",") + " => " + lkl}
+            extra{"f" + start.name +": " + d.toList.mkString(",") + " => " + lkl}
             if (lkl.isNaN){Math.NEG_INF_DOUBLE}else{ lkl}
         }
-        ),MAXIMIZE,start.toArray)
-        model.setParams(index)(result.getPoint)
-        println("OPT " + model.getParamName(t._2) + " " + index + "  " +  t._2 + "  " + model.logLikelihood)
+        ),MAXIMIZE,startP.toArray)
+        start.setParams(result.getPoint)
+        println("OPT " + start.name + " " + model.logLikelihood)
         println(model)
         finest{model.likelihoods.mkString(" ")}
         finest{model.realLikelihoods.mkString(" ")}
@@ -47,10 +47,10 @@ object ModelOptimiser extends Logging{
 
 
 
-  def nelderMead[A <: BioEnum](paramSet:Int=>Boolean,model:Model[A]):Model[A]=optimise[A](paramSet,getNelderMead)(model)
-  def multiDirectional[A <: BioEnum](paramSet:Int=>Boolean,model:Model[A]):Model[A]=optimise[A](paramSet,getMultiDirectional)(model)
+  def nelderMead[A <: BioEnum](paramSet:Seq[ParamControl],model:ComposeModel[A]):ComposeModel[A]=optimise[A](paramSet,getNelderMead)(model)
+  def multiDirectional[A <: BioEnum](paramSet:Seq[ParamControl],model:ComposeModel[A]):ComposeModel[A]=optimise[A](paramSet,getMultiDirectional)(model)
 
-  def nelderMead[A <: BioEnum](model:Model[A]):Model[A]=nelderMead({i:Int=>true},model)
+  def nelderMead[A <: BioEnum](model:ComposeModel[A]):ComposeModel[A]=nelderMead(model.params,model)
   object DefaultConvergence extends RealConvergenceChecker{
     import   org.apache.commons.math.optimization.RealPointValuePair
     def converged(iter:Int,oldPt:RealPointValuePair,newPt:RealPointValuePair)={iter > 1000 || newPt.getValue - oldPt.getValue < 0.01} 

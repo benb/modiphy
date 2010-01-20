@@ -66,12 +66,15 @@ class ModelSuite extends FunSuite {
     val (tree5,aln5) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(5))
     val piMe = new BasicPiComponent(WAG.pi)
     val pi = new PriorPiComponent(piMe,tree5.alphabet)
-    val gammaMe=new GammaMathComponent(0.5,4,20,pi.getView(20,100),sC)
-    val model4 = new ComposeModel(pi,sC,new InvariantMathComponent(20,pi,sC,gammaMe),tree5)
+    val gammaMe=new GammaMathComponent(0.5,4,20,pi.getView(20),sC)
+   // val model4 = new ComposeModel(pi,sC,new InvariantMathComponent(20,pi,sC,gammaMe),tree5)
+    val model4 = ModelFact.invarThmm(WAG.pi,WAG.S,0.5,Matrix(5,5),tree5)
+
     model4.logLikelihood should be (-5824.746968 plusOrMinus 0.01) // phyml -d aa -o n -i png1-aln.phy -u png1.tre -a 0.5 -m WAG -v 0.2
     var priorInv = 0.4D
     def priorGamma = (1.0D - priorInv)/4.0D
-    model4.params(1).asInstanceOf[PiParam].setPi(Array(priorInv,priorGamma,priorGamma,priorGamma,priorGamma))
+    val priorParam = model4.params.filter{_.name=="Prior Pi"}(0)
+    priorParam.asInstanceOf[PiParam].setPi(Array(priorInv,priorGamma,priorGamma,priorGamma,priorGamma))
     model4.logLikelihood should be (-5864.879865 plusOrMinus 0.01) // phyml -d aa -o n -i png1-aln.phy -u png1.tre -a 0.5 -m WAG -v 0.4
     priorInv = 0.3D
     model4.params(1).asInstanceOf[PiParam].setPi(Array(priorInv,priorGamma,priorGamma,priorGamma,priorGamma))
@@ -87,6 +90,6 @@ class ModelSuite extends FunSuite {
     model3.logLikelihood should be < (start) // artificially setting a branch length to exp(1.0) should be bad for the likelihood
     bls(0)=bl
     param.setParams(bls)
-    model3.logLikelihood should be (start)
+    model3.logLikelihood should be (start plusOrMinus 1e-4)
   }
 }

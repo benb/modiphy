@@ -23,9 +23,10 @@ trait Subject {
 abstract class ParamControl extends Subject{
   def getParams:Array[Double]
   def setParams(a:Array[Double]):Unit
+  def name:String
 }
 
-class BasicParamControl(a:Array[Double]) extends ParamControl{
+class BasicParamControl(a:Array[Double],val name:String) extends ParamControl{
   def getParams=a.toArray//copy
   def setParams(x:Array[Double]){
     x.copyToArray(a,0)
@@ -46,6 +47,7 @@ class TreeParamControl[A <: BioEnum](t:Tree[A]) extends ParamControl{
     notifyObservers
   }
   def getLatestTree:Tree[A] = t.setBranchLengths(params)
+  val name="Branch Lengths"
   
 }
 class LogTreeParamControl[A <: BioEnum](t:Tree[A]) extends TreeParamControl[A](t) with LogParamControl
@@ -110,7 +112,7 @@ abstract class SComponent extends MComponent{
 class BasicSMatComponent(sMat:Matrix) extends SComponent with SMatUtil{
   def apply(node:Node[_])=sMat
   val paramName="S Matrix"
-  val param = new SMatParam(sMat)
+  val param = new SMatParam(sMat,"SMat")
   param.addObserver(this)
   def getParams=List(param)
   override val nodeDependent=false
@@ -149,7 +151,8 @@ abstract class PiComponent extends MComponent{
   def apply(node:Node[_]):Vector
 }
 
-class PiParam(pi:Vector) extends ParamControl{
+class PiParam(pi:Vector,val name:String) extends ParamControl{
+  def this(pi:Vector)=this(pi,"Pi")
   def fromFit(array:Array[Double],medianIndex:Int)={
     val exponentiated =  array.map{i=>Math.exp(i)}
     val total = (0.0D /: exponentiated){_+_} + Math.exp(0.0D)
@@ -201,7 +204,7 @@ class PriorPiComponent(startPi:PiComponent,numClasses:Int,numAlpha:Int) extends 
   val pi=Vector(numAlpha * numClasses)
   startPi.addObserver(this)
   var prior = Vector((0 until numClasses).map{i=> 1.0D/numClasses}.toArray)
-  val param = new PiParam(prior)
+  val param = new PiParam(prior,"Prior Pi")
   param.addObserver(this)
   def apply(node:Node[_]) = {
     if (!clean){
@@ -251,7 +254,7 @@ class GammaMathComponent(a:Double,numClasses:Int,numAlpha:Int,pi:PiComponent,s:S
   def matLength = numClasses * numAlpha
   val alpha = Array(a)
   def gMath = new Gamma(numClasses)
-  val param=new BasicParamControl(alpha)
+  val param=new BasicParamControl(alpha,"Alpha Shape")
   def getParams=List(param)
   param.addObserver(this)
   val internalS=Matrix(matLength,matLength)
@@ -296,7 +299,7 @@ class InvariantMathComponent(numAlpha:Int,pi:PiComponent,s:SComponent,base:Gamma
 class THMMGammaMathComponent(gMath:MathComponent,cMat:Matrix,alphabet:BioEnum) extends MathComponent{
   override val nodeDependent = false
   var cachedQ:Matrix=null
-  val param = new FullSMatParam(cMat)
+  val param = new FullSMatParam(cMat,"CMat")
   param.addObserver(this)
   gMath.addObserver(this)
   override def sToQ(node:Node[_])(sMat:Matrix,pi:Vector)={
@@ -346,7 +349,7 @@ object ModelFact{
   def invarThmm[A <: BioEnum](pi:Vector,s:Matrix,alpha:Double,cMat:Matrix,tree:Tree[A])={
     val sC = new BasicSMatComponent(s)
     val piC = new BasicPiComponent(pi)
-    val piC2 = new FlatPriorPiComponent(piC,tree.alphabet)
+    val piC2 = new PriorPiComponent(piC,tree.alphabet)
     val view = piC2.getView(tree.alphabet.numAlpha)
     val gammaC = new GammaMathComponent(alpha,tree.alphabet.numClasses-1,tree.alphabet.numAlpha,view,sC)
     val invariantMath = new InvariantMathComponent(tree.alphabet.numAlpha,piC2,sC,gammaC)
@@ -434,14 +437,14 @@ trait TraitModel[A <: BioEnum] extends Model[A] with SMatUtil{
  
 }
 
-class SMatParam(sMat:Matrix) extends ParamControl with SMatUtil{
+class SMatParam(sMat:Matrix,val name:String) extends ParamControl with SMatUtil{
   def getParams=linearSMat(sMat).toArray
   def setParams(a:Array[Double])={
     setSMat(a,sMat)
     notifyObservers
   }
 }
-class FullSMatParam(sMat:Matrix) extends SMatParam(sMat){
+class FullSMatParam(sMat:Matrix,name:String) extends SMatParam(sMat,name){
   override def getParams=linearSMatFull(sMat).toArray
 }
 trait SMatUtil{
