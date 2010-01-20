@@ -81,7 +81,9 @@ abstract class SComponent extends MComponent{
 class BasicSMatComponent(sMat:Matrix) extends SComponent with SMatUtil{
   def apply(node:Node[_])=sMat
   val paramName="S Matrix"
-  def getParams=List() // don't expose to optimiser
+  val param = new SMatParam(sMat)
+  param.addObserver(this)
+  def getParams=List(param)
   override val nodeDependent=false
 }
 
@@ -105,7 +107,7 @@ object PiComponent{
     val smallestPi=0.001D
     val initial = startPi.copy
     (0 until initial.size).foreach{i=> 
-      if (initial(i)<smallestPi){
+      if (initial(i) < smallestPi){
         initial(i)=smallestPi
       }
     }
@@ -162,14 +164,16 @@ class BasicPiComponent(startPi:Vector) extends PiComponent{
   override val nodeDependent=false
 }
 
-class FlatPriorPiComponent(startPi:PiComponent,alphabet:BioEnum) extends PiComponent{
+class PriorPiComponent(startPi:PiComponent,alphabet:BioEnum) extends PiComponent{
   assert(startPi.nodeDependent==false)//not implemented node-dependent pis here
   override val nodeDependent=false
 
   val pi=Vector(alphabet.matLength)
   startPi.addObserver(this)
   val numClasses = alphabet.numClasses
-  val prior = (0 until numClasses).map{i=> 1.0D/numClasses}.toArray
+  var prior = Vector((0 until numClasses).map{i=> 1.0D/numClasses}.toArray)
+  val param = new PiParam(prior)
+  param.addObserver(this)
   def apply(node:Node[_]) = {
     if (!clean){
       recaluclatePi
@@ -180,10 +184,13 @@ class FlatPriorPiComponent(startPi:PiComponent,alphabet:BioEnum) extends PiCompo
   def recaluclatePi{
     (0 until numClasses).foreach{i=>
       pi.viewPart(i * alphabet.numAlpha ,alphabet.numAlpha).assign(startPi(null))*prior(i)
-      println("Added class " + i + "\n" + pi)
+      //println("Added class " + i + "\n" + pi)
     }
   }
-  def getParams=startPi.getParams
+  def getParams=param :: startPi.getParams
+}
+class FlatPriorPiComponent(startPi:PiComponent,alphabet:BioEnum) extends PriorPiComponent(startPi,alphabet){
+  override def getParams = startPi.getParams
 }
 
 abstract class SMatComponent extends MComponent with SMatUtil{
@@ -193,22 +200,82 @@ abstract class SMatComponent extends MComponent with SMatUtil{
   def apply(node:Node[_]):Matrix
 }
 
-class GammaMathComponent(a:Double,alphabet:BioEnum) extends MathComponent{
+class GammaMathComponent(a:Double,numClasses:Int,numAlpha:Int,pi:PiComponent,s:SComponent) extends MathComponent{
+  def this(a:Double,alphabet:BioEnum,pi:PiComponent,s:SComponent)=this(a,alphabet.numClasses,alphabet.numAlpha,pi,s)
+  pi.addObserver(this)
+  s.addObserver(this)
+  def matLength = numClasses * numAlpha
   val alpha = Array(a)
-  def gMath = new Gamma(alphabet.numClasses)
+  def gMath = new Gamma(numClasses)
   val param=new BasicParamControl(alpha)
   def getParams=List(param)
-  val internalS=Matrix(alphabet.matLength,alphabet.matLength)
-  val numAlpha = alphabet.numAlpha
+  param.addObserver(this)
+  val internalS=Matrix(matLength,matLength)
   override val nodeDependent = false
+  var cachedQ:Matrix=null
   
   def sToQ(node:Node[_])(sMat:Matrix,pi:Vector)={
+    if (!(clean)){
     val rates = gMath(alpha(0))
-    (0 until alphabet.numClasses).foreach{i=>
+    (0 until numClasses).foreach{i=>
       internalS.viewPart(i * numAlpha,i * numAlpha,numAlpha,numAlpha).assign(sMat)*rates(i)
     }
-    internalS.sToQ(pi).normalize(pi)
+      cachedQ= internalS.sToQ(pi).normalize(pi)
+      clean=true
+    }
+    cachedQ
   }
+}
+
+class InvariantMathComponent(numAlpha:Int,pi:PiComponent,s:SComponent,base:GammaMathComponent) extends  MathComponent{
+  var cachedQ:Matrix=null
+  pi.addObserver(this)
+  s.addObserver(this)
+  base.addObserver(this)
+  def sToQ(node:Node[_])(sMat:Matrix,pi:Vector)={
+    if (!(clean)){
+      val startQ = base.sToQ(node)(sMat,pi)
+      if (cachedQ==null){
+        cachedQ = Matrix(startQ.rows + numAlpha, startQ.rows + numAlpha)
+      }
+      cachedQ assign 0.0D
+      cachedQ.viewPart(numAlpha,numAlpha,startQ.rows,startQ.rows).assign(startQ)
+      cachedQ = cachedQ.normalize(pi)
+      clean=true
+    }
+    cachedQ
+  }
+  def getParams=List()
+  override val nodeDependent=false
+}
+
+class THMMGammaMathComponent(gMath:GammaMathComponent,cMat:Matrix,alphabet:BioEnum) extends MathComponent{
+  override val nodeDependent = false
+  var cachedQ:Matrix=null
+  val param = new FullSMatParam(cMat)
+  param.addObserver(this)
+  gMath.addObserver(this)
+  override def sToQ(node:Node[_])(sMat:Matrix,pi:Vector)={
+    import alphabet._
+    if (!clean){
+      val qStart = gMath.sToQ(node)(sMat,pi)
+        for (i <- 0 until numClasses){
+        for (j <- i+1 until numClasses){
+          for (x <- 0 until numAlpha){
+            qStart(i * numAlpha + x, j * numAlpha + x) = cMat(i,j) * pi(j * numAlpha + x) // i->j transition
+
+            qStart(j * numAlpha + x, i * numAlpha + x) = cMat(i,j) * pi(i * numAlpha + x) // j->i transition
+          }
+        }
+      }
+      cachedQ=qStart.fixDiag
+      clean=true
+      //println("Q:\n" + cachedQ)
+    }
+    cachedQ
+    
+  }
+  def getParams=param::gMath.getParams
 }
 
 object ModelFact{
@@ -219,10 +286,18 @@ object ModelFact{
   }
   def gamma[A <: BioEnum](pi:Vector,s:Matrix,alpha:Double,tree:Tree[A])={
     val sC=new BasicSMatComponent(s)
-    val gammaC=new GammaMathComponent(alpha,tree.alphabet)
     //val cC=new SMatComponent(cC)
     val piC = new FlatPriorPiComponent(new BasicPiComponent(pi),tree.alphabet)
+    val gammaC=new GammaMathComponent(alpha,tree.alphabet,piC,sC)
     new ComposeModel(piC,sC,gammaC,tree)
+  }
+  def thmm[A <: BioEnum](pi:Vector,s:Matrix,alpha:Double,cMat:Matrix,tree:Tree[A])={
+    val sC = new BasicSMatComponent(s)
+    val piC = new BasicPiComponent(pi)
+    val piC2 = new FlatPriorPiComponent(piC,tree.alphabet)
+    val gammaC = new GammaMathComponent(alpha,tree.alphabet,piC2,sC)
+    val thmmMath = new THMMGammaMathComponent(gammaC,cMat,tree.alphabet)
+    new ComposeModel(piC2,sC,thmmMath,tree)
   }
 }
 
@@ -230,6 +305,7 @@ object ModelFact{
 
 class UnknownParamException(i:Int) extends java.lang.RuntimeException("Unknown parameter " + i.toString)
 trait Model[A <: BioEnum] extends Logging{
+  
   var tree:Tree[A]
   def cromulent:Boolean
 
@@ -268,7 +344,7 @@ trait Model[A <: BioEnum] extends Logging{
     val ans = intermediates.head
     val func = new cern.colt.function.DoubleDoubleFunction{def apply(x:Double,y:Double)=x*y}
     intermediates.tail.foreach{list2=>
-      ans.zip(list2).foreach{t=>
+      ans.zip(list2).map{t=> // not really a map but used for parallel reasons
         val (vec,vec2)=t
         vec.assign(vec2,func)
       }
@@ -303,7 +379,24 @@ trait TraitModel[A <: BioEnum] extends Model[A] with SMatUtil{
  
 }
 
+class SMatParam(sMat:Matrix) extends ParamControl with SMatUtil{
+  def getParams=linearSMat(sMat).toArray
+  def setParams(a:Array[Double])={
+    setSMat(a,sMat)
+    notifyObservers
+  }
+}
+class FullSMatParam(sMat:Matrix) extends SMatParam(sMat){
+  override def getParams=linearSMatFull(sMat).toArray
+}
 trait SMatUtil{
+  def linearSMatFull(sMatInst:Matrix):Seq[Double]={
+    val list = (0 to sMatInst.rows -2).map{ i=> // don't skip last elment...
+       val list1 = sMatInst(i).viewPart(i+1,sMatInst.columns - i - 1).toList
+       list1
+    }.toList.flatten[Double]
+    list
+  }
   def linearSMat(sMatInst:Matrix):Seq[Double]={
     val list = (0 to sMatInst.rows -3).map{ i=> // skip last elment...
        val list1 = sMatInst(i).viewPart(i+1,sMatInst.columns - i - 1).toList
@@ -468,7 +561,7 @@ class Gamma(numCat:Int){
         (1 until numCat-1).foreach{i=>
           rK(i) = (freqK(i)-freqK(i-1))*factor;
         }
-        println("RATES " + rK.toList)
+       // println("RATES " + rK.toList)
         rK
   }
 }
