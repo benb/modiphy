@@ -23,13 +23,13 @@ object ModelOptimiser extends Logging{
     do {
       startLkl = newLkl
       val startModels = paramList
-      info{"START OPT" + model + "\n" + model.logLikelihood}
+      info{"START OPT " + model + " \n" + model.logLikelihood}
       startModels.foreach{start=> 
         val startP=start.getParams
         val result = optFactory.optimize(new MultFunction({ d:Array[Double]=>
             start.setParams(d)
             val lkl = model.logLikelihood
-            extra{"f" + start.name +": " + d.toList.mkString(",") + " => " + lkl}
+            extra{"f(" + start.name +"): " + d.toList.mkString(",") + " => " + lkl}
             if (lkl.isNaN){Math.NEG_INF_DOUBLE}else{ lkl}
         }
         ),MAXIMIZE,startP.toArray)

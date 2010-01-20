@@ -204,7 +204,7 @@ class PriorPiComponent(startPi:PiComponent,numClasses:Int,numAlpha:Int) extends 
   val pi=Vector(numAlpha * numClasses)
   startPi.addObserver(this)
   var prior = Vector((0 until numClasses).map{i=> 1.0D/numClasses}.toArray)
-  val param = new PiParam(prior,"Prior Pi")
+  val param:ParamControl = new PiParam(prior,"Prior Pi")
   param.addObserver(this)
   def apply(node:Node[_]) = {
     if (!clean){
@@ -227,17 +227,33 @@ class PriorPiComponent(startPi:PiComponent,numClasses:Int,numAlpha:Int) extends 
     new PiComponent{
       def apply(node:Node[_])=outer.apply(node).viewPart(start,stop-start)
       def getParams=List()
-      def setParams(array:Array[Double])={throw new IllegalArgumentException("Can't optimise PriorPiView")
+      def setParams(array:Array[Double])=throw new IllegalArgumentException("Can't optimise PriorPiView")
       outer.addObserver(this)
     }
   }
 }
+
+class FirstOnlyPiParam(pi:Vector,val name:String) extends ParamControl{
+  def getParams=Array(pi(0))
+  def setParams(a:Array[Double]){
+    pi(0)=a(0)
+    for (i<-1 until pi.size){
+      pi(i)=1.0D/(pi.size-1)
+    }
+    notifyObservers
+  }
   
 }
 
 class FlatPriorPiComponent(startPi:PiComponent,numClasses:Int,numAlpha:Int) extends PriorPiComponent(startPi,numClasses,numAlpha){
   def this(startPi:PiComponent,alphabet:BioEnum)=this(startPi,alphabet.numClasses,alphabet.numAlpha)
   override def getParams = startPi.getParams
+}
+
+class FirstPriorPiComponent(startPi:PiComponent,numClasses:Int,numAlpha:Int) extends PriorPiComponent(startPi,numClasses,numAlpha){
+  def this(startPi:PiComponent,alphabet:BioEnum)=this(startPi,alphabet.numClasses,alphabet.numAlpha)
+  override val param = new FirstOnlyPiParam(pi,"First Prior")
+  param.addObserver(this)
 }
 
 abstract class SMatComponent extends MComponent with SMatUtil{
@@ -281,7 +297,7 @@ class InvariantMathComponent(numAlpha:Int,pi:PiComponent,s:SComponent,base:Gamma
   base.addObserver(this)
   def sToQ(node:Node[_])(sMat:Matrix,pi:Vector)={
     if (!(clean)){
-      val startQ = base.sToQ(node)(sMat,pi)
+      val startQ = base.sToQ(node)(sMat,pi.viewPart(numAlpha,pi.size-numAlpha))
       if (cachedQ==null){
         cachedQ = Matrix(startQ.rows + numAlpha, startQ.rows + numAlpha)
       }
