@@ -46,7 +46,7 @@ class TreeParamControl[A <: BioEnum](t:Tree[A]) extends ParamControl{
     params = a.toList
     notifyObservers
   }
-  def getLatestTree:Tree[A] = {val ans = t.setBranchLengths(params); println("New tree " + ans); ans}
+  def getLatestTree:Tree[A] = {t.setBranchLengths(params)}
   val name="Branch Lengths"
   
 }
