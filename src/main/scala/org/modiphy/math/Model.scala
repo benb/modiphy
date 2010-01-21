@@ -46,7 +46,7 @@ class TreeParamControl[A <: BioEnum](t:Tree[A]) extends ParamControl{
     params = a.toList
     notifyObservers
   }
-  def getLatestTree:Tree[A] = t.setBranchLengths(params)
+  def getLatestTree:Tree[A] = {val ans = t.setBranchLengths(params); println("New tree " + ans); ans}
   val name="Branch Lengths"
   
 }
@@ -242,8 +242,8 @@ class FirstOnlyPiParam(pi:Vector,val name:String) extends ParamControl{
     }
     notifyObservers
   }
-  
 }
+
 
 class FlatPriorPiComponent(startPi:PiComponent,numClasses:Int,numAlpha:Int) extends PriorPiComponent(startPi,numClasses,numAlpha){
   def this(startPi:PiComponent,alphabet:BioEnum)=this(startPi,alphabet.numClasses,alphabet.numAlpha)
@@ -252,9 +252,18 @@ class FlatPriorPiComponent(startPi:PiComponent,numClasses:Int,numAlpha:Int) exte
 
 class FirstPriorPiComponent(startPi:PiComponent,numClasses:Int,numAlpha:Int) extends PriorPiComponent(startPi,numClasses,numAlpha){
   def this(startPi:PiComponent,alphabet:BioEnum)=this(startPi,alphabet.numClasses,alphabet.numAlpha)
-  val myParam = new FirstOnlyPiParam(prior,"First Prior")
+  val myParam = new FirstOnlyPiParam(prior,"First Prior") with LogParamControl
   myParam.addObserver(this)
   override def getParams = myParam :: startPi.getParams
+
+  override def cromulent = {
+    if (!clean){
+      recaluclatePi
+      clean=true
+    }
+    val sum = pi.zSum
+    pi.toArray.foldLeft(true){_ && _ > -Math.EPS_DOUBLE} && pi.zSum > 0.99999 && pi.zSum < 1.00001
+  }
 }
 
 abstract class SMatComponent extends MComponent with SMatUtil{
@@ -271,7 +280,7 @@ class GammaMathComponent(a:Double,numClasses:Int,numAlpha:Int,pi:PiComponent,s:S
   def matLength = numClasses * numAlpha
   val alpha = Array(a)
   def gMath = new Gamma(numClasses)
-  val param=new BasicParamControl(alpha,"Alpha Shape")
+  val param=new BasicParamControl(alpha,"Alpha Shape") with LogParamControl
   def getParams=List(param)
   param.addObserver(this)
   val internalS=Matrix(matLength,matLength)
@@ -316,7 +325,7 @@ class InvariantMathComponent(numAlpha:Int,pi:PiComponent,s:SComponent,base:Gamma
 class THMMGammaMathComponent(gMath:MathComponent,cMat:Matrix,alphabet:BioEnum) extends MathComponent{
   override val nodeDependent = false
   var cachedQ:Matrix=null
-  val param = new FullSMatParam(cMat,"CMat")
+  val param = new FullSMatParam(cMat,"CMat") with LogParamControl
   param.addObserver(this)
   gMath.addObserver(this)
   override def sToQ(node:Node[_])(sMat:Matrix,pi:Vector)={
@@ -333,8 +342,9 @@ class THMMGammaMathComponent(gMath:MathComponent,cMat:Matrix,alphabet:BioEnum) e
         }
       }
       cachedQ=qStart.fixDiag
+  //    println("CMAT " + cMat)
+  //    println("QMAT " + cachedQ)
       clean=true
-      //println("Q:\n" + cachedQ)
     }
     cachedQ
     
@@ -426,7 +436,15 @@ trait Model[A <: BioEnum] extends Logging{
 
   def likelihoods:List[Vector]=tree.likelihoods(this)
   def realLikelihoods=tree.realLikelihoods(this)
-  def logLikelihood=if (cromulent){tree.logLikelihood(this)}else{Math.NEG_INF_DOUBLE}
+  def logLikelihood=if (cromulent){
+    val lnL = tree.logLikelihood(this)
+    if (lnL.isNaN){
+      println("lnL is NaN")
+      println("Q mat:" + qMat(tree))
+    }
+    lnL
+
+  }else{Math.NEG_INF_DOUBLE}
   def getParams(i:Int):Array[Double]
   def getParams:List[Array[Double]]
 }

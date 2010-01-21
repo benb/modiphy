@@ -39,7 +39,7 @@ class ModelSuite extends FunSuite {
     //assume a conservative rate of change between fast site classes is probably better than none at all
     //this is not a definite but seems to be true for this dataset
     //and possible that slow<->fast might be close to 0!
-    thmmMath.getParams.head.setParams(Array(0,0,0,0,0,0.05))
+    thmmMath.getParams.head.setParams(Array(0,0,0,0,0,0.05).map{Math.log})
     val ans1 = model2.logLikelihood
     model3.logLikelihood should be > (ans1)
   }
@@ -73,12 +73,11 @@ class ModelSuite extends FunSuite {
 
     model4.logLikelihood should be (-5824.746968 plusOrMinus 0.01) // phyml -d aa -o n -i png1-aln.phy -u png1.tre -a 0.5 -m WAG -v 0.2
     var priorInv = 0.4D
-    def priorGamma = (1.0D - priorInv)/4.0D
     val priorParam = model4.params.filter{_.name=="First Prior"}(0)
-    priorParam.setParams(Array(priorInv))
+    priorParam.setParams(Array(Math.log(priorInv)))
     model4.logLikelihood should be (-5864.879865 plusOrMinus 0.01) // phyml -d aa -o n -i png1-aln.phy -u png1.tre -a 0.5 -m WAG -v 0.4
     priorInv = 0.3D
-    priorParam.setParams(Array(priorInv))
+    priorParam.setParams(Array(Math.log(priorInv)))
     model4.logLikelihood should be (-5841.318438 plusOrMinus 0.01) // phyml -d aa -o n -i png1-aln.phy -u png1.tre -a 0.5 -m WAG -v 0.4
   }
   test("Branch Length changes"){
