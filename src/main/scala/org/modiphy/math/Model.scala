@@ -309,7 +309,7 @@ class InvariantMathComponent(numAlpha:Int,pi:PiComponent,s:SComponent,base:Gamma
     }
     cachedQ
   }
-  def getParams=List()
+  def getParams=base.getParams
   override val nodeDependent=false
 }
 

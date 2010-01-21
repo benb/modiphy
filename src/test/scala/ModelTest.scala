@@ -64,11 +64,12 @@ class ModelSuite extends FunSuite {
   }
   test("Gamma + Invariant model should match phyml"){
     val (tree5,aln5) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(5))
-    val piMe = new BasicPiComponent(WAG.pi)
-    val pi = new PriorPiComponent(piMe,tree5.alphabet)
-    val gammaMe=new GammaMathComponent(0.5,4,20,pi.getView(20),sC)
+  //  val piMe = new BasicPiComponent(WAG.pi)
+  //  val pi = new PriorPiComponent(piMe,tree5.alphabet)
+  //  val gammaMe=new GammaMathComponent(0.5,4,20,pi.getView(20),sC)
    // val model4 = new ComposeModel(pi,sC,new InvariantMathComponent(20,pi,sC,gammaMe),tree5)
     val model4 = ModelFact.invarThmm(WAG.pi,WAG.S,0.5,Matrix(5,5),tree5)
+    model4.params.length should be (6) // pi firstPrior sMat bl cMat shape
 
     model4.logLikelihood should be (-5824.746968 plusOrMinus 0.01) // phyml -d aa -o n -i png1-aln.phy -u png1.tre -a 0.5 -m WAG -v 0.2
     var priorInv = 0.4D
