@@ -73,11 +73,11 @@ class ModelSuite extends FunSuite {
     model4.logLikelihood should be (-5824.746968 plusOrMinus 0.01) // phyml -d aa -o n -i png1-aln.phy -u png1.tre -a 0.5 -m WAG -v 0.2
     var priorInv = 0.4D
     def priorGamma = (1.0D - priorInv)/4.0D
-    val priorParam = model4.params.filter{_.name=="Prior Pi"}(0)
-    priorParam.asInstanceOf[PiParam].setPi(Array(priorInv,priorGamma,priorGamma,priorGamma,priorGamma))
+    val priorParam = model4.params.filter{_.name=="First Prior"}(0)
+    priorParam.setParams(Array(priorInv))
     model4.logLikelihood should be (-5864.879865 plusOrMinus 0.01) // phyml -d aa -o n -i png1-aln.phy -u png1.tre -a 0.5 -m WAG -v 0.4
     priorInv = 0.3D
-    model4.params(1).asInstanceOf[PiParam].setPi(Array(priorInv,priorGamma,priorGamma,priorGamma,priorGamma))
+    priorParam.setParams(Array(priorInv))
     model4.logLikelihood should be (-5841.318438 plusOrMinus 0.01) // phyml -d aa -o n -i png1-aln.phy -u png1.tre -a 0.5 -m WAG -v 0.4
   }
   test("Branch Length changes"){

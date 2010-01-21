@@ -238,7 +238,7 @@ class FirstOnlyPiParam(pi:Vector,val name:String) extends ParamControl{
   def setParams(a:Array[Double]){
     pi(0)=a(0)
     for (i<-1 until pi.size){
-      pi(i)=1.0D/(pi.size-1)
+      pi(i)=(1.0D-pi(0))/(pi.size-1)
     }
     notifyObservers
   }
@@ -252,8 +252,9 @@ class FlatPriorPiComponent(startPi:PiComponent,numClasses:Int,numAlpha:Int) exte
 
 class FirstPriorPiComponent(startPi:PiComponent,numClasses:Int,numAlpha:Int) extends PriorPiComponent(startPi,numClasses,numAlpha){
   def this(startPi:PiComponent,alphabet:BioEnum)=this(startPi,alphabet.numClasses,alphabet.numAlpha)
-  override val param = new FirstOnlyPiParam(pi,"First Prior")
-  param.addObserver(this)
+  val myParam = new FirstOnlyPiParam(prior,"First Prior")
+  myParam.addObserver(this)
+  override def getParams = myParam :: startPi.getParams
 }
 
 abstract class SMatComponent extends MComponent with SMatUtil{
@@ -365,7 +366,7 @@ object ModelFact{
   def invarThmm[A <: BioEnum](pi:Vector,s:Matrix,alpha:Double,cMat:Matrix,tree:Tree[A])={
     val sC = new BasicSMatComponent(s)
     val piC = new BasicPiComponent(pi)
-    val piC2 = new PriorPiComponent(piC,tree.alphabet)
+    val piC2 = new FirstPriorPiComponent(piC,tree.alphabet)
     val view = piC2.getView(tree.alphabet.numAlpha)
     val gammaC = new GammaMathComponent(alpha,tree.alphabet.numClasses-1,tree.alphabet.numAlpha,view,sC)
     val invariantMath = new InvariantMathComponent(tree.alphabet.numAlpha,piC2,sC,gammaC)
