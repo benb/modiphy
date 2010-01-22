@@ -54,22 +54,40 @@ class LogTreeParamControl[A <: BioEnum](t:Tree[A]) extends TreeParamControl[A](t
 /**
  The basic model, composed of an sMatrix, a pi matrix, and the MathComponent that converts the S into a Q matrix.
 */
+
+class MixtureModel[A <: BioEnum](val models:List[Model[A]],val priors:PiComponent) extends BasicModel[A]{
+  val nodeDependent = models.foldLeft(false){(a,b)=>a||b.nodeDependent} 
+  assert(nodeDependent==false,"Components must be node independent to be used with MixtureModel")
+  models.foreach{_.addObserver(this)}
+  // tree assumed to be identical for all models
+  def tree = models.head.tree
+  def logLikelihood= {
+    var subLikelihoods = models.map{a=>a.realLikelihoods}
+    var patternCounts = models.head.tree.aln.pCount
+    var total=0.0D
+    val pri = priors(tree).toList
+    while (subLikelihoods.head != Nil){
+      total+=(patternCounts.head * Math.log(subLikelihoods.map{_.head}.zip(pri).foldLeft(0.0D){(a,b)=>a+(b._1*b._2)}))
+      subLikelihoods = subLikelihoods.map{_.tail}
+      patternCounts=patternCounts.tail
+    }
+    total
+  }
+  val params = (priors.getParams ++ models.map{_.params}.flatten[ParamControl].removeDuplicates.toList).toArray
+  def cromulent = models.foldLeft(true){_ && _.cromulent}
+
+  def setPi(a:Array[Double]){
+    models.foreach{_.setPi(a)}
+  }
+
+}
 class ComposeModel[A <: BioEnum](pi:PiComponent,s:SComponent,maths:MathComponent,var tree:Tree[A]) extends Model[A]{
   val alphabet = tree.alphabet
-  val treeParamControl = new LogTreeParamControl(tree)
-  treeParamControl.addObserver(this)
   val params = (s.getParams ++ pi.getParams ++ maths.getParams ++ List(treeParamControl)).toArray
   List(pi,s,maths).foreach{m =>
     m.addObserver(this)
   }
 
-  var clean=false
-  def receiveUpdate(s:Subject){
-    clean=false
-    if (s==treeParamControl){
-      tree = treeParamControl.getLatestTree
-    }
-  }
   val nodeDependent = pi.nodeDependent || s.nodeDependent || maths.nodeDependent
   assert(nodeDependent==false,"Components must be node independent to be used with ComposeModel")
   var qMatCache:Matrix=null
@@ -78,11 +96,9 @@ class ComposeModel[A <: BioEnum](pi:PiComponent,s:SComponent,maths:MathComponent
   }
 
   override def cromulent=pi.cromulent && s.cromulent && maths.cromulent && tree.cromulent
-  def getParams=params.map{_.getParams}.toList
-  def setParams(i:Int)(a:Array[Double]){params(i).setParams(a)}
-  def getParams(i:Int)=params(i).getParams
 
 
+  def setPi(a:Array[Double]){pi.setPi(a)}
 
   def sMat=s(tree)
   def sMat(node:Node[A])=s(node)
@@ -117,16 +133,20 @@ class BasicSMatComponent(sMat:Matrix) extends SComponent with SMatUtil{
   def getParams=List(param)
   override val nodeDependent=false
 }
-
 abstract class MathComponent extends MComponent{
   def sToQ(node:Node[_])(start:Matrix,pi:Vector):Matrix 
+}
+class ScaledMathComponent(scale:SingleComponent) extends DefaultMathComponent{
+  scale.addObserver(this)
+  override def normalValue(node:Node[_])=scale(node)
 }
 
 class DefaultMathComponent extends MathComponent{
   var cacheQ:Matrix=null
+  def normalValue(node:Node[_])=1.0D
   def sToQ(node:Node[_])(sMat:Matrix,pi:Vector)={
     if (!clean){
-      cacheQ=sMat.sToQ(pi).normalize(pi)
+      cacheQ=sMat.sToQ(pi).normalize(pi,normalValue(node))
     }
     cacheQ
   }
@@ -147,8 +167,14 @@ object PiComponent{
   }
 }
 
-abstract class PiComponent extends MComponent{
+abstract class VectorComponent extends MComponent{
   def apply(node:Node[_]):Vector
+}
+abstract class SingleComponent extends MComponent{
+  def apply(node:Node[_]):Double
+}
+abstract class PiComponent extends VectorComponent{
+  def setPi(a:Array[Double])
 }
 
 class PiParam(pi:Vector,val name:String) extends ParamControl{
@@ -192,8 +218,11 @@ class BasicPiComponent(startPi:Vector) extends PiComponent{
   val getParams=List(param)
   def apply(node:Node[_])=pi
   override val cromulent=true // should not be possible to get completely awful pis
-  val paramName="Pi Values"
   override val nodeDependent=false
+
+  def setPi(a:Array[Double]){
+    param.setPi(a)
+  }
 }
 
 class PriorPiComponent(startPi:PiComponent,numClasses:Int,numAlpha:Int) extends PiComponent{
@@ -225,12 +254,15 @@ class PriorPiComponent(startPi:PiComponent,numClasses:Int,numAlpha:Int) extends 
   def getView(start:Int,stop:Int):PiComponent={
     val outer=this
     new PiComponent{
-      def apply(node:Node[_])=outer.apply(node).viewPart(start,stop-start)
+      def apply(node:Node[_])=outer.apply(node).viewPart(start,stop-start).copy
       def getParams=List()
       def setParams(array:Array[Double])=throw new IllegalArgumentException("Can't optimise PriorPiView")
+      override val nodeDependent = outer.nodeDependent
       outer.addObserver(this)
+      def setPi(a:Array[Double]){}
     }
   }
+  def setPi(a:Array[Double])=startPi.setPi(a)
 }
 
 class FirstOnlyPiParam(pi:Vector,val name:String) extends ParamControl{
@@ -249,6 +281,17 @@ class FlatPriorPiComponent(startPi:PiComponent,numClasses:Int,numAlpha:Int) exte
   def this(startPi:PiComponent,alphabet:BioEnum)=this(startPi,alphabet.numClasses,alphabet.numAlpha)
   override def getParams = startPi.getParams
 }
+class FlatPrior(numClasses:Int) extends PiComponent{
+  val priors = Vector(numClasses)
+  priors.assign(1.0D/numClasses)
+  def apply(n:Node[_])=priors
+  def getParams=Nil
+  def setParams(a:Array[Double]){}
+  def setPi(a:Array[Double]){
+
+  }
+}
+
 
 class FirstPriorPiComponent(startPi:PiComponent,numClasses:Int,numAlpha:Int) extends PriorPiComponent(startPi,numClasses,numAlpha){
   def this(startPi:PiComponent,alphabet:BioEnum)=this(startPi,alphabet.numClasses,alphabet.numAlpha)
@@ -286,18 +329,21 @@ class GammaMathComponent(a:Double,numClasses:Int,numAlpha:Int,pi:PiComponent,s:S
   val internalS=Matrix(matLength,matLength)
   override val nodeDependent = false
   var cachedQ:Matrix=null
+
+  def rates=gMath(alpha(0))
   
   def sToQ(node:Node[_])(sMat:Matrix,pi:Vector)={
     if (!(clean)){
-    val rates = gMath(alpha(0))
+    val r = rates
     (0 until numClasses).foreach{i=>
-      internalS.viewPart(i * numAlpha,i * numAlpha,numAlpha,numAlpha).assign(sMat)*rates(i)
+      internalS.viewPart(i * numAlpha,i * numAlpha,numAlpha,numAlpha).assign(sMat)*r(i)
     }
       cachedQ= internalS.sToQ(pi).normalize(pi)
       clean=true
     }
     cachedQ
   }
+  
 }
 
 class InvariantMathComponent(numAlpha:Int,pi:PiComponent,s:SComponent,base:GammaMathComponent) extends  MathComponent{
@@ -365,6 +411,14 @@ object ModelFact{
     val gammaC=new GammaMathComponent(alpha,tree.alphabet,piC,sC)
     new ComposeModel(piC,sC,gammaC,tree)
   }
+  def gammaMixture[A <: BioEnum](pi:Vector,s:Matrix,alpha:Double,tree:Tree[A],numSC:Int)={
+    val sC = new BasicSMatComponent(s)
+    val piC = new BasicPiComponent(pi)
+    val gammaC = new GammaMixtureComponent(alpha,numSC)
+    import tree.alphabet._
+    val modelList = (for (i <- 0 until numSC) yield new ComposeModel(piC,sC,new ScaledMathComponent(gammaC.getView(i)),tree)).toList
+    new MixtureModel(modelList,new FlatPrior(numSC))
+  }
   def thmm[A <: BioEnum](pi:Vector,s:Matrix,alpha:Double,cMat:Matrix,tree:Tree[A])={
     val sC = new BasicSMatComponent(s)
     val piC = new BasicPiComponent(pi)
@@ -386,13 +440,43 @@ object ModelFact{
   }
 }
 
-trait Model[A <: BioEnum] extends Logging{
-  
-  var tree:Tree[A]
+/**
+ A basic model, but not necessarily one that can be passed to a tree to do likelihood calculations
+
+*/
+abstract class BasicModel[A <: BioEnum] extends Logging with Subject{
+
+  def setPi(a:Array[Double])
+  var clean=false
+ 
+  def params:Array[ParamControl]
+
+  def nodeDependent:Boolean
   def cromulent:Boolean
+  def getParams=params.map{_.getParams}.toList
+  def setParams(i:Int)(a:Array[Double]){params(i).setParams(a)}
+  def getParams(i:Int)=params(i).getParams
 
-  def setParams(i:Int)(a:Array[Double]):Unit
+  def receiveUpdate(s:Subject){
+    clean=false
+    notifyObservers
+  }
+  def logLikelihood:Double
+}
+abstract class Model[A <: BioEnum] extends BasicModel[A]{
 
+  val treeParamControl = new LogTreeParamControl(tree)
+  treeParamControl.addObserver(this)
+
+  override def receiveUpdate(s:Subject){
+    if (s==treeParamControl){
+      tree = treeParamControl.getLatestTree
+    }
+    super.receiveUpdate(s)
+  }
+ 
+ 
+  var tree:Tree[A]
   def piVals(node:Node[A]):Vector
   def piVals:Vector=piVals(tree) //assume we want pi at root unless specified
   def qMat(node:Node[A]):Matrix
@@ -436,17 +520,14 @@ trait Model[A <: BioEnum] extends Logging{
 
   def likelihoods:List[Vector]=tree.likelihoods(this)
   def realLikelihoods=tree.realLikelihoods(this)
-  def logLikelihood=if (cromulent){
+  def logLikelihood:Double=if (cromulent){
     val lnL = tree.logLikelihood(this)
     if (lnL.isNaN){
       println("lnL is NaN")
       println("Q mat:" + qMat(tree))
     }
     lnL
-
   }else{Math.NEG_INF_DOUBLE}
-  def getParams(i:Int):Array[Double]
-  def getParams:List[Array[Double]]
 }
 
 class SMatParam(sMat:Matrix,val name:String) extends ParamControl with SMatUtil{
@@ -529,6 +610,32 @@ class Gamma(numCat:Int){
        // println("RATES " + rK.toList)
         rK
   }
+}
+
+class GammaMixtureComponent(initAlpha:Double,numCat:Int) extends VectorComponent{
+  val param = new BasicParamControl(Array(initAlpha),"Alpha Shape")
+  def getParams=List(param)
+  val gammaMath = new Gamma(numCat)
+  var gammaVect:Vector=Vector(numCat)
+  def apply(n:Node[_])={
+    if (!clean){
+      gammaVect.assign(gammaMath(param.getParams(0)))
+    }
+    gammaVect
+  }
+
+  def getView(i:Int)={
+    assert(i < numCat)
+    val out=this
+    val ans = new SingleComponent{
+      def apply(n:Node[_])=out(n)(i)
+      def getParams=List()
+      override val nodeDependent = out.nodeDependent
+    }
+    ans.addObserver(this)
+    ans
+  }
+  override val nodeDependent=false
 }
 
 

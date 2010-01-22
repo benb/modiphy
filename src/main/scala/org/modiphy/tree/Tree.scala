@@ -131,6 +131,9 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
     val lkl = realLikelihoods(m)
     lkl.zip(aln.pCount).foldLeft(0.0D){(i,j)=>i+Math.log(j._1)*j._2}
   }
+
+      
+
   val name=""
 
   def factory[B<:BioEnum](c:List[Node[B]],aln:Alignment[B],len:Double)=if (isRoot){new INode[B](c,aln,len,id) with RootNode[B]}else {new INode[B](c,aln,len,id)}

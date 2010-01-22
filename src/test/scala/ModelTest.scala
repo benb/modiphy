@@ -18,12 +18,19 @@ class ModelSuite extends FunSuite {
   val piCG = new FlatPriorPiComponent(piC,tree4.alphabet)
   val gammaC=new GammaMathComponent(0.5,tree4.alphabet,piCG,sC)
   val model2 = new ComposeModel(piCG,sC,gammaC,tree4)
+  val model2Mixture = ModelFact.gammaMixture(WAG.pi,WAG.S,0.5,tree,4)
 
   test("log likelihood of basic model should match PAML") (model.logLikelihood should be (-6057.892394 plusOrMinus 0.001))//from PAML
-  test("log likelihood of gamma model should match PAML") (model2.logLikelihood should be (-5808.929978 plusOrMinus 0.001))//from PAML
+  test("log likelihood of gamma model should match PAML") {
+    model2.logLikelihood should be (-5808.929978 plusOrMinus 0.001)
+    model2Mixture.logLikelihood should be (-5808.929978 plusOrMinus 0.001)
+  }//from PAML
   test("updating gamma model to gamma+F model should match PAML"){
-    piC.getParams(0).setPi(Array(0.038195,0.070238,0.054858,0.072802,0.037939,0.046398,0.080749,0.048962,0.017175,0.043066,0.085106,0.069726,0.015124,0.046142,0.028198,0.073571,0.044604,0.024096,0.049474,0.053576))
+    val plusF=Array(0.038195,0.070238,0.054858,0.072802,0.037939,0.046398,0.080749,0.048962,0.017175,0.043066,0.085106,0.069726,0.015124,0.046142,0.028198,0.073571,0.044604,0.024096,0.049474,0.053576)
+    piC.getParams(0).setPi(plusF)
     model2.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
+    model2Mixture.setPi(plusF)
+    model2Mixture.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
   }
 
     val mat = Matrix(4,4)
@@ -52,6 +59,8 @@ class ModelSuite extends FunSuite {
     pSorted(1).getParams.length should be (19)
     pSorted(2).getParams.length should be (19) // branch lengths
     pSorted(3).getParams.length should be (189)
+  }
+  test("gamma model should give same answer whether mixture or bigmat"){
   }
   test("thmm model should have the right param controls"){
     val params = model3.params

@@ -5,16 +5,6 @@ import cern.colt.function.DoubleFunction
 import cern.colt.matrix.linalg.{Algebra,EigenvalueDecomposition}
 import org.modiphy.util._
 
-object BasicModel{
-  def GTR={
-    val vector = Vector(4)
-    vector assign 0.25
-    val matrix = Matrix(4,4)
-    matrix assign 1.0
-    (vector,matrix)
-  }
-}
-
 object EnhancedMatrix{
   type Matrix=DoubleMatrix2D
   type Vector=DoubleMatrix1D
