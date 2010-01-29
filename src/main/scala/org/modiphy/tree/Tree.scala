@@ -150,7 +150,7 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
   }
   def descendents:List[String]=childElements.map{i=>i.descendents}.toList.flatten[String]
   def descendentNodes = {children ++ children.map{c=>c.descendentNodes}.flatten[Node[A]]}
-  def removeUseless:INode[A]={
+  def removeUseless:Node[A]={
     val newChildren = children.map{child=>
       if (child.numChildren >1){
         child
@@ -169,7 +169,7 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
       }
     }.map{_.removeUseless}
     if (newChildren.length==1){// This check can't be made because of erasure: && newChildren(0).isInstanceOf[INode[A]]){
-        newChildren(0).asInstanceOf[INode[A]]
+        newChildren(0)
     }else{
       factory(newChildren,aln,lengthTo)
     }

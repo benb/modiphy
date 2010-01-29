@@ -369,6 +369,7 @@ class InvariantMathComponent(numAlpha:Int,pi:PiComponent,s:SComponent,base:Gamma
 }
 
 class THMMGammaMathComponent(gMath:MathComponent,cMat:Matrix,alphabet:BioEnum) extends MathComponent{
+  def scale(node:Node[_])=1.0D
   override val nodeDependent = false
   var cachedQ:Matrix=null
   val param = new FullSMatParam(cMat,"CMat") with LogParamControl
@@ -381,9 +382,9 @@ class THMMGammaMathComponent(gMath:MathComponent,cMat:Matrix,alphabet:BioEnum) e
         for (i <- 0 until numClasses){
         for (j <- i+1 until numClasses){
           for (x <- 0 until numAlpha){
-            qStart(i * numAlpha + x, j * numAlpha + x) = cMat(i,j) * pi(j * numAlpha + x) // i->j transition
+            qStart(i * numAlpha + x, j * numAlpha + x) = cMat(i,j) * scale(node) *  pi(j * numAlpha + x) // i->j transition
 
-            qStart(j * numAlpha + x, i * numAlpha + x) = cMat(i,j) * pi(i * numAlpha + x) // j->i transition
+            qStart(j * numAlpha + x, i * numAlpha + x) = cMat(i,j) * scale(node) * pi(i * numAlpha + x) // j->i transition
           }
         }
       }
@@ -396,6 +397,17 @@ class THMMGammaMathComponent(gMath:MathComponent,cMat:Matrix,alphabet:BioEnum) e
     
   }
   def getParams=param::gMath.getParams
+}
+
+class THMMGammaMathComponentBranch[A <: BioEnum](gMath:MathComponent,cMat:Matrix,alphabet:BioEnum,scales:Array[Double],tree:Tree[A]) extends THMMGammaMathComponent(gMath,cMat,alphabet){
+  assert(scales.length==tree.getBranchLengths.length)
+  val nodeOrder=tree.nodes.filter{n:Node[A]=> !(n.isRoot)}.zipWithIndex.foldLeft(Map[Node[_],Int]()){_+_}
+  override def scale(node:Node[_])={
+    assert(nodeOrder isDefinedAt node)
+    scales(nodeOrder(node)) 
+  }
+  val scaleParam=new BasicParamControl(scales,"THMM Scale")
+  override def getParams=scaleParam::super.getParams
 }
 
 object ModelFact{
@@ -437,6 +449,17 @@ object ModelFact{
     val thmmMath = new THMMGammaMathComponent(invariantMath,cMat,tree.alphabet)
     new ComposeModel(piC2,sC,thmmMath,tree)
 
+  }
+  def invarThmmBS[A <: BioEnum](pi:Vector,s:Matrix,alpha:Double,cMat:Matrix,tree:Tree[A])={
+    val sC = new BasicSMatComponent(s)
+    val piC = new BasicPiComponent(pi)
+    val piC2 = new FirstPriorPiComponent(piC,tree.alphabet)
+    val view = piC2.getView(tree.alphabet.numAlpha)
+    val gammaC = new GammaMathComponent(alpha,tree.alphabet.numClasses-1,tree.alphabet.numAlpha,view,sC)
+    val invariantMath = new InvariantMathComponent(tree.alphabet.numAlpha,piC2,sC,gammaC)
+    val blScale = Array.make(tree.getBranchLengths.length,1.0D)
+    val thmmMath = new THMMGammaMathComponentBranch(invariantMath,cMat,tree.alphabet,blScale,tree)
+    new ComposeModel(piC2,sC,thmmMath,tree)
   }
 }
 

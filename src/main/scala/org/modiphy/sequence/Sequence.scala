@@ -1,5 +1,6 @@
 package org.modiphy.sequence
 import org.modiphy.math._
+import org.modiphy.math.EnhancedMatrix._
 
 abstract class BioEnum(names:String*) extends Enumeration(names: _*){
   def isReal(a:Value)=true
@@ -71,6 +72,7 @@ class Fasta(source:Iterator[String]) extends Iterator[(String,String)]{
       (name,seq)
     }
     def hasNext = iter.hasNext
+    def toAlignment[A <: BioEnum](alphabet:A)={new Alignment(this.foldLeft(Map[String,String]()){_+_},alphabet)}
   }
 
 class Maf(source:Iterator[String]) extends Iterator[MafAln]{
@@ -154,6 +156,30 @@ class Alignment[A<:BioEnum](m:Map[String,String],val alphabet:A){
 
   def apply(a:String)=map(a)
   def getF={
+
+    val letterCounts:List[Map[Letter,Int]] = map.values.map{
+      alphabet.parseString(_).foldLeft(Map[Letter,Int]()){
+        (m,l)=>m(l)=m.getOrElse(l,0)+1
+      }
+    }.toList//map each sequence to a map of counts of each letter
+
+    val pMap = letterCounts.map{m=>
+      val propMap = Map[Letter,Double]()
+        val total = m.values.foldLeft(0){_+_}
+        m.foldLeft(propMap){(m2,t)=> 
+          m2(t._1)=t._2.toDouble/total 
+        }
+    }
+    println(pMap)
+    val num = map.size
+    val ans = pMap.foldLeft(Map[Letter,Double]()){(m,m2)=>
+      m2.foldLeft(m){(m3,t)=>m3(t._1)=m3.getOrElse(t._1,0.0D)+t._2/num}
+    }
+    println(ans)
+    ans
+
+
+    /*
     val countTreeMaps:List[Map[Letter,Int]] = alphaList.map(_.foldLeft(Map[Letter,Int]()){(m,l)=>m.update(l,1+m.getOrElse(l,0))}) //mapped to count of each letter in column
 
     val filteredCountTreeMaps:List[Map[Letter,Int]] = countTreeMaps.map{_.filter{t=>alphabet.isReal(t._1)}}//remove gaps/unknown
@@ -166,11 +192,16 @@ class Alignment[A<:BioEnum](m:Map[String,String],val alphabet:A){
     
     val ans = totalFreqMap.map(t=>(t._1,t._2/total)).foldLeft(Map[Letter,Double]()){_+_}
     ans
+    */
     }
 
   def getFPi={
     val f = getF
-    Vector(alphabet.matElements.map{f(_)})
+    Vector(alphabet.matElements.map{f(_)}).normalize(1.0D)
+  }
+
+  def toFasta={
+    map.foldLeft(""){(s,t)=>s + ">"+t._1+"\n"+t._2+"\n"}
   }
     
 }
