@@ -170,12 +170,10 @@ class Alignment[A<:BioEnum](m:Map[String,String],val alphabet:A){
           m2(t._1)=t._2.toDouble/total 
         }
     }
-    println(pMap)
     val num = map.size
     val ans = pMap.foldLeft(Map[Letter,Double]()){(m,m2)=>
       m2.foldLeft(m){(m3,t)=>m3(t._1)=m3.getOrElse(t._1,0.0D)+t._2/num}
     }
-    println(ans)
     ans
 
 

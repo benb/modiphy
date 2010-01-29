@@ -28,7 +28,6 @@ class ModelSuite extends FunSuite {
   test("updating gamma model to gamma+F model should match PAML"){
     //val plusF=Array(0.038195,0.070238,0.054858,0.072802,0.037939,0.046398,0.080749,0.048962,0.017175,0.043066,0.085106,0.069726,0.015124,0.046142,0.028198,0.073571,0.044604,0.024096,0.049474,0.053576)
     val plusF=aln.getFPi.toArray
-    println(plusF.mkString(" "))
     piC.getParams(0).setPi(plusF)
     model2.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
     //piC.getParams(0).setPi(aln.getFPi.toArray)
