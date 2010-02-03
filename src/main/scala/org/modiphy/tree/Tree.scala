@@ -101,12 +101,12 @@ trait RootNode[A <: BioEnum] extends INode[A]{
   override val isRoot=true
   override def toString="("+children.mkString(",")+");"
 
-  override def factory[B <: BioEnum](c:List[Node[B]],aln:Alignment[B],len:Double):INode[B] with RootNode[B]=new INode[B](c,aln,len,id) with RootNode[B]
+  override def factory[B <: BioEnum](c:List[Node[B]],aln:Alignment[B],len:Double):Tree[B]=new INode[B](c,aln,len,id) with RootNode[B]
 
   override def getBranchLengths={
     children.map{c=>c.getBranchLengths}.flatten[Double]
   }
-  override def setBranchLengths(l:List[Double]):INode[A] with RootNode[A]={
+  override def setBranchLengths(l:List[Double]):Tree[A]={
     var listPtr = l
     val newchildren = children.map{c=>val c2 = c.setBranchLengths(listPtr); listPtr = listPtr.drop(c.descendentNodes.size + 1);c2}
     factory(newchildren,aln,l.head)

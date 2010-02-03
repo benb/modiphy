@@ -10,8 +10,19 @@ object EnhancedMatrix{
   type Vector=DoubleMatrix1D
   implicit def enhanceMatrix(m:Matrix)=new EnhancedMatrix(m)
   implicit def enhanceVector(m:Vector)=new EnhancedVector(m)
+  implicit def enhanceArray(m:Array[Double])=new EnhancedArray(m)
+  implicit def enhanceList(m:List[Double])=new EnhancedList(m)
   private lazy val algebra = new Algebra
+
+  class EnhancedList(l:List[Double]){
+    def toVector=Vector(l)
+  }
+  class EnhancedArray(a:Array[Double]){
+    def toVector=Vector(a)
+  }
+
 }
+
 import EnhancedMatrix._
 object Vector{
   def apply(i:Int):Vector=cern.colt.matrix.DoubleFactory1D.dense.make(i)

@@ -15,15 +15,86 @@ class MultFunction(f:Array[Double]=>Double) extends MultivariateRealFunction{
   def value(point:Array[Double])=f(point)
 }
 
+class JoinedParam(p:Array[ParamControl]) extends ParamControl{
+  def this(p2:List[ParamControl])=this(p2.toArray)
+  val lengths = p.map{_.getParams.length}
+  val pointers = lengths.foldLeft(List(0)){(p,a)=> (a+p.head)::p}.reverse
+
+  val subArrays = p.map{_.getParams.toArray}
+
+
+  val backing = new Array[Double](lengths.foldLeft(0){_+_})
+  def update{
+    var pointer = 0
+    for (t<-lengths.zip(p)){
+      println(t._2.getParams.length + " " + 0 + " " + pointer + " " + t._1 + " " + backing.length)
+      Array.copy(t._2.getParams,0,backing,pointer,t._1)
+      pointer+=t._1
+    }
+  }
+  def getParams={
+    update
+    backing.toArray //copy
+  }
+  def setParams(a:Array[Double])={
+    for (t<-pointers.zip(pointers.tail).zip(p.toList)){
+      t._2.softSetParams(a.subArray(t._1._1,t._1._2))
+    }
+  }
+  def softSetParams(a:Array[Double])=setParams(a)
+  def view=null
+  val name = "Joined param: " + p.map{_.name}.mkString(" ")
+}
+class RestrictedParam(p:ParamControl,f:Array[Double]=>Array[Double],initialParam:Array[Double]) extends ParamControl{
+  val currParam = initialParam.toArray
+  def getParams = currParam.toArray
+  
+  private def copyToInternal(a:Array[Double]){
+    Array.copy(a,0,currParam,0,a.length)
+  }
+  
+  def setParams(a:Array[Double]){copyToInternal(a); p.setParams(f(a))}
+  def softSetParams(a:Array[Double]){copyToInternal(a); p.softSetParams(f(a))}
+  def view = null
+  def name="Restricted " + p.name
+}
+  
+object RestrictedParamFunctions{
+  def oneToMany(num:Int):Array[Double]=>Array[Double]=
+    {d:Array[Double] =>
+      val x = new Array[Double](num)
+      for (i<-0 until x.length){x(i)=d(0)}
+      x
+    }
+  /**
+    First array value is 0<->[1,2,3,4..k]
+    Second array value is for [1,2,3...k] <->[1,2,3...k]
+    Intended for having separate invar<->gamma and between gamma switching rates
+  */
+  def dualThmm(numSC:Int)={
+    val size = numSC*(numSC-1)/2
+    val ans = {d:Array[Double] => 
+      val x = new Array[Double](size)
+      for (i<-0 until numSC -1){x(i)=d(0)}
+      for (i<-numSC until size){x(i)=d(1)}
+      x
+    }
+    ans
+   }
+}
+
 object ModelOptimiser extends Logging{
 
+  
   def optimise[A <: BioEnum](paramList:Seq[ParamControl],optFactory: => MultivariateRealOptimizer)(model:ComposeModel[A])={
     var startLkl = model.logLikelihood
     var newLkl=startLkl
+
     do {
       startLkl = newLkl
       val startModels = paramList
       info{"START OPT " + model + " \n" + model.logLikelihood}
+
       startModels.foreach{start=> 
         val startP=start.getParams
         val result = optFactory.optimize(new MultFunction({ d:Array[Double]=>
@@ -41,9 +112,11 @@ object ModelOptimiser extends Logging{
         newLkl = result.getValue
         true
       }
+
     } while (newLkl - startLkl > 0.03)
     model
   }
+  
 
 
 
