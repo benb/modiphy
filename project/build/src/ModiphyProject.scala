@@ -10,5 +10,6 @@ class ModiphyProject(info: ProjectInfo) extends DefaultProject(info)
   val colt = "coltjar" % "colt" % "1.2.0" from "http://repo1.maven.org/maven2/colt/colt/1.2.0/colt-1.2.0.jar"
   val commonsMath = "org.apache.commons" % "commons-math" % "2.0"
   val commonsCollections = "commons-collections" % "commons-collections" % "3.2.1"
+  val beastBeauti = "dr.math" % "beauti" % "1.5.3" from "http://www.logspace.co.uk/jar/beauti-1.5.3.jar"
   
 }
