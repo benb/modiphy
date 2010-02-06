@@ -38,7 +38,10 @@ object MatExp{
   private lazy val algebra = new Algebra
   private lazy val cache:SoftCacheMap[String,(EigenvalueDecomposition,Matrix)] = new SoftCacheMap(10)
   def decomp(m:Matrix)={
-    cache.getOrElseUpdate(m.toString,{val e = new EigenvalueDecomposition(m); (e,algebra.inverse(e.getV))})
+    if (m.exists{d=> d==Math.NEG_INF_DOUBLE || d==Math.POS_INF_DOUBLE || d==Math.NaN_DOUBLE}) throw new InvalidMatrixException("Invalid matrix " + m.toString)
+    cache.getOrElseUpdate(m.toString,{
+        val e = new EigenvalueDecomposition(m); (e,algebra.inverse(e.getV))
+     })
   }
   def exp(m:Matrix,t:Double) = {
     val (eigen,vprime)=decomp(m)
@@ -86,8 +89,10 @@ class EnhancedMatrix(d:DoubleMatrix2D){
   }
 
   def exists(f: Double=>Boolean):Boolean={
-   d.toArray.toList.exists{row:Array[Double] => row.toList.exists(f)}
+   this.elements.exists{f}
   }
+  def toList=elements.toList
+  
 
   def diagonal=dense.diagonal(d)
 
@@ -111,6 +116,22 @@ class EnhancedMatrix(d:DoubleMatrix2D){
   }
   def rowElements={
     for (i <- 0 until d.rows) yield d.viewRow(i)
+  }
+  def elements={
+    val outer = this
+    new Iterator[Double]{
+      var i=0
+      var j=0
+      def hasNext={i < d.rows && j < d.columns}
+      private def inc = {
+        j+=1
+        if (j >= d.columns){
+          j=0
+          i+=1
+        }
+      }
+      def next={val ans = d.getQuick(i,j);inc;ans}
+    }
   }
 
 }

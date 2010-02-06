@@ -20,6 +20,8 @@ trait Subject {
   def notifyObservers{observers.foreach{_.receiveUpdate(this)}}
 }
 
+class InvalidMatrixException(m:String) extends RuntimeException(m)
+
 abstract class ParamControl extends Subject{
   def getParams:Array[Double]
   def setParams(a:Array[Double]):Unit
@@ -443,7 +445,7 @@ class THMMGammaMathComponentBranch[A <: BioEnum](gMath:MathComponent,cMat:Matrix
   val nodeOrder:Map[Int,Int]=tree.nodes.filter{n:Node[A]=> !(n.isRoot)}.map{_.id}.zipWithIndex.foldLeft[Map[Int,Int]](IntMap[Int]()){_+_}
   override def scale(node:Node[_])={
     assert(nodeOrder isDefinedAt node.id)
-    scales(nodeOrder(node.id)) 
+    scales(nodeOrder(node.id)) / node.lengthTo // now appears independent of branch length to optimiser
   }
 
   val scaleParam=new BasicParamControl(scales,"THMM Scale") with LogParamControl
@@ -497,7 +499,7 @@ object ModelFact{
     val view = piC2.getView(tree.alphabet.numAlpha)
     val gammaC = new GammaMathComponent(alpha,tree.alphabet.numClasses-1,tree.alphabet.numAlpha,view,sC)
     val invariantMath = new InvariantMathComponent(tree.alphabet.numAlpha,piC2,sC,gammaC)
-    val blScale = Array.make(tree.getBranchLengths.length,1.0D)
+    val blScale = tree.getBranchLengths.toArray
     val thmmMath = new THMMGammaMathComponentBranch(invariantMath,cMat,tree.alphabet,blScale,tree)
     new NodeDependentComposeModel(piC2,sC,thmmMath,tree)
   }
@@ -590,6 +592,11 @@ abstract class Model[A <: BioEnum] extends BasicModel[A]{
       tree.logLikelihood(this)
     }catch {
       case mex:org.apache.commons.math.MathException => Math.NaN_DOUBLE
+      case iex:InvalidMatrixException =>{
+        println("Trying invalid params " + iex)
+        Math.NaN_DOUBLE
+      }
+
     }
     if (lnL.isNaN){
       println("lnL is NaN")
@@ -629,8 +636,7 @@ trait SMatUtil{
     }.toList.flatten[Double]
     list
   }
-
-  def setSMat(array:Array[Double],sMatInst:Matrix){
+def setSMat(array:Array[Double],sMatInst:Matrix){
     val iter:Iterator[Double]=array.elements
     (0 to sMatInst.rows-1).foreach{i=>
       (i+1 to sMatInst.columns-1).foreach{j=>
@@ -655,8 +661,11 @@ class Gamma(numCat:Int){
   import Gamma._
   val chi2=new ChiSquaredDistributionImpl(1.0D)
   def chiSquareInverseCDF(prob:Double,df:Double)={
+     println("Chi Square for " + prob + " " + df)
      chi2.setDegreesOfFreedom(df)
-     chi2.inverseCumulativeProbability(prob) 
+     val ans = chi2.inverseCumulativeProbability(prob) 
+     println("Done")
+     ans
   }
   def gammaInverseCDF(prob:Double,alpha:Double,beta:Double)=chiSquareInverseCDF(prob,2.0*(alpha))/(2.0*(beta))
 
@@ -665,11 +674,15 @@ class Gamma(numCat:Int){
     cache.getOrElseUpdate((numCat,shape),gamma(shape))
   }
   def gamma(shape:Double):Array[Double]={
+    if (shape==Math.POS_INF_DOUBLE){
+      (0 until numCat).map{a=>1.0}.toArray
+    }else {
+      println("SHAPE " + shape)
       val alpha = shape
       val beta = shape
       val factor=alpha/beta*numCat
       val freqK=new Array[Double](numCat)
-      val rK=new Array[Double](numCat)
+        val rK=new Array[Double](numCat)
 
         (0 until numCat-1).foreach{i=>
           freqK(i)=gammaInverseCDF((i+1.0)/numCat, alpha, beta);
@@ -679,10 +692,11 @@ class Gamma(numCat:Int){
         rK(0) = freqK(0)*factor;
         rK(numCat-1) = (1-freqK(numCat-2))*factor;
         (1 until numCat-1).foreach{i=>
-          rK(i) = (freqK(i)-freqK(i-1))*factor;
-        }
-       // println("RATES " + rK.toList)
-        rK
+        rK(i) = (freqK(i)-freqK(i-1))*factor;
+      }
+      // println("RATES " + rK.toList)
+      rK
+    }
   }
 }
 

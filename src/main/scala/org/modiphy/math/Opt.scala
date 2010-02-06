@@ -10,10 +10,45 @@ import cern.colt.function.DoubleFunction
 import DataParse._
 import tlf.Logging
 
+import dr.math.{MultivariateFunction,MultivariateMinimum}
 
-class MultFunction(f:Array[Double]=>Double) extends MultivariateRealFunction{
-  def value(point:Array[Double])=f(point)
+
+abstract class Gradient extends MultivariateVectorialFunction{
+  def apply(point:Array[Double]):Array[Double]
+  def value(point:Array[Double])=apply(point)
 }
+class MultFunction(f:Array[Double]=>Double,numArg:Int) extends DifferentiableMultivariateRealFunction with MultivariateFunction{
+  def apply(point:Array[Double])=f(point)
+  def value(point:Array[Double])=f(point)
+  def evaluate(point:Array[Double])={val ans = value(point) ; println("EVAL " + ans);ans}
+  def partialDerivative(k:Int)={
+    val outer = this
+    new MultivariateRealFunction{
+      def value(point:Array[Double])={
+        val h = 1E-4
+        val hplus = point.toArray
+        val hminus = point.toArray
+        hplus(k)=hplus(k)+h
+        hminus(k)=hminus(k)-h
+        (outer.value(hplus)-outer.value(hminus))/h/2.0
+      }
+    }
+  }
+  def gradient():Gradient={
+    new Gradient{
+      def apply(point:Array[Double])={
+        for (k<-0 until point.length) yield partialDerivative(k).value(point)
+      }.toArray
+    }
+  }
+  def gradient(point:Array[Double]):Array[Double]=gradient()(point)
+  def getUpperBound(n:Int)=Math.MAX_DOUBLE
+  def getLowerBound(n:Int)=Math.MIN_DOUBLE
+  def getNumArguments=numArg
+  def negative = new MultFunction({a:Array[Double]=> -f(a)},numArg)
+
+}
+
 
 class JoinedParam(p:Array[ParamControl]) extends ParamControl{
   def this(p2:List[ParamControl])=this(p2.toArray)
@@ -45,6 +80,9 @@ class JoinedParam(p:Array[ParamControl]) extends ParamControl{
   def view=null
   val name = "Joined param: " + p.map{_.name}.mkString(" ")
 }
+
+
+
 class RestrictedParam(p:ParamControl,f:Array[Double]=>Array[Double],initialParam:Array[Double]) extends ParamControl{
   val currParam = initialParam.toArray
   def getParams = currParam.toArray
@@ -85,8 +123,26 @@ object RestrictedParamFunctions{
 
 object ModelOptimiser extends Logging{
 
+  type Optimizer ={
+    def optimize(f:MultFunction,initial:Array[Double]):RealPointValuePair
+  }
+  class OptimWrapperApache(o:MultivariateRealOptimizer){
+    def optimize(f:MultFunction,initial:Array[Double]):RealPointValuePair = 
+      o.optimize(f,MAXIMIZE,initial)
+  }
+  class OptimWrapperBeast(o:MultivariateMinimum){
+    def optimize(f:MultFunction,initial:Array[Double]):RealPointValuePair = {
+      val point = initial.toArray
+      o.optimize(f.negative,point,1E-3,1E-6)
+      new RealPointValuePair(point,f.value(point))
+    }
+  }
+  implicit def RealPointValuePairToTuple(r:RealPointValuePair)=(r.getPoint,r.getValue)
+  implicit def WrapOpt(o:MultivariateRealOptimizer)=new OptimWrapperApache(o)
+  implicit def WrapOpt(o:MultivariateMinimum)=new OptimWrapperBeast(o)
+
   
-  def optimise[A <: BioEnum](paramList:Seq[ParamControl],optFactory: => MultivariateRealOptimizer)(model:ComposeModel[A])={
+  def optimise[A <: BioEnum](paramList:Seq[ParamControl],optFactory: => Optimizer)(model:ComposeModel[A])={
     var startLkl = model.logLikelihood
     var newLkl=startLkl
 
@@ -102,14 +158,14 @@ object ModelOptimiser extends Logging{
             val lkl = model.logLikelihood
             extra{"f(" + start.name +"): " + d.toList.mkString(",") + " => " + lkl}
             if (lkl.isNaN){Math.NEG_INF_DOUBLE}else{ lkl}
-        }
-        ),MAXIMIZE,startP.toArray)
-        start.setParams(result.getPoint)
+        },start.getParams.length
+        ),startP.toArray)
+        start.setParams(result._1)
         println("OPT " + start.name + " " + model.logLikelihood)
         println(model)
         finest{model.likelihoods.mkString(" ")}
         finest{model.realLikelihoods.mkString(" ")}
-        newLkl = result.getValue
+        newLkl = result._2
         true
       }
 
@@ -122,25 +178,67 @@ object ModelOptimiser extends Logging{
 
   def nelderMead[A <: BioEnum](paramSet:Seq[ParamControl],model:ComposeModel[A]):ComposeModel[A]=optimise[A](paramSet,getNelderMead)(model)
   def multiDirectional[A <: BioEnum](paramSet:Seq[ParamControl],model:ComposeModel[A]):ComposeModel[A]=optimise[A](paramSet,getMultiDirectional)(model)
+  def conjugateGradient[A <: BioEnum](paramSet:Seq[ParamControl],model:ComposeModel[A]):ComposeModel[A]=optimise[A](paramSet,getConjugateGradient)(model)
+  def conjugateDirection[A <: BioEnum](paramSet:Seq[ParamControl],model:ComposeModel[A]):ComposeModel[A]=optimise[A](paramSet,getConjugateDirection)(model)
+
+
 
   def nelderMead[A <: BioEnum](model:ComposeModel[A]):ComposeModel[A]=nelderMead(model.params,model)
   object DefaultConvergence extends RealConvergenceChecker{
     import   org.apache.commons.math.optimization.RealPointValuePair
-    def converged(iter:Int,oldPt:RealPointValuePair,newPt:RealPointValuePair)={iter > 1000 || newPt.getValue - oldPt.getValue < 0.01} 
+    def converged(iter:Int,oldPt:RealPointValuePair,newPt:RealPointValuePair)={iter > 30000 || newPt.getValue - oldPt.getValue < 0.01} 
   }
   def getNelderMead={
     val opt = new NelderMead
     opt.setConvergenceChecker(DefaultConvergence)
     opt
-    }
+  }
+  def getConjugateDirection={
+    new dr.math.ConjugateDirectionSearch
+  }
+  def getConjugateGradient={
+    new dr.math.ConjugateGradientSearch
+  }
 
   def getMultiDirectional={
     val opt = new MultiDirectional
     opt.setConvergenceChecker(DefaultConvergence)
     opt
 
+  }
+}
+
+/*import ModelOptimiser._
+object NewtonRaphson{
+  def iterate(f:DifferentiableMultivariateRealFunction,x:Array[Double])={
+    val fx = f.value(x)
+    x.zip(f.gradient.value(x)).map{t=> 
+      t._1-fx/t._2
     }
+  }
+  
+  def optimize(f:DifferentiableMultivariateRealFunction,direction:GoalType,initial:Array[Double],iter:Int,tol:Double,maxIter:Int):RealPointValuePair={
+    if (iter>maxIter){
+      new RealPointValuePair(initial,f.value(initial)) 
+    }else{
+      val newLoc = iterate(f,initial)
+      if (
+        newLoc.zip(initial).foldLeft(true){(ans,t)=>
+          ans && (t._1-t._2).abs < tol
+        }
+      ){
+        new RealPointValuePair(initial,f.value(initial))
+      }else {
+        optimize(f,direction,newLoc,iter+1,tol,maxIter)
+      }
+    }
+  }
+  def optimize(f:DifferentiableMultivariateRealFunction,direction:GoalType,initial:Array[Double]):RealPointValuePair=optimize(f,direction,initial,0,1E-7,30000)
 
 }
+*/
+
+
+
 
 
