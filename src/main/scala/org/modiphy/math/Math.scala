@@ -38,7 +38,7 @@ object MatExp{
   private lazy val algebra = new Algebra
   private lazy val cache:SoftCacheMap[String,(EigenvalueDecomposition,Matrix)] = new SoftCacheMap(10)
   def decomp(m:Matrix)={
-    if (m.exists{d=> d==Math.NEG_INF_DOUBLE || d==Math.POS_INF_DOUBLE || d==Math.NaN_DOUBLE}) throw new InvalidMatrixException("Invalid matrix " + m.toString)
+    if (m.exists{d=> d==Math.NEG_INF_DOUBLE || d==Math.POS_INF_DOUBLE || d.isNaN}) throw new InvalidMatrixException("Invalid matrix")
     cache.getOrElseUpdate(m.toString,{
         val e = new EigenvalueDecomposition(m); (e,algebra.inverse(e.getV))
      })

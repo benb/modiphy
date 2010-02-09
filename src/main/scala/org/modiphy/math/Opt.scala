@@ -10,17 +10,22 @@ import cern.colt.function.DoubleFunction
 import DataParse._
 import tlf.Logging
 
-import dr.math.{MultivariateFunction,MultivariateMinimum}
+import dr.math.{MultivariateFunction,MultivariateMinimum,UnivariateMinimum,UnivariateFunction}
 
 
 abstract class Gradient extends MultivariateVectorialFunction{
   def apply(point:Array[Double]):Array[Double]
   def value(point:Array[Double])=apply(point)
 }
-class MultFunction(f:Array[Double]=>Double,numArg:Int) extends DifferentiableMultivariateRealFunction with MultivariateFunction{
+class MultFunction(f:Array[Double]=>Double,val numArg:Int,p:ParamControl) extends DifferentiableMultivariateRealFunction with MultivariateFunction{
+
+  def makeCromulent(point:Array[Double]){
+    p.setParams(point)
+    p.makeCromulent
+  }
   def apply(point:Array[Double])=f(point)
   def value(point:Array[Double])=f(point)
-  def evaluate(point:Array[Double])={val ans = value(point) ; println("EVAL " + ans);ans}
+  def evaluate(point:Array[Double])=value(point)
   def partialDerivative(k:Int)={
     val outer = this
     new MultivariateRealFunction{
@@ -42,13 +47,18 @@ class MultFunction(f:Array[Double]=>Double,numArg:Int) extends DifferentiableMul
     }
   }
   def gradient(point:Array[Double]):Array[Double]=gradient()(point)
-  def getUpperBound(n:Int)=Math.MAX_DOUBLE
-  def getLowerBound(n:Int)=Math.MIN_DOUBLE
   def getNumArguments=numArg
-  def negative = new MultFunction({a:Array[Double]=> -f(a)},numArg)
-
+  def getLowerBound(i:Int)=p.lowerBound(i)
+  def getUpperBound(i:Int)=p.upperBound(i)
+  def negative = new MultFunction({a:Array[Double]=> -f(a)},numArg,p)
 }
-
+class SingleFunction(m:MultFunction) extends UnivariateFunction{
+  def apply(x:Double)=evaluate(x)
+  def evaluate(x:Double)={val ans = m.evaluate(Array(x)); if (ans < 1E-100 || ans==Math.NEG_INF_DOUBLE){1E-100}else{ans}}//hack to make BEAST behave
+  def getLowerBound=m.getLowerBound(0)
+  def getUpperBound=m.getUpperBound(0)
+  
+}
 
 class JoinedParam(p:Array[ParamControl]) extends ParamControl{
   def this(p2:List[ParamControl])=this(p2.toArray)
@@ -79,12 +89,16 @@ class JoinedParam(p:Array[ParamControl]) extends ParamControl{
   def softSetParams(a:Array[Double])=setParams(a)
   def view=null
   val name = "Joined param: " + p.map{_.name}.mkString(" ")
+  val lowerB = p.toList.map{i=>i.lowerBounds.toList}.flatten[Double].toArray
+  val upperB = p.toList.map{i=>i.upperBounds.toList}.flatten[Double].toArray
+  override def lowerBound(i:Int)=lowerB(i)
+  override def upperBound(i:Int)=upperB(i)
 }
 
 
 
 class RestrictedParam(p:ParamControl,f:Array[Double]=>Array[Double],initialParam:Array[Double]) extends ParamControl{
-  val currParam = initialParam.toArray
+  var currParam = initialParam.toArray
   def getParams = currParam.toArray
   
   private def copyToInternal(a:Array[Double]){
@@ -126,15 +140,45 @@ object ModelOptimiser extends Logging{
   type Optimizer ={
     def optimize(f:MultFunction,initial:Array[Double]):RealPointValuePair
   }
-  class OptimWrapperApache(o:MultivariateRealOptimizer){
+  abstract class OptimWrapper{
+    def optimize(f:MultFunction,initial:Array[Double]):RealPointValuePair={
+      f.numArg match {
+        case 1=>uniOpt.optimize(f,initial)
+        case _=>optimizeImpl(f,initial)
+      }
+    }
+    lazy val uniOpt = new OptimWrapperApache(new NelderMead)
+    def optimizeImpl(f:MultFunction,initial:Array[Double]):RealPointValuePair
+/*    def optimizeImpl(f:SingleFunction,initial:Double):RealPointValuePair = {
+      println("BOUND " + f.getLowerBound + " " + f.getUpperBound)
+      println("1.0D " + f(1.0D))
+      println("-1.0D " + f(-1.0D))
+      val ans = uniOpt.optimize(f,1E-12,f.getLowerBound,f.getUpperBound)
+      new RealPointValuePair(Array(ans),f(ans))
+    }*/
+  }
+  class OptimWrapperApache(o:MultivariateRealOptimizer) {
     def optimize(f:MultFunction,initial:Array[Double]):RealPointValuePair = 
       o.optimize(f,MAXIMIZE,initial)
   }
-  class OptimWrapperBeast(o:MultivariateMinimum){
-    def optimize(f:MultFunction,initial:Array[Double]):RealPointValuePair = {
-      val point = initial.toArray
-      o.optimize(f.negative,point,1E-3,1E-6)
-      new RealPointValuePair(point,f.value(point))
+  class OptimWrapperBeast(o:MultivariateMinimum) extends OptimWrapper{
+    def optimizeImpl(f:MultFunction,initial:Array[Double]):RealPointValuePair = {
+      val point = Array(initial :_*)
+      f.makeCromulent(point)
+
+      import sbt.TrapExit
+      val ans = TrapExit({ o.optimize(f.negative,point,0E-2,1E-6)},new sbt.ConsoleLogger)
+      if (ans == 0){
+        println("SUCCESS! " + ans)
+        new RealPointValuePair(point,f.value(point))
+      }else {
+        val point2 = Array(initial :_*)
+        println("Trying " + point2.mkString(","))
+
+        (new OptimWrapperApache(new NelderMead)).optimize(f,point2)
+        f(point2)
+        new RealPointValuePair(point2,f.value(point2))
+      }
     }
   }
   implicit def RealPointValuePairToTuple(r:RealPointValuePair)=(r.getPoint,r.getValue)
@@ -145,10 +189,10 @@ object ModelOptimiser extends Logging{
   def optimise[A <: BioEnum](paramList:Seq[ParamControl],optFactory: => Optimizer)(model:ComposeModel[A])={
     var startLkl = model.logLikelihood
     var newLkl=startLkl
+    val startModels = paramList
 
     do {
       startLkl = newLkl
-      val startModels = paramList
       info{"START OPT " + model + " \n" + model.logLikelihood}
 
       startModels.foreach{start=> 
@@ -158,7 +202,7 @@ object ModelOptimiser extends Logging{
             val lkl = model.logLikelihood
             extra{"f(" + start.name +"): " + d.toList.mkString(",") + " => " + lkl}
             if (lkl.isNaN){Math.NEG_INF_DOUBLE}else{ lkl}
-        },start.getParams.length
+        },start.getParams.length,start
         ),startP.toArray)
         start.setParams(result._1)
         println("OPT " + start.name + " " + model.logLikelihood)
@@ -169,7 +213,7 @@ object ModelOptimiser extends Logging{
         true
       }
 
-    } while (newLkl - startLkl > 0.03)
+    } while (newLkl - startLkl > 0.03 && !(startModels.drop(1).isEmpty))//only loop if there is >1 model
     model
   }
   

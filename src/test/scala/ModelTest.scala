@@ -50,7 +50,7 @@ class ModelSuite extends FunSuite {
     //assume a conservative rate of change between fast site classes is probably better than none at all
     //this is not a definite but seems to be true for this dataset
     //and possible that slow<->fast might be close to 0!
-    thmmMath.getParams.head.setParams(Array(0,0,0,0,0,0.05).map{Math.log})
+    thmmMath.getParams.head.setParams(Array(0,0,0,0,0,0.05))
     val ans1 = model2.logLikelihood
     model3.logLikelihood should be > (ans1)
   }
@@ -86,11 +86,11 @@ class ModelSuite extends FunSuite {
 
     model4.logLikelihood should be (-5824.746968 plusOrMinus 0.01) // phyml -d aa -o n -i png1-aln.phy -u png1.tre -a 0.5 -m WAG -v 0.2
     var priorInv = 0.4D
-    val priorParam = model4.params.filter{_.name=="First Prior"}(0)
-    priorParam.setParams(Array(Math.log(priorInv)))
+    val priorParam = model4.params.filter{_.name=="First Prior"} (0)
+    priorParam.setParams(Array(priorInv))
     model4.logLikelihood should be (-5864.879865 plusOrMinus 0.01) // phyml -d aa -o n -i png1-aln.phy -u png1.tre -a 0.5 -m WAG -v 0.4
     priorInv = 0.3D
-    priorParam.setParams(Array(Math.log(priorInv)))
+    priorParam.setParams(Array(priorInv))
     model4.logLikelihood should be (-5841.318438 plusOrMinus 0.01) // phyml -d aa -o n -i png1-aln.phy -u png1.tre -a 0.5 -m WAG -v 0.4
   }
   test("Branch Length changes"){
@@ -115,7 +115,7 @@ class ModelSuite extends FunSuite {
     sigma(0,4)=2.415327
     val pi = Vector(Array(0.024191,0.002492,0.002932,0.002492,0.001906,0.002492,0.006304,0.023018,0.002346,0.026683,0.034307,0.008943,0.007037,0.014808,0.005278,0.018326,0.013928,0.007477,0.007917,0.020379)).normalize(1)
     val thmmsi = ModelFact.invarThmm(pi,WAG.S,3.270690,sigma,tree5)
-    thmmsi.params.filter{_.name=="First Prior"}(0).setParams(Array(Math.log(0.066963)))
+    thmmsi.params.filter{_.name=="First Prior"}(0).setParams(Array(0.066963))
     thmmsi.logLikelihood should be (-2972.196109 plusOrMinus 1e-1)
     //can't hope for much better as we only know params/bls to a certain number of decimal places
     //this log-likelihood is taken from an optimised model of Leaphy's

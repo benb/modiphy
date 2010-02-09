@@ -25,6 +25,7 @@ class InvalidMatrixException(m:String) extends RuntimeException(m)
 abstract class ParamControl extends Subject{
   def getParams:Array[Double]
   def setParams(a:Array[Double]):Unit
+  def numParams=getParams.length
   def name:String
   def view:Vector
   /**
@@ -39,7 +40,38 @@ abstract class ParamControl extends Subject{
       setParams(to)
     }
   }
- 
+
+
+  def lower = Math.MIN_DOUBLE //default
+  def upper = Math.MAX_DOUBLE //default
+
+  def softLower = lower
+  def softUpper = upper
+
+  def lowerBound(i:Int)=lower
+  def upperBound(i:Int)=upper
+
+  lazy val lowerBounds = (0 until numParams).map{i=> lowerBound(i)}
+  lazy val upperBounds = (0 until numParams).map{i=> upperBound(i)}
+
+  def softLowerBound(i:Int)=softLower
+  def softUpperBound(i:Int)=softUpper
+
+  private def contained(i:Int)={val p = getParams(i); p >= lowerBound(i) && p <= upperBound(i)}
+  def cromulent = (0 until numParams).foldLeft(true){(b,p)=> b && contained(p)}
+
+  def makeCromulent{
+    if (! cromulent){
+      setParams(
+        getParams.zipWithIndex.map{t=> if (t._1.isNaN || t._1 < softLowerBound(t._2)){softLowerBound(t._2)}else if (t._1 > softUpperBound(t._2)){softUpperBound(t._2)} else {t._1}}
+      )
+    }
+  }
+  def distFromCromulence={
+    getParams.zipWithIndex.map{t=>
+      if (t._1 < lowerBound(t._2)){t._1 - lowerBound(t._2)}else if (t._1 > upperBound(t._2)){upperBound(t._2) - t._1 } else {0.0D}
+    }
+  }
 }
 
 class BasicParamControl(a:Array[Double],val name:String) extends ParamControl{
@@ -55,13 +87,17 @@ class BasicParamControl(a:Array[Double],val name:String) extends ParamControl{
 }
 
 trait LogParamControl extends ParamControl{
+  def sensibleMin = -5E2 // exp(sensibleMin) should be seems to be a small but non-zero number so opt is not flat
+  def sensibleMax = 400D // again, exp(sensibleMax) should be < Inf
   abstract override def getParams=super.getParams.map{Math.log}
   abstract override def setParams(a:Array[Double])=super.setParams(a.map{Math.exp})
+  override def upper = {val ans = Math.log(super.upper);if (ans.isNaN || ans > sensibleMax){sensibleMax}else{ans}}
+  override def lower = {val ans = Math.log(super.lower);if (ans.isNaN || ans < sensibleMin){sensibleMin}else{ans}}
 }
 
 class TreeParamControl[A <: BioEnum](t:Tree[A]) extends ParamControl{
   var params = t.getBranchLengths
-  def getParams=params.toArray
+  def getParams = params.toArray
   def setParams(a:Array[Double]){
     params = a.toList
     notifyObservers
@@ -70,8 +106,10 @@ class TreeParamControl[A <: BioEnum](t:Tree[A]) extends ParamControl{
   val name="Branch Lengths"
   def view = getLatestTree.getBranchLengths.toVector
   def softSetParams(a:Array[Double])=softSetParams(params.toArray,a)
- 
+  override def lower = 0.0D
+  override def upper = 10.0D
 }
+
 class LogTreeParamControl[A <: BioEnum](t:Tree[A]) extends TreeParamControl[A](t) with LogParamControl
 /**
  The basic model, composed of an sMatrix, a pi matrix, and the MathComponent that converts the S into a Q matrix.
@@ -117,8 +155,10 @@ class ComposeModel[A <: BioEnum](pi:PiComponent,s:SComponent,maths:MathComponent
     maths.sToQ(node)(s(node),pi(node)) 
   }
 
-  override def cromulent=pi.cromulent && s.cromulent && maths.cromulent && tree.cromulent
-
+  override def cromulent={
+    println(params.map{c => c.cromulent.toString + " " + c.name})
+    params.foldLeft(true){(a,b) => a && b.cromulent}
+  }
 
   def setPi(a:Array[Double]){pi.setPi(a)}
 
@@ -242,6 +282,9 @@ class PiParam(pi:Vector,val name:String) extends ParamControl{
   def softSetParams(a:Array[Double])={
    softSetParams(lastGotParams,a) 
   }
+
+  override def softLower = -10.0D
+  override def softUpper = 10.0D
 }
 
 class BasicPiComponent(startPi:Vector) extends PiComponent{
@@ -313,6 +356,9 @@ class FirstOnlyPiParam(pi:Vector,val name:String) extends ParamControl{
       setParams(a)
     }
   }
+  override def lower=0.0D
+  override def softUpper=1.0D-1E-5
+  override def upper=1.0D
 }
 
 
@@ -334,7 +380,7 @@ class FlatPrior(numClasses:Int) extends PiComponent{
 
 class FirstPriorPiComponent(startPi:PiComponent,numClasses:Int,numAlpha:Int) extends PriorPiComponent(startPi,numClasses,numAlpha){
   def this(startPi:PiComponent,alphabet:BioEnum)=this(startPi,alphabet.numClasses,alphabet.numAlpha)
-  val myParam = new FirstOnlyPiParam(prior,"First Prior") with LogParamControl
+  val myParam = new FirstOnlyPiParam(prior,"First Prior") //with LogParamControl
   myParam.addObserver(this)
   override def getParams = myParam :: startPi.getParams
 
@@ -359,10 +405,11 @@ class GammaMathComponent(a:Double,numClasses:Int,numAlpha:Int,pi:PiComponent,s:S
   def this(a:Double,alphabet:BioEnum,pi:PiComponent,s:SComponent)=this(a,alphabet.numClasses,alphabet.numAlpha,pi,s)
   pi.addObserver(this)
   s.addObserver(this)
+  override def cromulent = alpha(0)>0.0D && alpha(0)<1E5 && !(alpha(0).isNaN) &&  super.cromulent
   def matLength = numClasses * numAlpha
   val alpha = Array(a)
   def gMath = new Gamma(numClasses)
-  val param=new BasicParamControl(alpha,"Alpha Shape") with LogParamControl
+  val param=new BasicParamControl(alpha,"Alpha Shape") {override def lower=1E-6; override def upper=100.0D}//with LogParamControl {override def lower=1.01D;override def upper=11.5}
   def getParams=List(param)
   param.addObserver(this)
   val internalS=Matrix(matLength,matLength)
@@ -406,13 +453,14 @@ class InvariantMathComponent(numAlpha:Int,pi:PiComponent,s:SComponent,base:Gamma
   }
   def getParams=base.getParams
   override val nodeDependent=false
+  override def cromulent = base.cromulent && super.cromulent
 }
 
 class THMMGammaMathComponent(gMath:MathComponent,cMat:Matrix,alphabet:BioEnum) extends MathComponent{
   def scale(node:Node[_])=1.0D
   override val nodeDependent = false
   var cachedQ:Matrix=null
-  val param = new FullSMatParam(cMat,"CMat") with LogParamControl
+  val param = new FullSMatParam(cMat,"CMat")
   param.addObserver(this)
   gMath.addObserver(this)
   override def sToQ(node:Node[_])(sMat:Matrix,pi:Vector)={
@@ -436,6 +484,7 @@ class THMMGammaMathComponent(gMath:MathComponent,cMat:Matrix,alphabet:BioEnum) e
     cachedQ
     
   }
+  override def cromulent = gMath.cromulent && super.cromulent
   def getParams=param::gMath.getParams
 }
 
@@ -448,8 +497,9 @@ class THMMGammaMathComponentBranch[A <: BioEnum](gMath:MathComponent,cMat:Matrix
     scales(nodeOrder(node.id)) / node.lengthTo // now appears independent of branch length to optimiser
   }
 
-  val scaleParam=new BasicParamControl(scales,"THMM Scale") with LogParamControl
+  val scaleParam=new BasicParamControl(scales,"THMM Scale") {override def lower=0.0D; override def softUpper=1E100} 
   override def getParams=scaleParam::super.getParams
+  override def cromulent = gMath.cromulent && super.cromulent
 }
 
 object ModelFact{
@@ -587,7 +637,19 @@ abstract class Model[A <: BioEnum] extends BasicModel[A]{
 
   def likelihoods:List[Vector]=tree.likelihoods(this)
   def realLikelihoods=tree.realLikelihoods(this)
-  def logLikelihood:Double=if (cromulent){
+  def logLikelihood:Double={
+    /*
+    val (p:Option[List[List[Double]]],diff:Double)=
+  if (cromulent){
+    (None,0.0D) 
+  }else {
+    val ans = (Some(params.map{_.getParams}),params.map{_.distFromCromulence.toList}.toList.flatten[Double].foldLeft(0.0D){(a,b)=>a+b.abs})
+      println(params.map{a => (a.distFromCromulence.toList, a.name)}.toList)
+    params.foreach{_.makeCromulent}
+    println("Penalty " + ans._2)
+    ans
+  }*/
+  if (cromulent){
     val lnL = try{
       tree.logLikelihood(this)
     }catch {
@@ -597,12 +659,17 @@ abstract class Model[A <: BioEnum] extends BasicModel[A]{
         Math.NaN_DOUBLE
       }
 
-    }
-    if (lnL.isNaN){
-      println("lnL is NaN")
-    }
+    }/*finally{
+      if (p.isDefined){
+        params.toList.zip(p.get).foreach{t:(ParamControl,List[Double])=> t._1.setParams(t._2.toArray)}
+      }
+    }*/
     lnL
-  }else{Math.NEG_INF_DOUBLE}
+  }else {
+    -1E100
+  }
+  }
+  def makeCromulent=params.foreach{_.makeCromulent}
 }
 
 class SMatParam(sMat:Matrix,val name:String) extends ParamControl with SMatUtil{
@@ -617,6 +684,8 @@ class SMatParam(sMat:Matrix,val name:String) extends ParamControl with SMatUtil{
   }
   def view=getParams.toVector
   def softSetParams(a:Array[Double]){softSetParams(lastParams,a)}
+  override def lower=0.0D
+  override def upper=1E20
 }
 class FullSMatParam(sMat:Matrix,name:String) extends SMatParam(sMat,name){
   override def getParams=linearSMatFull(sMat).toArray
@@ -661,10 +730,8 @@ class Gamma(numCat:Int){
   import Gamma._
   val chi2=new ChiSquaredDistributionImpl(1.0D)
   def chiSquareInverseCDF(prob:Double,df:Double)={
-     println("Chi Square for " + prob + " " + df)
      chi2.setDegreesOfFreedom(df)
      val ans = chi2.inverseCumulativeProbability(prob) 
-     println("Done")
      ans
   }
   def gammaInverseCDF(prob:Double,alpha:Double,beta:Double)=chiSquareInverseCDF(prob,2.0*(alpha))/(2.0*(beta))
@@ -677,7 +744,6 @@ class Gamma(numCat:Int){
     if (shape==Math.POS_INF_DOUBLE){
       (0 until numCat).map{a=>1.0}.toArray
     }else {
-      println("SHAPE " + shape)
       val alpha = shape
       val beta = shape
       val factor=alpha/beta*numCat
