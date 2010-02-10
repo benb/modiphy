@@ -123,9 +123,10 @@ class MafAln(source:BufferedIterator[String]){
 }
 
 class Alignment[A<:BioEnum](m:Map[String,String],val alphabet:A){
-  import scala.collection.immutable._
   type Letter=alphabet.Value
+  import scala.collection.immutable._
   val map = m.foldLeft(TreeMap[String,String]()){_+_} // use TreeMap to keep sorted
+
 
   val stateMap=map.map{t=>(t._1,t._2.split("").drop(1).map{alphabet.valueOf(_).getOrElse(alphabet.unknown)}.toList)}.foldLeft(Map[String,List[Letter]]()){_+_}
   private def columns:List[List[String]] = new FlippedIterator(map.values.map{s=>s.split("").drop(1).elements}.toList).toList
@@ -151,8 +152,35 @@ class Alignment[A<:BioEnum](m:Map[String,String],val alphabet:A){
     patterns._2
   }
 
+  def length = patterns._2.foldLeft(0){_+_}
+  /**
+   return (List[patternCount],Map(Name,Patterns)) taking npatterns after dropping skip
+  */
+  def sub(skip:Int,nPatterns:Int)={
+    (patterns._2.drop(skip).take(nPatterns),
+      patterns._1.map{t=> val(name,patterns)=t
+        (name,patterns.drop(skip).take(nPatterns))
+      }.foldLeft(Map[String,List[Letter]]()){_+_}
+    )
+  }
+
+  def split(i:Int):List[Alignment[A]]={
+    val size = patterns._1.values.next.length
+    for (j <- 0 until (size - (size % i)) by (size/i)) yield {
+      val t = if (j < (size - (size % i)) - (size/i)){
+        sub(j,(size/i))
+      }else {
+        sub(j,(size/i)+(size%i))
+      }
+        val subMap = t._2.map{tx => 
+          (tx._1, tx._2.zip(t._1).map{ty=> ty._1.toString * ty._2}.mkString(""))
+        }.foldLeft(Map[String,String]()){_+_}
+      new Alignment(subMap,alphabet)
+    }
+  }.toList
 
   def getPatterns(a:String)=patterns._1(a)
+
 
   def apply(a:String)=map(a)
   def getF={

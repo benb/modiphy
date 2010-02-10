@@ -94,6 +94,8 @@ trait Node[A <: BioEnum] extends Logging{
   def iNode:Option[INode[A]]=None
 
   def cromulent:Boolean= lengthTo > -Math.EPS_DOUBLE && children.foldLeft(true){(a,b)=>a && b.cromulent}
+
+  def splitAln(i:Int):List[Node[A]]
 }
 
 trait RootNode[A <: BioEnum] extends INode[A]{
@@ -114,6 +116,7 @@ trait RootNode[A <: BioEnum] extends INode[A]{
   override def removeUseless:INode[A] with RootNode[A]=super.removeUseless.iNode.get.setRoot
   override def restrictTo(allowed:Set[String]):INode[A] with RootNode[A]=super.restrictTo(allowed).iNode.get.setRoot
   override val cromulent = children.foldLeft(true){(a,b) => a && b.cromulent}
+  override def splitAln(i:Int)=super.splitAln(i).map{_.asInstanceOf[INode[A]].setRoot}
 }
 
 class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val lengthTo:Double,val id:Int) extends Node[A]{ 
@@ -195,6 +198,14 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
   }
 
   def branchTo=descendents.mkString(",")
+  def splitAln(i:Int)={
+    val splitChildren = children.map{_.splitAln(i)}
+    def makeNode(chi:List[Node[A]],nextChi:List[List[Node[A]]]):List[Node[A]]= nextChi.head match{
+      case Nil => List(factory(chi,chi.head.aln,lengthTo))
+      case _ => factory(chi,chi.head.aln,lengthTo)::makeNode(nextChi.map{_.head},nextChi.map{_.tail})
+    }
+    makeNode(splitChildren.map{_.head},splitChildren.map{_.tail})
+  }
 }
 
 class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Double, val id:Int) extends Node[A]{
@@ -229,6 +240,15 @@ class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Doubl
   def getBranchLengths=List(lengthTo)
   def factory[B <: BioEnum](n:String,a:Alignment[B],len:Double)=new Leaf[B](n,a,len,id)
   def branchTo=name
+
+  def splitAln(i:Int)={
+    val alnSplit = aln.split(i)
+    val ans = alnSplit.map{a => new Leaf(name,a,lengthTo,id)}
+    println(ans.length)
+    assert(ans.length==i)
+    ans
+  }
+
 }
 
 
