@@ -17,14 +17,15 @@ abstract class Gradient extends MultivariateVectorialFunction{
   def apply(point:Array[Double]):Array[Double]
   def value(point:Array[Double])=apply(point)
 }
-class MultFunction(f:Array[Double]=>Double,val numArg:Int,p:ParamControl) extends DifferentiableMultivariateRealFunction with MultivariateFunction{
+class MultFunction(f:Array[Double]=>Double,val numArg:Int,p:ParamControl,badVal:Double) extends DifferentiableMultivariateRealFunction with MultivariateFunction{
+ def this(f:Array[Double]=>Double,numArg:Int,p:ParamControl)=this(f,numArg,p,-1E100)
 
   def makeCromulent(point:Array[Double]){
     p.setParams(point)
     p.makeCromulent
   }
-  def apply(point:Array[Double])=f(point)
-  def value(point:Array[Double])=f(point)
+  def apply(point:Array[Double])=value(point)
+  def value(point:Array[Double])={val ans = f(point); if (ans.isNaN){badVal}else{ans}}
   def evaluate(point:Array[Double])=value(point)
   def partialDerivative(k:Int)={
     val outer = this
@@ -50,7 +51,7 @@ class MultFunction(f:Array[Double]=>Double,val numArg:Int,p:ParamControl) extend
   def getNumArguments=numArg
   def getLowerBound(i:Int)=p.lowerBound(i)
   def getUpperBound(i:Int)=p.upperBound(i)
-  def negative = new MultFunction({a:Array[Double]=> -f(a)},numArg,p)
+  def negative = new MultFunction({a:Array[Double]=> -f(a)},numArg,p,-badVal)
 }
 class SingleFunction(m:MultFunction) extends UnivariateFunction{
   def apply(x:Double)=evaluate(x)
