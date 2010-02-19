@@ -13,6 +13,7 @@ class ModelSuite extends FunSuite {
 
 
   val (tree4,aln4) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(4))
+  val (tree5,aln5) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(5))
   val sC=new BasicSMatComponent(WAG.S)
   val piC = new BasicPiComponent(WAG.pi)
   val piCG = new FlatPriorPiComponent(piC,tree4.alphabet)
@@ -20,6 +21,26 @@ class ModelSuite extends FunSuite {
   val model2 = new ComposeModel(piCG,sC,gammaC,tree4)
   val model2Mixture = ModelFact.gammaMixture(WAG.pi,WAG.S,0.5,tree,4)
 
+  test("TufA Model 2"){
+    val (tree,aln)=DataParse(tufaTree,tufaAln.lines,new org.modiphy.sequence.SiteClassAA(4))
+    val pi = Vector(0.066487,0.050798,0.021011,0.069415,0.001862,0.033511,0.095479,0.089628,0.012500,0.061436,0.093617,0.053457,0.032979,0.038830,0.051064,0.027926,0.067287,0.000266,0.025532,0.106915)
+
+    //val gammaModel = ModelFact.gamma(pi,WAG.S,0.496466,tree)
+    val gammaModel = ModelFact.gamma(pi,WAG.S,0.496466,tree)
+    gammaModel.logLikelihood should be (-2900.328678 plusOrMinus 1E-6)
+
+  }
+
+  test("TufA Model 2 mixture"){
+    val (tree,aln)=DataParse(tufaTree,tufaAln.lines,new org.modiphy.sequence.SiteClassAA(1))
+    val pi = Vector(0.066487,0.050798,0.021011,0.069415,0.001862,0.033511,0.095479,0.089628,0.012500,0.061436,0.093617,0.053457,0.032979,0.038830,0.051064,0.027926,0.067287,0.000266,0.025532,0.106915)
+
+    val gammaModel = ModelFact.gammaMixture(pi,WAG.S,0.496466,tree,4)
+    println(gammaModel.getParam("Branch Lengths").head.getParams.toList)
+    println(gammaModel.tree)
+    gammaModel.logLikelihood should be (-2900.328678 plusOrMinus 1E-6)
+
+  }
   test("log likelihood of basic model should match PAML") (model.logLikelihood should be (-6057.892394 plusOrMinus 0.001))//from PAML
   test("log likelihood of gamma model should match PAML") {
     model2.logLikelihood should be (-5808.929978 plusOrMinus 0.001)
@@ -36,6 +57,23 @@ class ModelSuite extends FunSuite {
     model2Mixture.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
   }
 
+  test("complex model with restricted params should match simpler model"){
+    val plusF=aln.getFPi.toArray
+    piC.getParams(0).setPi(plusF)
+    model2.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
+    val model2B = ModelFact.invarThmm(Vector(plusF),WAG.S,0.5,Matrix(5,5),tree5)
+    model2B.getParam("First Prior").head.setParams(Array(0))
+    model2B.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
+  }
+
+  test("BS complex model with restricted params should match simpler model"){
+    val plusF=aln.getFPi.toArray
+    piC.getParams(0).setPi(plusF)
+    model2.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
+    val model2B = ModelFact.invarThmmBS(Vector(plusF),WAG.S,0.5,Matrix(5,5),tree5)
+    model2B.getParam("First Prior").head.setParams(Array(0))
+    model2B.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
+  }
     val mat = Matrix(4,4)
     val thmmMath = new THMMGammaMathComponent(gammaC,mat,tree4.alphabet)
     val model3 = new ComposeModel(piCG,sC,thmmMath,tree4)

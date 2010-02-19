@@ -288,7 +288,7 @@ class PiParam(pi:Vector,val name:String) extends ParamControl{
 }
 
 class BasicPiComponent(startPi:Vector) extends PiComponent{
-  val pi = PiComponent.makeSensible(startPi)
+  val pi = startPi.copy//PiComponent.makeSensible(startPi)
   val param = new PiParam(pi)
   param.addObserver(this)
   val getParams=List(param)
@@ -581,7 +581,7 @@ abstract class BasicModel[A <: BioEnum] extends Logging with Subject{
 }
 abstract class Model[A <: BioEnum] extends BasicModel[A]{
 
-  val treeParamControl = new LogTreeParamControl(tree)
+  val treeParamControl = new TreeParamControl(tree)
   treeParamControl.addObserver(this)
 
   override def receiveUpdate(s:Subject){
