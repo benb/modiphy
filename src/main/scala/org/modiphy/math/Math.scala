@@ -34,6 +34,67 @@ object Matrix{
   def apply(i:Int,j:Int)=dense.make(i,j)
 }
 
+trait MatrixExponential{
+  def pi:Vector
+  def u:Matrix
+  def v:Matrix
+  def scale:Double
+  def q:Matrix
+  lazy val qNorm = u * d * v
+  def rawD:Matrix
+  def normFact = - dense.diagonal(q).zDotProduct(pi) / scale
+  def normFunc = new DoubleFunction(){def apply(v:Double)=v/normFact}
+  //println("Normfact " + normFact)
+  lazy val d = rawD.copy.assign(normFunc)
+  def exp(t:Double)={
+    val funcExp = new DoubleFunction(){def apply(v:Double)=Math.exp(t* v)}
+    (u * d.expVals(t)) * v
+  }
+}
+class MatExpNormal(val q:Matrix,val pi:Vector,val scale:Double) extends MatrixExponential{
+  def this(q:Matrix,pi:Vector)= this(q,pi,1.0D)
+  val eigen = new EigenvalueDecomposition(q)  
+  val algebra = new Algebra
+  val u = eigen.getV
+  val rawD = eigen.getD
+  val v = algebra.inverse(u)
+}
+class MatExpScale(m:MatrixExponential,val scale:Double) extends MatrixExponential{
+  def pi = m.pi
+  def u = m.u
+  def v = m.v
+  def q = m.q
+  def rawD = m.rawD
+}
+class BasicMatExpScale(val u:Matrix,val rawD:Matrix,val v:Matrix,val pi:Vector,val scale:Double) extends MatrixExponential{
+  def this(u:Matrix,rawD:Vector,v:Matrix,pi:Vector,scale:Double)= this(u,sparse.diagonal(rawD),v,pi,scale)
+  def q = u * rawD * v
+}
+
+
+class MatExpYang(val q:Matrix,val pi:Vector,val scale:Double) extends MatrixExponential{
+  import cern.colt.matrix.DoubleFactory2D.sparse
+  def this(q:Matrix,pi:Vector)=this(q,pi,1.0D)
+
+    val funcRoot = new DoubleFunction(){def apply(v:Double)=Math.sqrt(v)}
+  val funcRec = new DoubleFunction(){def apply(v:Double)=1.0D/v}
+  val piRootVec =  pi.copy.assign(funcRoot)
+    val piRoot = sparse.diagonal(piRootVec)
+    val inversePiRoot:Matrix = sparse.diagonal(piRootVec.copy.assign(funcRec))
+
+    val a = ((piRoot * q) * inversePiRoot)//.symmetrise
+
+
+  
+  val eigen = new EigenvalueDecomposition(a)
+    val u:Matrix = inversePiRoot * eigen.getV
+  val v:Matrix = eigen.getV.viewDice * piRoot
+  val rawD = eigen.getD
+//  println("MatExpYang" + d(0,0) + " " + q(0,0))
+}
+
+
+
 object MatExp{
   private lazy val algebra = new Algebra
   private lazy val cache:SoftCacheMap[String,(EigenvalueDecomposition,Matrix)] = new SoftCacheMap(10)
@@ -143,7 +204,7 @@ class EnhancedVector(d:DoubleMatrix1D){
   def apply(i:ID):Double=apply(i.id)
   def update(i:Int,v:Double):Unit=d.set(i,v)
   def update(i:ID,v:Double):Unit=update(i.id,v)
-  def *(n:Double)=d.assign(new DoubleFunction(){def apply(v:Double)=v * n}) 
+  def *(n:Double)=d.copy.assign(new DoubleFunction(){def apply(v:Double)=v * n}) 
   def /(n:Double)={*(1/n)} 
   def normalize(a:Double):Vector={
     val sum = d.zSum

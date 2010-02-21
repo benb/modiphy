@@ -5,6 +5,7 @@ import cern.colt.matrix.DoubleFactory1D
 import scala.collection.Set
 import org.modiphy.math._
 import tlf.Logging
+import scala.actors._
 
 
 import scala.util.parsing.combinator._
@@ -66,8 +67,12 @@ object DataParse{
 
 import DataParse._
 
+import scala.actors.Actor
+import scala.actors.Actor._
 
-trait Node[A <: BioEnum] extends Logging{
+trait Node[A <: BioEnum] extends Actor with Logging{
+  start
+  def isLeaf=false
   val id:Int
   val isRoot=false
   val aln:Alignment[A]
@@ -89,14 +94,21 @@ trait Node[A <: BioEnum] extends Logging{
   def branchTo:String
 
   def nodes=this::descendentNodes
-  def likelihoods(m:Model[A]):List[Vector]=m.likelihoods(this)
+  def likelihoods(m:MatrixPi[A]):List[Vector]=
+  {
+   BasicLikelihoodCalc(m,this) 
+  }
 
   def iNode:Option[INode[A]]=None
 
   def cromulent:Boolean= lengthTo > -Math.EPS_DOUBLE && children.foldLeft(true){(a,b)=>a && b.cromulent}
 
   def splitAln(i:Int):List[Node[A]]
+  
 }
+
+
+
 
 trait RootNode[A <: BioEnum] extends INode[A]{
   val children:List[Node[A]]
@@ -117,25 +129,155 @@ trait RootNode[A <: BioEnum] extends INode[A]{
   override def restrictTo(allowed:Set[String]):INode[A] with RootNode[A]=super.restrictTo(allowed).iNode.get.setRoot
   override val cromulent = children.foldLeft(true){(a,b) => a && b.cromulent}
   override def splitAln(i:Int)=super.splitAln(i).map{_.asInstanceOf[INode[A]].setRoot}
+
+  def logLikelihood(m:MatrixPi[A])={
+     realLikelihoods(m).zip(aln.pCount).foldLeft(0.0D){(i,j)=>i+Math.log(j._1)*j._2}
+
+  }
+
+
+  override def act{
+    react {
+      case LogLikelihoodCalc(model,actor) => {
+        //println("ROOT GOT REQ " + sender)
+        
+        children.foreach{c => c ! LikelihoodCalc(model)}
+        model ! NewMatReq(self.asInstanceOf[Node[A]]) 
+        act2(Nil,0,actor,None)
+      }
+    }
+  }
+  def act2(pl:List[List[Vector]],done:Int,requester:Actor,pi:Option[Vector]){
+    //println("ROOT ACT2")
+    if (done < numChildren+1){
+      //println("0")
+    react{
+      case PartialLikelihoods(pl2,eMat)=>{
+        //println("1")
+        plCalc ! PartialLikelihoods(pl2,eMat)
+        act2(pl,done,requester,pi)
+      }
+      case CalculatedPartialLikelihoods(pl2)=>{
+        //println("2")
+        act2(pl2::pl,done+1,requester,pi)
+      }
+      case MatReq(self,_,p) =>{
+        //println("3")
+        act2(pl,done+1,requester,p)
+      }
+    }
+  }
+  else {
+    act3(pl,requester,pi.get)
+  }
 }
 
-class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val lengthTo:Double,val id:Int) extends Node[A]{ 
-  override def iNode=Some(this)
-  def realLikelihoods(m:Model[A]) = {
-    likelihoods(m).map{vec=>
-      val ans = m.piVals.toArray.elements.zipWithIndex.map{t=>
+
+  def act3(pl:List[List[Vector]],requester:Actor,pi:Vector){
+        //println("ROOT ACT3")
+        assert (pl.length==numChildren)
+    val myPl = BasicLikelihoodCalc.combinePartialLikelihoods(pl)
+    val likelihoods = myPl.map{vec=>
+      val ans = pi.elements.zipWithIndex.map{t=>
         val(p,i)=t
         vec(i)*p
       }.foldLeft(0.0D){_+_}
       ans
     }
-  }
-  def logLikelihood(m:Model[A])={
-    val lkl = realLikelihoods(m)
-    lkl.zip(aln.pCount).foldLeft(0.0D){(i,j)=>i+Math.log(j._1)*j._2}
+   // println("parallel likelihoods " + likelihoods)
+    val lnL = likelihoods.zip(aln.pCount).foldLeft(0.0D){(i,j)=>i+Math.log(j._1)*j._2}
+    //println("LnL = " + lnL)
+    //println("ROOT SENDING LOG LIKELIHOOD " + requester)
+    requester ! LogLikelihood(lnL)
+    act
   }
 
-      
+
+
+
+}
+
+
+case class PartialLikelihoods(pl:List[Vector],eMat:Matrix)
+case class CalculatedPartialLikelihoods(pl:List[Vector])
+case class LogLikelihood(lnl:Double)
+case class LikelihoodCalc(m:ActorModelComponent)
+case class LogLikelihoodCalc(m:ActorModelComponent,receiver:Actor)
+
+class PartialLikelihoodCalc extends Actor{
+  def act{
+     loop{
+       react{
+         case PartialLikelihoods(pl2,eMat) => {
+           sender ! CalculatedPartialLikelihoods(BasicLikelihoodCalc.partialLikelihoodCalc(pl2,eMat))
+         }
+       }
+     }
+  }
+}
+
+abstract class MatExpActor extends Actor
+class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val lengthTo:Double,val id:Int) extends Node[A]{ 
+  val plCalc = new PartialLikelihoodCalc
+  plCalc.start
+
+
+  def act{
+    react {
+      case LikelihoodCalc(model) => {
+        //println("INode got")
+        children.foreach{c => c ! LikelihoodCalc(model)}
+        model ! NewMatReq(self.asInstanceOf[Node[A]])
+        qMat(Nil,0,sender,model,None)
+      }
+    }
+  }
+  def qMat(pl:List[List[Vector]],done:Int,requester:OutputChannel[Any],matExp:ActorModelComponent,myEMat:Option[Matrix]){
+    //println("DONE " + done)
+    if (done < numChildren+1){
+    react{
+      case MatReq(self,mat,pi) =>{
+        //println("CASE 1")
+        qMat(pl,done+1,requester,matExp,mat)
+      }
+      case PartialLikelihoods(pl2,eMat)=>{
+        //println("CASE 2")
+        plCalc ! PartialLikelihoods(pl2,eMat)
+        qMat(pl,done,requester,matExp,myEMat)
+      }
+      case CalculatedPartialLikelihoods(pl2)=>{
+        //println("CASE 3")
+        qMat(pl2::pl,done+1,requester,matExp,myEMat)
+      }
+    }
+  }
+  else {
+    answer(pl,requester,myEMat.get)
+  }
+}
+
+
+  def answer(pl:List[List[Vector]],requester:OutputChannel[Any],eMat:Matrix){
+    assert(pl.length==numChildren)
+    val myPl = BasicLikelihoodCalc.combinePartialLikelihoods(pl)
+    requester ! PartialLikelihoods(myPl,eMat) 
+    act
+  }
+
+  override def iNode=Some(this)
+  def realLikelihoods(m:MatrixPi[A]) = {
+    val rl = 
+    likelihoods(m).map{vec=>
+      val ans = m.getPi.elements.zipWithIndex.map{t=>
+        val(p,i)=t
+        vec(i)*p
+      }.foldLeft(0.0D){_+_}
+      ans
+    }
+   // println("Serial likelihoods " + rl)
+    rl
+  }
+        
 
   val name=""
 
@@ -210,6 +352,7 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
 
 class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Double, val id:Int) extends Node[A]{
 
+  override def isLeaf=true
   def children:List[Node[A]]=Nil
 
   val sequence:List[alphabet.Value]=aln.getPatterns(name).asInstanceOf[List[alphabet.Value]]
@@ -222,7 +365,7 @@ class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Doubl
         vec
     }.toList
   }
-  override def likelihoods(m:Model[A]):List[Vector]=likelihoods
+  override def likelihoods(m:MatrixPi[A]):List[Vector]=likelihoods
 
   def descendentNodes=List()
   def setBranchLengths(l:List[Double])={
@@ -244,11 +387,27 @@ class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Doubl
   def splitAln(i:Int)={
     val alnSplit = aln.split(i)
     val ans = alnSplit.map{a => new Leaf(name,a,lengthTo,id)}
-    println(ans.length)
+    //println(ans.length)
     assert(ans.length==i)
     ans
   }
-
+  def act{
+    react {
+      case LikelihoodCalc(model) => {
+        //println("LeafNode Got")
+        model ! NewMatReq(self.asInstanceOf[Node[A]])
+        qMat(sender,model)
+      }
+    }
+  }
+  def qMat(requester:OutputChannel[Any],matExp:ActorModelComponent){
+    //println("LeafNode Got2")
+    react{
+      case MatReq(self,eMat,pi) =>{
+        requester ! PartialLikelihoods(likelihoods,eMat.get)
+        act
+      }
+    }
+  }
 }
-
 

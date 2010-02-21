@@ -604,7 +604,7 @@ abstract class Model[A <: BioEnum] extends BasicModel[A]{
   def sMat(node:Node[A]):Matrix
 
   def likelihoods(node:Node[A]):List[Vector]={
-    val childLkl = node.children.map{i:Node[A]=>(i.likelihoods(this),i.lengthTo)}.toList
+    val childLkl = node.children.map{i:Node[A]=>(i.likelihoods(new SerialMatPi(this,tree)),i.lengthTo)}.toList
 
     val intermediates= childLkl.zip(node.children.toList).map{t=>
     val ((siteVectorList,length),c)=t // list of vectors  1 for each site
@@ -635,8 +635,8 @@ abstract class Model[A <: BioEnum] extends BasicModel[A]{
     ans
   }
 
-  def likelihoods:List[Vector]=tree.likelihoods(this)
-  def realLikelihoods=tree.realLikelihoods(this)
+  def likelihoods:List[Vector]=tree.likelihoods(new SerialMatPi(this,tree))
+  def realLikelihoods=tree.realLikelihoods(new SerialMatPi(this,tree))
   def logLikelihood:Double={
     /*
     val (p:Option[List[List[Double]]],diff:Double)=
@@ -651,7 +651,7 @@ abstract class Model[A <: BioEnum] extends BasicModel[A]{
   }*/
   if (cromulent){
     val lnL = try{
-      tree.logLikelihood(this)
+      tree.logLikelihood(new SerialMatPi(this,tree))
     }catch {
       case mex:org.apache.commons.math.MathException => Math.NaN_DOUBLE
       case iex:InvalidMatrixException =>{
@@ -792,4 +792,33 @@ class GammaMixtureComponent(initAlpha:Double,numCat:Int) extends VectorComponent
   override val nodeDependent=false
 }
 
+///TEMP
+
+
+trait MatrixPi[A <: BioEnum]{
+  def getMat(node:Node[A]):Matrix=getMat(node.id)
+    def getMat(nodeID:Int):Matrix
+  def getPi:Vector
+}
+
+class SerialMatPi[A <: BioEnum](m:Model[A],node:Node[A]) extends MatrixPi[A]{
+  val descendentNodes = node.descendentNodes
+  val array = new Array[Matrix](descendentNodes.length)
+  val (qMats,eig) = if (m.nodeDependent){
+    val q = m.qMat(node)
+    val e = new MatExpYang(q,getPi)
+    (Stream.const(q).take(array.length),
+     Stream.const(e).take(array.length).toList)
+  }else {
+    val q = descendentNodes.map{m.qMat}
+    val e = q.map{new MatExpYang(_,getPi)}
+    (q,e.toList)
+  }
+    node.descendentNodes.zip(eig).foreach{t=>
+      array(t._1.id)=t._2.exp(t._1.lengthTo)
+    }
+    def getPi = m.piVals
+    def getMat(nodeid:Int)=array(nodeid)
+
+}
 
