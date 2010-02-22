@@ -35,8 +35,13 @@ object InvarPrior extends InvarPrior(0)
 case class Sigma(i:Int) extends ParamName
 object Sigma extends Sigma(0)
 
+case class SingleParam(p:ParamName) extends ParamName
+
 case class ParamUpdate[A](d:A)
 case class ParamChanged[A](p:ParamName,param:A)
+
+object Lower
+object Upper
 
 
 /**
@@ -399,6 +404,33 @@ trait ActorParamComponent extends Actor{
     modelComp = l::modelComp
   }
 }
+
+
+case class SingleParamWrapper(p:ActorParamComponent) extends ActorParamComponent{
+  start
+  val name = SingleParam(p.name)
+  def act{
+    val mainParam = (p !? RequestOpt).asInstanceOf[Array[Double]]
+    main(Array.make(mainParam.length,mainParam(0)))
+  }
+  def main(param:Array[Double]){
+    react{
+    case RequestParam=>
+      sender ! ParamChanged(name,param)
+    case ParamUpdate(x:Array[Double])=>
+      val newParam = Array.make(param.length,x(0))
+      p forward OptUpdate(newParam)
+      main(newParam)
+    case OptUpdate(x:Array[Double]) =>
+      val newParam = Array.make(param.length,x(0))
+      p forward OptUpdate(newParam)
+      main(newParam)
+    case RequestOpt =>
+      sender ! Array(param(0))
+    }
+  }
+}
+
 abstract class AbstractActorParam[A] extends ActorParamComponent{
   type Param = {
     def getParams:Array[Double]
@@ -579,7 +611,15 @@ def apply[A <: BioEnum](tree:Tree[A])={
 }
 
 object BranchSpecificThmmModel{
-  def apply[A <: BioEnum](tree:Tree[A],map:Map[Node[A],Int])={
+  def apply[A <: BioEnum](tree:Tree[A]):ActorModel={
+    var i = -1
+    val nodeMap=tree.descendentNodes.foldLeft(Map[Node[A],Int]()){(m,n)=>
+        i=i+1
+        m + ((n,i))
+    }
+    apply(tree,nodeMap)
+  }
+  def apply[A <: BioEnum](tree:Tree[A],map:Map[Node[A],Int]):ActorModel={
     val numClasses = tree.alphabet.numClasses
     val pi = new ActorPiComponent(WAG.pi,Pi)
     val s = new ActorSComponent(WAG.S,S)
@@ -593,7 +633,7 @@ object BranchSpecificThmmModel{
       (a,ans)
     }.foldLeft[Map[Int,Actor]](IntMap[Actor]()){_+_}
       
-    val modelMap = (tree :: tree.descendentNodes).map{n=> (n,modelMapTmp(map(n)))}.foldLeft(Map[Node[A],Actor]()){_+_}
+    val modelMap = (map.keys).map{n=> (n,modelMapTmp(map(n)))}.foldLeft(Map[Node[A],Actor]()){_+_}
     val components = new BasicActorModel(pi,s,
       new GammaActorModel(alpha,numClasses-1,
         new InvarActorModel(invarPrior,pi,numClasses,
@@ -616,17 +656,97 @@ trait PSetter{
   override def toString = name + " : " + paramString
   def paramString:String
 }
+trait OptPSetter {
+  def lower:Array[Double]
+  def upper:Array[Double]
+  def numArguments:Int
+  def apply(d:Array[Double])
+  def currentArgs:Array[Double]
+  def latestArgs:Array[Double]
+}
 
 class ActorModel(tree:Tree[_],components:ActorModelComponent){
   components.start
   tree.start
   val params = (components !? GetParams).asInstanceOf[Params].list.removeDuplicates
   val paramMap = params.foldLeft(Map[ParamName,ActorParamComponent]()){(m,p)=>m+((p.name,p))}
-  def update(p:ParamName,x:Array[Double]) {paramMap(p) !? ParamUpdate[Array[Double]](x)}
-  def update(p:ParamName,x:Double) {paramMap(p) !? ParamUpdate(Array(x))}
-  def update(p:ParamName,x:Vector) {paramMap(p) !? ParamUpdate(x.toArray)}
-  def update(p:ParamName,x:Matrix) {paramMap(p) !? ParamUpdate(x)}
-  def optUpdate(p:ParamName,x:Array[Double]){paramMap(p) !? OptUpdate(x)}
+  def getParam(p:ParamName)={
+    p match {
+      case SingleParam(p2)=>SingleParamWrapper(paramMap(p2))
+      case p => paramMap(p)
+    }
+  }
+  val paramLengthMap = paramMap.keys.map{t=>(t,optGet(t).length)}.foldLeft(Map[ParamName,Int]()){(m,p)=>m+((p._1,p._2))}
+  def update(p:ParamName,x:Array[Double]) {getParam(p) !? ParamUpdate[Array[Double]](x)}
+  def update(p:ParamName,x:Double) {getParam(p) !? ParamUpdate(Array(x))}
+  def update(p:ParamName,x:Vector) {getParam(p) !? ParamUpdate(x.toArray)}
+  def update(p:ParamName,x:Matrix) {getParam(p) !? ParamUpdate(x)}
+  def optUpdate(p:ParamName,x:Array[Double]){getParam(p) !? OptUpdate(x)}
+  def optGet(p:ParamName):Array[Double]={getParam(p) !? RequestOpt}.asInstanceOf[Array[Double]]
+  def optUpdate(pList:List[ParamName])(x:Array[Double]){
+    val iter = x.elements
+    pList.foreach{p=>
+      optUpdate(p,iter.take(paramLengthMap(p)).toList.toArray)
+    }
+  }
+  def optGet(p:List[ParamName]):Array[Double]={
+    //this is a crappy implementation
+    //but how often is this really going to be called?
+    p.map{optGet(_).toList}.flatten[Double].toArray
+  }
+  def optSetter(p:ParamName):OptPSetter={
+    new OptPSetter{
+      val param = getParam(p) 
+      val lower = (param !? Lower).asInstanceOf[Array[Double]]
+      val upper = (param !? Upper).asInstanceOf[Array[Double]]
+      val numArguments=lower.length
+      val currentArgs=(param !? RequestOpt).asInstanceOf[Array[Double]]
+      def latestArgs={
+        val latestArgs=(param !? RequestOpt).asInstanceOf[Array[Double]]
+        Array.copy(latestArgs,0,currentArgs,0,currentArgs.length)
+        latestArgs
+      }
+      def apply(d:Array[Double])={
+        if (d.zip(currentArgs).foldLeft(false){(bool,t)=> bool || t._1!=t._2}){
+          Array.copy(d,0,currentArgs,0,d.length)
+          param !? ParamUpdate(d)
+        }
+      }
+      def paramString=currentArgs.mkString(" ")
+      override def toString = p + " : (" +paramString+")"
+    }
+  }
+  def optSetter(p:List[ParamName]):OptPSetter={
+    new OptPSetter{
+      val numSub=p.length
+      val sub = p.map{optSetter}
+      val lower = sub.map{_.lower.toList}.flatten[Double].toArray
+      val upper = sub.map{_.upper.toList}.flatten[Double].toArray
+      val subLengths = sub.map{_.numArguments}
+      val numArguments=subLengths.foldLeft(0){_+_}
+
+      val currentArgs = sub.map{_.currentArgs.toList}.flatten[Double].toArray
+      def latestArgs={
+        val latestArgs = sub.map{_.latestArgs.toList}.flatten[Double].toArray
+        Array.copy(latestArgs,0,currentArgs,0,currentArgs.length)
+        latestArgs
+
+      }
+      def apply(d:Array[Double])={
+        var pointer =0
+        val subIter = sub.elements
+        val lenIter=subLengths.elements
+        for (i<- 0 until numSub){
+          val len = lenIter.next
+          val s =  subIter.next
+          s(d.subArray(pointer,pointer + len))
+          pointer = pointer + len
+        }
+      }
+      override def toString = sub.map{_.toString}.mkString(" ")
+    }
+  }
+
 
   type SensibleParam1D = {
     def update(i:Int,d:Double)
@@ -636,9 +756,10 @@ class ActorModel(tree:Tree[_],components:ActorModelComponent){
     def update(i:Int,j:Int,d:Double)
     def apply(i:Int,j:Int):Double
   }
-  def paramSetter1D[A <: SensibleParam1D](p:ActorParamComponent)(startParam:A)={
+
+  def paramSetterVector(p:ActorParamComponent)(startParam:Vector)={
     class APSetter extends PSetter{
-      def getP={(p !? RequestParam).asInstanceOf[ParamChanged[A]].param}
+      def getP={(p !? RequestParam).asInstanceOf[ParamChanged[Vector]].param}
       override def update(i:Int,x:Double){
         val array=getP
         array(i)=x
@@ -676,9 +797,9 @@ class ActorModel(tree:Tree[_],components:ActorModelComponent){
   }
 
  
-  def paramSetter2D[A <: SensibleParam2D](p:ActorParamComponent)(startParam:A)={
+  def paramSetterMatrix(p:ActorParamComponent)(startParam:Matrix)={
     class APSetter extends PSetter{
-      def getP=(p !? RequestParam).asInstanceOf[ParamChanged[A]].param
+      def getP=(p !? RequestParam).asInstanceOf[ParamChanged[Matrix]].param
       override def update(i:Int,j:Int,x:Double){
         val array = getP
         array(i,j)=x
@@ -692,14 +813,15 @@ class ActorModel(tree:Tree[_],components:ActorModelComponent){
     }
     new APSetter
   }
+
   //model(Pi(0))(S)=0.03
   def apply(p:ParamName)={
-    val param = paramMap(p)
+    val param = getParam(p)
     val start = param !? RequestParam
     start match {
       case ParamChanged(_,a:Array[Double])=>paramSetterArray(param)(a)
-      case ParamChanged(_,a:Vector)=>paramSetter1D(param)(enhanceVector(a))
-      case ParamChanged(_,a:Matrix)=>paramSetter2D(param)(enhanceMatrix(a))
+      case ParamChanged(_,a:Vector)=>paramSetterVector(param)(a)
+      case ParamChanged(_,a:Matrix)=>paramSetterMatrix(param)(a)
       case _ => null//TODO error handling
     }
   }

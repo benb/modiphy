@@ -66,6 +66,15 @@ class ModelSuite extends FunSuite {
     model4.logLikelihood should be (-5841.318438 plusOrMinus 0.01) // phyml -d aa -o n -i png1-aln.phy -u png1.tre -a 0.5 -m WAG -v 0.4
   }
 
+  test("Single Param Wrapper works"){
+    val (tree5,aln5) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(5))
+    val model4 = BranchSpecificThmmModel(tree5)
+    model4(Sigma(2))(2,3) should be (0.0)
+    model4(SingleParam(Sigma(2)))=1.0
+    model4(Sigma(2))(2,3) should be (1.0)
+  }
+ 
+
   test("THMM.SI"){
     val (tree5,aln5)=DataParse(pfTree,pfAln.lines,new org.modiphy.sequence.SiteClassAA(5))
     val thmmsi=InvarThmmModel(tree5)
