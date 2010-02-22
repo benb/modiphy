@@ -87,14 +87,33 @@ class ModelSuite extends FunSuite {
     //this log-likelihood is taken from an optimised model of Leaphy's
   }
 
-/*
   test("BS complex model with restricted params should match simpler model"){
-    val plusF=aln.getFPi.toArray
-    piC.getParams(0).setPi(plusF)
+    model2(Pi)=plusF
     model2.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
-    val model2B = ModelFact.invarThmmBS(Vector(plusF),WAG.S,0.5,Matrix(5,5),tree5)
-    model2B.getParam("First Prior").head.setParams(Array(0))
-    model2B.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
+  //  val model2B = ModelFact.invarThmmBS(Vector(plusF),WAG.S,0.5,Matrix(5,5),tree5)
+    val typ = new org.modiphy.sequence.SiteClassAA(5)
+    val (tree5a,aln5a) = DataParse(treeStr,alnStr.lines,typ)
+    var i= -1
+    val model2C=BranchSpecificThmmModel(tree5a,(tree5a::tree5a.descendentNodes).foldLeft(Map[Node[org.modiphy.sequence.SiteClassAA],Int]()){(m,n)=>i=i+1;m+((n,i))})
+    model2C(InvarPrior)=0.0
+    model2C(Pi)=plusF
+    model2C.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
+  }
+
+/*
+
+  test("Branch Length changes"){
+    val (tree5,aln5)=DataParse(pfTree,pfAln.lines,new org.modiphy.sequence.SiteClassAA(5))
+    val model3=InvarThmmModel(tree5)
+    val start=model3.logLikelihood
+    val startBL = model3[Array[Double]](BranchLengths).get
+    val bl = startBL(0)
+    startBL(0)=10.0D
+    model3(BranchLengths)=startBL
+    model3.logLikelihood should be < (start) // artificially setting a branch length to exp(1.0) should be bad for the likelihood
+    startBL(0)=bl
+    model3(BranchLengths)=startBL
+    model3.logLikelihood should be (start plusOrMinus 1e-4)
   }
     val mat = Matrix(4,4)
     val thmmMath = new THMMGammaMathComponent(gammaC,mat,tree4.alphabet)
@@ -133,18 +152,6 @@ class ModelSuite extends FunSuite {
     pSorted(2).getParams.length should be (19)
     pSorted(3).getParams.length should be (19) //branch lengths
     pSorted(4).getParams.length should be (189)
-  }
-  test("Branch Length changes"){
-    val param = model3.params(4)
-    val bls = param.getParams
-    val bl = bls(0)
-    bls(0)=1.0
-    val start=model3.logLikelihood
-    param.setParams(bls)
-    model3.logLikelihood should be < (start) // artificially setting a branch length to exp(1.0) should be bad for the likelihood
-    bls(0)=bl
-    param.setParams(bls)
-    model3.logLikelihood should be (start plusOrMinus 1e-4)
   }
 
 */
