@@ -314,7 +314,11 @@ class ForkActor[A <: BioEnum](tree:Tree[A],receiverMap:Map[Node[A],Actor]) exten
           }
           getCleanReplies(sender,numRec)
         case MatReq(n,m,p)=>
-          receiverMap(n) forward MatReq(n,m,p)
+          if(receiverMap contains n){
+            receiverMap(n) forward MatReq(n,m,p)
+          }else {
+            sender ! MatReq(n,m,p) 
+          }
       }
     }
   }

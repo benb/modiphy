@@ -232,20 +232,22 @@ object ModelOptimiser extends Logging{
     } while (newLkl - startLkl > 0.03 && !(startModels.drop(1).isEmpty))//only loop if there is >1 model
     model
   }
-  
-  def optimize[A <: BioEnum](optFactory: => MultivariateMinimum)(pList:List[ParamName],model:ActorModel):Double={
+  def optimise[A <: BioEnum](optFactory: => MultivariateMinimum,p:ParamName,model:ActorModel):Double={
+    optimise(optFactory,p::Nil,model)
+  }
+  def optimise[A <: BioEnum](optFactory: => MultivariateMinimum,pList:List[ParamName],model:ActorModel):Double={
       val startParams = model.optSetter(pList)
       val func = new FuncWrapper(model,startParams,println)
       optFactory.optimize(func,func.latestArgs,1E-2,1E-2)
       model.logLikelihood
   }
-  def optimizeSequential[A <: BioEnum](optFactory: => MultivariateMinimum)(pListList:List[List[ParamName]],model:ActorModel):Double={
+  def optimiseSequential[A <: BioEnum](optFactory: => MultivariateMinimum,pListList:List[List[ParamName]],model:ActorModel):Double={
      var start = model.logLikelihood
      var end = start
      do {
         start=end
         pListList.foreach{l:List[ParamName]=>
-          end=optimize(optFactory)(l,model)
+          end=optimise(optFactory,l,model)
         }
      } while (end - start > 0.02)
      end
