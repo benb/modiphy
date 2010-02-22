@@ -339,9 +339,10 @@ class ForkActor[A <: BioEnum](tree:Tree[A],receiverMap:Map[Node[A],Actor]) exten
 
 class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:ActorTreeComponent[A],reciever:Option[Actor]) extends ActorModelComponent{
   val blName = branchLengthParams.name
-  val nodes = (tree :: tree.descendentNodes).toArray
+  val nodes = tree.descendentNodes.toArray //root has no length
 
   override def start={
+    branchLengthParams addActor this
     branchLengthParams.start
     if (reciever.isDefined){reciever.get.start}
     super.start
@@ -374,8 +375,6 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
               react{
                 case ExpReq(n,e,lengthTo,pi)=> 
                   val ans = e.exp(lengthTo)
-                //  println("Node " + n.id + " " + ans(0,0))
-                //  println("Send Mat " + ans)
                   sender ! MatReq(n,Some(ans),Some(pi)) 
                   exit
               }
@@ -387,7 +386,8 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
           main(None,lengths)
         case ParamChanged(blName,a:Array[Double])=>
           if (reciever.isDefined){reciever.get forward Unclean} else {reply(Unclean)}
-          main(eigen,nodes.zip(a).foldLeft(Map[Node[A],Double]()){(m,t)=>m + ((t._1,t._2))})
+          val nodeMap = nodes.zip(a).foldLeft(Map[Node[A],Double]()){(m,t)=>m + ((t._1,t._2))}
+          main(eigen,nodeMap)
       }
   }
 }
@@ -481,9 +481,28 @@ class ActorFullSComponent(s:Matrix,val name:ParamName) extends AbstractActorPara
 }
 
 
-class ActorTreeComponent[A <: BioEnum](tree:Tree[A],val name:ParamName) extends AbstractActorParam[Array[Double]]{
-  val internal = new TreeParamControl[A](tree)
+class ActorTreeComponent[B <: BioEnum](tree:Tree[B],val name:ParamName) extends AbstractActorParam[Array[Double]]{
+  class TreeParam{
+    val nodes = tree.descendentNodes.toArray
+    var myP=nodes.map{n:Node[B]=>n.lengthTo}
+    def getParams=myP
+    def setParams(a:Array[Double]){Array.copy(a,0,myP,0,Math.min(a.length,myP.length))}
+  }
+  val internal = new TreeParam
   def myParam = internal.getParams
+  private val myHandler:PartialFunction[Any,Unit]={
+        case RequestParam=>
+          sender ! ParamChanged(name,myParam)
+        case ParamUpdate(x:Array[Double])=> 
+          setRaw(x)
+          modelComp.foreach{c=>
+            c !? ParamChanged(name,myParam)
+          }
+          reply('ok)
+  }
+  override def handler={
+    myHandler orElse (super.handler)
+  }
 }
 class ActorDoubleComponent(param:Double,val name:ParamName) extends AbstractActorParam[Double]{
   class DoubleParam{
@@ -586,11 +605,21 @@ object BranchSpecificThmmModel{
    
   }
 }
+class BadParameterException(s:String) extends Exception(s)
+
+trait PSetter{
+  def update(i:Int,x:Double) { throw new BadParameterException("Can't accept 1D parameter location")}
+  def update(i:Int,j:Int,x:Double) { throw new BadParameterException("Can't accept 2D parameter location")}
+  def apply(i:Int):Double = throw new BadParameterException("Can't accept 1D parameter location")
+  def apply(i:Int,j:Int):Double = throw new BadParameterException("Can't accept 2D parameter location")
+  def name:ParamName
+  override def toString = name + " : " + paramString
+  def paramString:String
+}
 
 class ActorModel(tree:Tree[_],components:ActorModelComponent){
   components.start
   tree.start
-  println("WTF")
   val params = (components !? GetParams).asInstanceOf[Params].list.removeDuplicates
   val paramMap = params.foldLeft(Map[ParamName,ActorParamComponent]()){(m,p)=>m+((p.name,p))}
   def update(p:ParamName,x:Array[Double]) {paramMap(p) !? ParamUpdate[Array[Double]](x)}
@@ -598,6 +627,83 @@ class ActorModel(tree:Tree[_],components:ActorModelComponent){
   def update(p:ParamName,x:Vector) {paramMap(p) !? ParamUpdate(x.toArray)}
   def update(p:ParamName,x:Matrix) {paramMap(p) !? ParamUpdate(x)}
   def optUpdate(p:ParamName,x:Array[Double]){paramMap(p) !? OptUpdate(x)}
+
+  type SensibleParam1D = {
+    def update(i:Int,d:Double)
+    def apply(i:Int):Double
+  }
+  type SensibleParam2D = {
+    def update(i:Int,j:Int,d:Double)
+    def apply(i:Int,j:Int):Double
+  }
+  def paramSetter1D[A <: SensibleParam1D](p:ActorParamComponent)(startParam:A)={
+    class APSetter extends PSetter{
+      def getP={(p !? RequestParam).asInstanceOf[ParamChanged[A]].param}
+      override def update(i:Int,x:Double){
+        val array=getP
+        array(i)=x
+        p !? ParamUpdate(array)
+      }
+      override def apply(i:Int):Double={
+        val array = getP
+        array(i)
+      }
+      def name = p.name
+      def paramString = getP.toString
+    }
+    
+    new APSetter
+  }
+  //Separate array type necessary otherwise casting back to [A] seems to give a
+  //java array rather than scala array - maybe this is something that changes
+  //in Scala 2.8?
+  def paramSetterArray(p:ActorParamComponent)(startParam:Array[Double])={
+    def getP={(p !? RequestParam).asInstanceOf[ParamChanged[Array[Double]]].param}
+    class APSetter extends PSetter{
+      override def update(i:Int,x:Double){
+        val array = getP
+        array(i)=x
+        p !? ParamUpdate(array)
+      }
+      override def apply(i:Int):Double={
+        val array = getP
+        array(i)
+      }
+      def name = p.name
+      def paramString =  getP.mkString(" ") 
+    }
+    new APSetter
+  }
+
+ 
+  def paramSetter2D[A <: SensibleParam2D](p:ActorParamComponent)(startParam:A)={
+    class APSetter extends PSetter{
+      def getP=(p !? RequestParam).asInstanceOf[ParamChanged[A]].param
+      override def update(i:Int,j:Int,x:Double){
+        val array = getP
+        array(i,j)=x
+        p !? ParamUpdate(array)
+      }
+      override def apply(i:Int,j:Int):Double={
+        getP(i,j)
+      }
+      def name = p.name
+      def paramString = getP.toString
+    }
+    new APSetter
+  }
+  //model(Pi(0))(S)=0.03
+  def apply(p:ParamName)={
+    val param = paramMap(p)
+    val start = param !? RequestParam
+    start match {
+      case ParamChanged(_,a:Array[Double])=>paramSetterArray(param)(a)
+      case ParamChanged(_,a:Vector)=>paramSetter1D(param)(enhanceVector(a))
+      case ParamChanged(_,a:Matrix)=>paramSetter2D(param)(enhanceMatrix(a))
+      case _ => null//TODO error handling
+    }
+  }
+
 
   def logLikelihood = {
     object Send
@@ -617,5 +723,7 @@ class ActorModel(tree:Tree[_],components:ActorModelComponent){
   }.asInstanceOf[Double]
 
   def paramString=paramMap.map{t=> t._2.toString}.mkString("\n")
+
+  
 }
 
