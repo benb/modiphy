@@ -459,12 +459,9 @@ abstract class AbstractActorParam[A] extends ActorParamComponent{
           sender ! ParamChanged[A](name,myParam)
         case ParamUpdate(x:Array[Double])=> 
           setRaw(x)
-          println("GOT PARAM UPDATE")
           modelComp.foreach{c=>
-          println("SENDING PARAM UPDATE")
             c !? ParamChanged[A](name,myParam)
           }
-          println("REPLYING PARAM UPDATE")
           reply('ok)
         case OptUpdate(x)=>
           internal setParams x
@@ -580,7 +577,7 @@ class ActorArrayComponent(param:Array[Double],val name:ParamName,val lower:Doubl
   def myParam = internal.getParams
 }
 class ActorProbComponent(prob:Double,name:ParamName) extends ActorDoubleComponent(prob,name,0,1)
-class ActorGammaComponent(alpha:Double,name:ParamName) extends ActorDoubleComponent(alpha,name,0,1000)
+class ActorGammaComponent(alpha:Double,name:ParamName) extends ActorDoubleComponent(alpha,name,0.01,1000)
 object SimpleModel{
   def apply[A <: BioEnum](tree:Tree[A])={
     val pi = new ActorPiComponent(WAG.pi,Pi)
@@ -677,6 +674,8 @@ trait PSetter{
   def update(i:Int,j:Int,x:Double) { throw new BadParameterException("Can't accept 2D parameter location")}
   def apply(i:Int):Double = throw new BadParameterException("Can't accept 1D parameter location")
   def apply(i:Int,j:Int):Double = throw new BadParameterException("Can't accept 2D parameter location")
+  def apply():Double = throw new BadParameterException("Can't accept 0D parameter location")
+  def update(x:Double) { throw new BadParameterException("Can't accept 0D parameter location")}
   def name:ParamName
   override def toString = name + " : " + paramString
   def paramString:String
@@ -764,7 +763,8 @@ class ActorModel(tree:Tree[_],components:ActorModelComponent){
         for (i<- 0 until numSub){
           val len = lenIter.next
           val s =  subIter.next
-          s(d.subArray(pointer,pointer + len))
+          println(i + " " + len + " " + s)
+          s(d.slice(pointer,pointer + len).force)
           pointer = pointer + len
         }
       }
@@ -838,6 +838,21 @@ class ActorModel(tree:Tree[_],components:ActorModelComponent){
     }
     new APSetter
   }
+  def paramSetterDouble(p:ActorParamComponent)(startParam:Double)={
+    class APSetter extends PSetter{
+      def getP=(p !? RequestParam).asInstanceOf[ParamChanged[Double]].param
+      override def update(x:Double){
+        p !? ParamUpdate(x)
+      }
+      override def apply():Double={
+        getP
+      }
+      def name = p.name
+      def paramString = getP.toString
+    }
+    new APSetter
+  }
+
 
   //model(Pi(0))(S)=0.03
   def apply(p:ParamName)={
@@ -847,6 +862,7 @@ class ActorModel(tree:Tree[_],components:ActorModelComponent){
       case ParamChanged(_,a:Array[Double])=>paramSetterArray(param)(a)
       case ParamChanged(_,a:Vector)=>paramSetterVector(param)(a)
       case ParamChanged(_,a:Matrix)=>paramSetterMatrix(param)(a)
+      case ParamChanged(_,a:Double)=>paramSetterDouble(param)(a)
       case _ => null//TODO error handling
     }
   }

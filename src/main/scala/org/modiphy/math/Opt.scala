@@ -17,7 +17,12 @@ abstract class Gradient extends MultivariateVectorialFunction{
   def apply(point:Array[Double]):Array[Double]
   def value(point:Array[Double])=apply(point)
 }
-class FuncWrapper(model:ActorModel,p:OptPSetter,monitor:String=>Unit) extends MultivariateFunction{
+class FuncWrapper(model:ActorModel,p:OptPSetter,monitor:String=>Unit) extends MultivariateFunction with MultivariateRealFunction{
+  val length = latestArgs.length
+  val lower = (0 until length).map{i=>p.lower(i)}.toArray
+  val upper = (0 until length).map{i=>p.upper(i)}.toArray
+  def getUpperBound(i:Int)=upper(i)
+  def getLowerBound(i:Int)=lower(i)
   def this(model:ActorModel,p:OptPSetter)=this(model,p,{s:String=>})
   def apply(point:Array[Double])={
     p(point)
@@ -25,10 +30,24 @@ class FuncWrapper(model:ActorModel,p:OptPSetter,monitor:String=>Unit) extends Mu
     monitor("f: " + p + " " + ans)
     ans
   }
-  def evaluate(point:Array[Double])=apply(point)
+  def evaluate(point:Array[Double])= -apply(point)
+  def inBounds(point:Array[Double])={
+    point.zip(lower).foldLeft(true){(bool,t) => bool && t._1 >= t._2} && 
+    point.zip(upper).foldLeft(true){(bool,t) => bool && t._1 <= t._2} 
+
+  }
+  def value(point:Array[Double]) = {
+    if (inBounds(point)){
+      apply(point)
+    }else {
+      monitor("f: " + point.mkString(" ") + " out of bounds")
+      monitor("lower " + lower.mkString(" "))
+      monitor("upper " + upper.mkString(" "))
+
+      -1e100
+    }
+  }
   def getNumArguments=p.numArguments
-  def getLowerBound(i:Int)=p.lower(i)
-  def getUpperBound(i:Int)=p.upper(i)
   def latestArgs=p.latestArgs
 }
 
@@ -240,7 +259,11 @@ object ModelOptimiser extends Logging{
       val func = new FuncWrapper(model,startParams,println)
       println("f1 "  + func(Array(3.0)))
       println("f2 "  + func(Array(4.0)))
-      optFactory.optimize(func,func.latestArgs,1E-2,1E-2)
+      if (func.length==1){
+        getNelderMead.optimize(func,MAXIMIZE,func.latestArgs)
+      }else {
+        optFactory.optimize(func,func.latestArgs,1E-3,1E-3)
+      }
       model.logLikelihood
   }
   def optimiseSequential[A <: BioEnum](optFactory: => MultivariateMinimum,pListList:List[List[ParamName]],model:ActorModel):Double={
