@@ -711,9 +711,9 @@ def setSMat(array:Array[Double],sMatInst:Matrix){
       (i+1 to sMatInst.columns-1).foreach{j=>
         if (iter.hasNext){
           sMatInst(i,j)=iter.next
-        }else{ //by passing in a shorter array, remaining elements set to 1
-          sMatInst(i,j)=1
-        }
+        }//else{ //by passing in a shorter array, remaining elements unset 
+          //sMatInst(i,j)=1
+       // }
       }
     }
     sMatInst

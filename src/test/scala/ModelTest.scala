@@ -72,8 +72,33 @@ class ModelSuite extends FunSuite {
     model4(Sigma(2))(2,3) should be (0.0)
     model4(SingleParam(Sigma(2)))=1.0
     model4(Sigma(2))(2,3) should be (1.0)
+    model4(SingleParam(Sigma(2)))=5.0
+    model4(Sigma(2))(1,3) should be (5.0)
   }
  
+  test("Copying Params"){
+    
+    val (tree5,aln5) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(5))
+    val (tree5a,aln5a) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(5))
+    val model4 = BranchSpecificThmmModel(tree5)
+    model4(Pi)=tree5.aln.getFPi
+    val model4b = BranchSpecificThmmModel(tree5a)
+    model4b(Pi) << model4(Pi)
+    model4b.logLikelihood should be (model4.logLikelihood)
+    model4b(Pi)=WAG.pi
+    model4b.logLikelihood should not (be (model4.logLikelihood))
+
+    model4b << model4
+
+    println(model4(Pi))
+    println(model4b(Pi))
+
+    println()
+    println(model4(BranchLengths))
+    println(model4b(BranchLengths))
+
+    model4b.logLikelihood should be (model4.logLikelihood)
+  }
 
   test("THMM.SI"){
     val (tree5,aln5)=DataParse(pfTree,pfAln.lines,new org.modiphy.sequence.SiteClassAA(5))
