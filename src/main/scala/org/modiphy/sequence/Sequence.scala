@@ -67,7 +67,7 @@ class Fasta(source:Iterator[String]) extends Iterator[(String,String)]{
   import EnhancedIterator._
   val iter=source.map{i=>i.trim}.buffered
   def next = {
-    val name = iter.next.trim.drop(1).split("\\s+")(0)
+    val name = iter.next.trim.drop(1).trim.split("\\s+")(0)
       val seq = iter.takeWhileSafe{s:String => !(s startsWith (">"))}.mkString("").toUpperCase
       (name,seq)
     }
