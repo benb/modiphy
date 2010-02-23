@@ -736,7 +736,7 @@ class ActorModel(tree:Tree[_],components:ActorModelComponent){
           param !? ParamUpdate(d)
         }
       }
-      def paramString=currentArgs.mkString(" ")
+      def paramString=latestArgs.mkString(" ")
       override def toString = p + " : (" +paramString+")"
     }
   }
@@ -886,6 +886,11 @@ class ActorModel(tree:Tree[_],components:ActorModelComponent){
   }.asInstanceOf[Double]
 
   def paramString=paramMap.map{t=> t._2.toString}.mkString("\n")
+
+  def optimise(params:ParamName*)={
+    import ModelOptimiser._
+    ModelOptimiser.optimise(getConjugateDirection,params.toList,this)
+  }
 
   
 }

@@ -51,6 +51,58 @@ trait MatrixExponential{
     (u * d.expVals(t)) * v
   }
 }
+
+
+//Doesn't play well with other actors 
+//(react from channel belonging to other actor error)
+//needs to be recoded as pure actor
+//TODO
+trait CachedMatrixExponential extends MatrixExponential{
+  import scala.actors.Actor
+  import scala.actors.OutputChannel
+  import scala.actors.Actor._
+  case class CacheReq(t:Double)
+  case class Calc(o:OutputChannel[Any],r:CacheReq)
+  case class Answer(t:Double,m:Matrix)
+  def realExp(t:Double) = super.exp(t)
+  class CacheActor extends Actor{
+    val cache = new SoftCacheMap[Double,Matrix](500)
+    def act{
+        loop{
+          react{
+            case Answer(t,m)=>
+            println("GOT ANSWER")
+              cache+((t,m)) 
+            case CacheReq(t) =>
+            println("GOT CACHEREQ")
+              val cacheLookup = cache.get(t)
+              if (cacheLookup.isDefined){
+                reply(Answer(t,cacheLookup.get))
+              }
+              else {
+                Actor.actor{
+                  react{
+                    case Calc(o,CacheReq(t))=>
+                      val ans = realExp(t)
+                      o ! Answer(t,ans)
+                      reply(Answer(t,ans))
+                  }
+                  exit
+                }
+              } ! Calc(sender,CacheReq(t))
+          }
+        }
+    }
+    
+  }
+  val actor = new CacheActor
+  actor.start
+  override def exp(t:Double)={
+    println("SENDING")
+    (actor !? CacheReq(t)).asInstanceOf[Answer].m
+  }
+  def exit { actor.exit }
+}
 class MatExpNormal(val q:Matrix,val pi:Vector,val scale:Double) extends MatrixExponential{
   def this(q:Matrix,pi:Vector)= this(q,pi,1.0D)
   val eigen = new EigenvalueDecomposition(q)  

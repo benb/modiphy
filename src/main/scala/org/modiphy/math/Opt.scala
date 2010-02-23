@@ -257,12 +257,10 @@ object ModelOptimiser extends Logging{
   def optimise[A <: BioEnum](optFactory: => MultivariateMinimum,pList:List[ParamName],model:ActorModel):Double={
       val startParams = model.optSetter(pList)
       val func = new FuncWrapper(model,startParams,println)
-      println("f1 "  + func(Array(3.0)))
-      println("f2 "  + func(Array(4.0)))
       if (func.length==1){
         getNelderMead.optimize(func,MAXIMIZE,func.latestArgs)
       }else {
-        optFactory.optimize(func,func.latestArgs,1E-3,1E-3)
+        optFactory.optimize(func,func.latestArgs,1E-4,1E-3)
       }
       model.logLikelihood
   }
