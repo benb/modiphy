@@ -417,6 +417,8 @@ case class SingleParamWrapper(p:ActorParamComponent) extends ActorParamComponent
     val mainParam = (p !? RequestOpt).asInstanceOf[Array[Double]]
     main(Array.make(mainParam.length,mainParam(0)))
   }
+  def lower = (p !? Lower).asInstanceOf[Array[Double]](0)
+  def upper = (p !? Upper).asInstanceOf[Array[Double]](0)
   def main(param:Array[Double]){
     react{
     case RequestParam=>
@@ -446,6 +448,10 @@ abstract class AbstractActorParam[A] extends ActorParamComponent{
     name.toString + " " + internal.getParams.toList
   }
 
+  def lower:Double
+  def upper:Double
+  def lowerArray = Array.make(internal.getParams.length,lower)
+  def upperArray = Array.make(internal.getParams.length,upper)
   //override this if raw params are different!
   def setRaw(p:Array[Double]){internal setParams p}
   private val myHandler:PartialFunction[Any,Unit] = {
@@ -453,9 +459,12 @@ abstract class AbstractActorParam[A] extends ActorParamComponent{
           sender ! ParamChanged[A](name,myParam)
         case ParamUpdate(x:Array[Double])=> 
           setRaw(x)
+          println("GOT PARAM UPDATE")
           modelComp.foreach{c=>
+          println("SENDING PARAM UPDATE")
             c !? ParamChanged[A](name,myParam)
           }
+          println("REPLYING PARAM UPDATE")
           reply('ok)
         case OptUpdate(x)=>
           internal setParams x
@@ -465,6 +474,10 @@ abstract class AbstractActorParam[A] extends ActorParamComponent{
           reply('ok)
         case RequestOpt=>
           sender ! internal.getParams
+        case Lower=>
+          sender ! lowerArray
+        case Upper=>
+          sender ! upperArray
   }
   def handler:PartialFunction[Any,Unit]= {
      myHandler 
@@ -478,6 +491,8 @@ abstract class AbstractActorParam[A] extends ActorParamComponent{
 }
 class ActorPiComponent(pi:Vector,val name:ParamName) extends AbstractActorParam[Vector]{
   val internal = new PiParam(pi)
+  def lower = -10 // this is log-odds scaled prob
+  def upper = 10
   def myParam = pi
   override def setRaw(p:Array[Double]){
     internal setPi p
@@ -487,6 +502,8 @@ class ActorPiComponent(pi:Vector,val name:ParamName) extends AbstractActorParam[
 class ActorSComponent(s:Matrix,val name:ParamName) extends AbstractActorParam[Matrix] with SMatUtil{
   val internal = new SMatParam(s,name.toString)
   def myParam = s
+  def lower = 0.0
+  def upper = 200
   private val myHandler:PartialFunction[Any,Unit]={
       case ParamUpdate(m:Matrix)=>
         setRaw(linearSMat(m).toArray)
@@ -502,6 +519,8 @@ class ActorSComponent(s:Matrix,val name:ParamName) extends AbstractActorParam[Ma
 }
 class ActorFullSComponent(s:Matrix,val name:ParamName) extends AbstractActorParam[Matrix] with SMatUtil{
   val internal = new FullSMatParam(s,name.toString)
+  def lower = 0.0D
+  def upper = 200
   def myParam = s
   private val myHandler:PartialFunction[Any,Unit]={
       case ParamUpdate(m:Matrix)=>
@@ -518,6 +537,8 @@ class ActorFullSComponent(s:Matrix,val name:ParamName) extends AbstractActorPara
 
 
 class ActorTreeComponent[B <: BioEnum](tree:Tree[B],val name:ParamName) extends AbstractActorParam[Array[Double]]{
+  def lower =0.0
+  def upper = 100.0
   class TreeParam{
     val nodes = tree.descendentNodes.toArray
     var myP=nodes.map{n:Node[B]=>n.lengthTo}
@@ -540,7 +561,7 @@ class ActorTreeComponent[B <: BioEnum](tree:Tree[B],val name:ParamName) extends 
     myHandler orElse (super.handler)
   }
 }
-class ActorDoubleComponent(param:Double,val name:ParamName) extends AbstractActorParam[Double]{
+class ActorDoubleComponent(param:Double,val name:ParamName,val lower:Double,val upper:Double) extends AbstractActorParam[Double]{
   class DoubleParam{
     var myP:Double=param
     def getParams=Array(myP)
@@ -549,7 +570,7 @@ class ActorDoubleComponent(param:Double,val name:ParamName) extends AbstractActo
   val internal = new DoubleParam
   def myParam = internal.getParams(0)
 }
-class ActorArrayComponent(param:Array[Double],val name:ParamName) extends AbstractActorParam[Array[Double]]{
+class ActorArrayComponent(param:Array[Double],val name:ParamName,val lower:Double, val upper:Double) extends AbstractActorParam[Array[Double]]{
   class ArrayParam{
     var myP=param
     def getParams = myP.toArray
@@ -558,8 +579,8 @@ class ActorArrayComponent(param:Array[Double],val name:ParamName) extends Abstra
   val internal = new ArrayParam
   def myParam = internal.getParams
 }
-class ActorProbComponent(prob:Double,name:ParamName) extends ActorDoubleComponent(prob,name)
-class ActorGammaComponent(alpha:Double,name:ParamName) extends ActorDoubleComponent(alpha,name)
+class ActorProbComponent(prob:Double,name:ParamName) extends ActorDoubleComponent(prob,name,0,1)
+class ActorGammaComponent(alpha:Double,name:ParamName) extends ActorDoubleComponent(alpha,name,0,1000)
 object SimpleModel{
   def apply[A <: BioEnum](tree:Tree[A])={
     val pi = new ActorPiComponent(WAG.pi,Pi)
