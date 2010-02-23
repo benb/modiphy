@@ -17,17 +17,23 @@ abstract class Gradient extends MultivariateVectorialFunction{
   def apply(point:Array[Double]):Array[Double]
   def value(point:Array[Double])=apply(point)
 }
-class FuncWrapper(model:ActorModel,p:OptPSetter,monitor:String=>Unit) extends MultivariateFunction with MultivariateRealFunction{
+class FuncWrapper(model:ActorModel,p:OptPSetter) extends MultivariateFunction with MultivariateRealFunction with Logging{
+  var count = 0
   val length = latestArgs.length
   val lower = (0 until length).map{i=>p.lower(i)}.toArray
   val upper = (0 until length).map{i=>p.upper(i)}.toArray
   def getUpperBound(i:Int)=upper(i)
   def getLowerBound(i:Int)=lower(i)
-  def this(model:ActorModel,p:OptPSetter)=this(model,p,{s:String=>})
+  //def this(model:ActorModel,p:OptPSetter)=this(model,p,{s:String=>})
   def apply(point:Array[Double])={
     p(point)
     val ans = model.logLikelihood
-    monitor("f: " + p + " " + ans)
+    if (count % 100==0){
+      info{count + " f: " + p + " " + ans}
+    }else {
+      extra{count + " f: " + p + " " + ans}
+    }
+    count=count+1
     ans
   }
   def evaluate(point:Array[Double])= -apply(point)
@@ -40,9 +46,9 @@ class FuncWrapper(model:ActorModel,p:OptPSetter,monitor:String=>Unit) extends Mu
     if (inBounds(point)){
       apply(point)
     }else {
-      monitor("f: " + point.mkString(" ") + " out of bounds")
-      monitor("lower " + lower.mkString(" "))
-      monitor("upper " + upper.mkString(" "))
+      extra{"f: " + point.mkString(" ") + " out of bounds"}
+      extra{"lower " + lower.mkString(" ")}
+      extra{"upper " + upper.mkString(" ")}
 
       -1e100
     }
@@ -256,7 +262,7 @@ object ModelOptimiser extends Logging{
   }
   def optimise[A <: BioEnum](optFactory: => MultivariateMinimum,pList:List[ParamName],model:ActorModel):Double={
       val startParams = model.optSetter(pList)
-      val func = new FuncWrapper(model,startParams,println)
+      val func = new FuncWrapper(model,startParams)
       if (func.length==1){
         getNelderMead.optimize(func,MAXIMIZE,func.latestArgs)
       }else {

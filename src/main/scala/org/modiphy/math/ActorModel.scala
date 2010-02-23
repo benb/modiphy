@@ -822,7 +822,6 @@ class ActorModel(tree:Tree[_],components:ActorModelComponent){
         for (i<- 0 until numSub){
           val len = lenIter.next
           val s =  subIter.next
-          println(i + " " + len + " " + s)
           s(d.slice(pointer,pointer + len).force)
           pointer = pointer + len
         }
