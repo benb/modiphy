@@ -950,7 +950,7 @@ class ActorModel(tree:Tree[_],components:ActorModelComponent){
 
   def paramString=paramMap.map{t=> t._2.toString}.mkString("\n")
 
-  override def toString = paramString + "log-likelihood: " + logLikelihood
+  override def toString = paramString + "\nlog-likelihood: " + logLikelihood
 
   def optimise(params:ParamName*):Double={
     optimise(params.toList)
