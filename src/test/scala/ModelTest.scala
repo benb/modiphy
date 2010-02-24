@@ -128,7 +128,7 @@ class ModelSuite extends FunSuite {
     val typ = new org.modiphy.sequence.SiteClassAA(5)
     val (tree5a,aln5a) = DataParse(treeStr,alnStr.lines,typ)
     var i= -1
-    val model2C=BranchSpecificThmmModel(tree5a,(tree5a::tree5a.descendentNodes).foldLeft(Map[Node[org.modiphy.sequence.SiteClassAA],Int]()){(m,n)=>i=i+1;m+((n,i))})
+    val model2C=BranchSpecificThmmModel(tree5a,(tree5a::tree5a.descendentNodes).foldLeft(Map[Int,Int]()){(m,n)=>i=i+1;m+((n.id,i))})
     model2C(InvarPrior)=0.0
     model2C(Pi)=plusF
     model2C.logLikelihood should be (-5810.399586 plusOrMinus 0.001)

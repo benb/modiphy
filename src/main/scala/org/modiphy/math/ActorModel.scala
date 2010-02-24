@@ -734,6 +734,8 @@ trait OptPSetter {
   def latestArgs:Array[Double]
 }
 
+
+
 class ActorModel(tree:Tree[_],components:ActorModelComponent){
   components.start
   tree.start

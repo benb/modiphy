@@ -60,3 +60,15 @@ class JclIterator[A](i:java.util.Iterator[A]) extends Iterator[A]{
   def next=i.next 
   def hasNext = i.hasNext
 }
+
+object Test{
+  def lrt(lkl1:Double,lkl2:Double,df:Int)={
+    import org.apache.commons.math.distribution._
+    val d = - 2.0 * (lkl1 - lkl2)
+    val chi = new ChiSquaredDistributionImpl(df)
+    1.0D - chi.cumulativeProbability(d)
+  }
+  def aic(lkl:Double,numParams:Int)={
+    2 * (numParams.toDouble - lkl)
+  }
+}

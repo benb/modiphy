@@ -143,6 +143,7 @@ trait RootNode[A <: BioEnum] extends INode[A]{
      realLikelihoods(m).zip(aln.pCount).foldLeft(0.0D){(i,j)=>i+Math.log(j._1)*j._2}
 
   }
+  def fPi = aln.getFPi
 
 
   override def act{
