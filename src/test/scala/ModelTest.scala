@@ -4,12 +4,16 @@ import org.modiphy.math._
 import org.modiphy.tree._
 import ModelData._
 import org.modiphy.math.EnhancedMatrix._
+import tlf.Logging
 
 
 class ModelSuite extends FunSuite {
    
   val (tree,aln) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(1))
   val model = org.modiphy.math.SimpleModel(tree)
+
+  Logging.toStdout 
+  Logging setLevel "finest"
 
 
   val (tree4,aln4) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(4))

@@ -7,8 +7,9 @@ import scala.collection.immutable.{Map,IntMap}
 import scala.actors.Actor
 import scala.actors.Actor._
 import scala.actors.OutputChannel
+import tlf.Logging
 
-abstract class ActorModelComponent extends Actor{
+abstract class ActorModelComponent extends Actor with Logging{
 }
 case class Params(list:List[ActorParamComponent])
 object GetParams extends Params(Nil)
@@ -70,6 +71,7 @@ class BasicActorModel(piParam:ActorPiComponent,sParam:ActorSComponent,reciever:A
     initialise(None,None)
   }
   def initialise(s:Option[Matrix],pi:Option[Vector]){
+    finest{"BasicActor initialise " + s + " " + pi}
     if (s.isDefined && pi.isDefined){
       main(s.get,pi.get,None)
     }
@@ -132,6 +134,7 @@ class THMMActorModel(sigmaParam:ActorFullSComponent,numClasses:Int,reciever:Acto
     initialise(None)
   }
   def initialise(sigma:Option[Matrix]){
+    finest{"Sigma Initialize " + sigma}
     react{
       case ParamChanged(sigmaName,a:Matrix)=>main(a,None)
     }
@@ -194,6 +197,7 @@ class InvarActorModel(priorParam:ActorProbComponent,piParam:ActorPiComponent,num
     initialise(None,None)
   }
   def initialise(prior:Option[Double],pi:Option[Vector]){
+    finest{"Invar Initialise " + prior + " " + pi}
     if (prior.isDefined && pi.isDefined){
       main(prior.get,pi.get,None,None)
     }
@@ -296,7 +300,8 @@ class GammaActorModel(shape:ActorGammaComponent,numClasses:Int,reciever:Actor) e
 }
 
 class ForkActor[A <: BioEnum](tree:Tree[A],receiverMap:Map[Int,Actor]) extends ActorModelComponent{
-  val numRec = receiverMap.values.toList.length
+  val rec = receiverMap.values.toList.removeDuplicates
+  val numRec = rec.length
   override def start={
     receiverMap.values.foreach{v=>
       v.start
@@ -308,12 +313,12 @@ class ForkActor[A <: BioEnum](tree:Tree[A],receiverMap:Map[Int,Actor]) extends A
     loop{
       react{
         case Params(l)=>
-          receiverMap.values.foreach{v=>
+          rec.foreach{v=>
             v ! Params(l)             
           }
           getListReplies(sender,numRec,Nil)
         case Unclean =>
-          receiverMap.values.foreach{v=>
+          rec.foreach{v=>
             v ! Unclean
           }
           getCleanReplies(sender,numRec)
@@ -395,10 +400,10 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
           }.start forward ExpReq(n,myEigen,lengths(n.id),pi)
           main(Some(myEigen),lengths)
         case Unclean=>
-          if (reciever.isDefined){reciever.get forward Unclean} else { reply(Unclean)}
+          if (reciever.isDefined){reciever.get forward Unclean} else { sender ! Unclean}
           main(None,lengths)
         case ParamChanged(blName,a:Array[Double])=>
-          if (reciever.isDefined){reciever.get forward Unclean} else {reply(Unclean)}
+          if (reciever.isDefined){reciever.get forward Unclean} else { sender ! Unclean}
           val nodeMap = nodes.zip(a).foldLeft(Map[Int,Double]()){(m,t)=>m + ((t._1.id,t._2))}
           main(eigen,nodeMap)
         case a:Any => println(this + " WTF " + a)
@@ -447,7 +452,7 @@ case class SingleParamWrapper(p:ActorParamComponent) extends ActorParamComponent
       sender ! Array(upper)
       main(param)
     case a:Any =>
-      println("WTF " + a)
+      println(this + "WTF " + a)
       main(param)
     }
   }
