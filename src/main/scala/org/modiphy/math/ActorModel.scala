@@ -947,7 +947,6 @@ class ActorModel(t:Tree[_],components:ActorModelComponent){
           receive{
             case LogLikelihood(d) => 
               returned=returned+1
-              println("GOT ONE " +returned)
               ans=ans+d
           }
         }
