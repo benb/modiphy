@@ -84,20 +84,14 @@ class ModelSuite extends FunSuite {
     model4(Pi)=tree5.aln.getFPi
     val model4b = BranchSpecificThmmModel(tree5a)
     model4b(Pi) << model4(Pi)
-    model4b.logLikelihood should be (model4.logLikelihood)
+    model4b.logLikelihood should be (model4.logLikelihood plusOrMinus 1E-6)
     model4b(Pi)=WAG.pi
-    model4b.logLikelihood should not (be (model4.logLikelihood))
+    model4b.logLikelihood should not (be (model4.logLikelihood plusOrMinus 1E-6))
 
     model4b << model4
-
-    println(model4(Pi))
-    println(model4b(Pi))
-
-    println()
-    println(model4(BranchLengths))
-    println(model4b(BranchLengths))
-
-    model4b.logLikelihood should be (model4.logLikelihood)
+    val a = model4.logLikelihood
+    val b = model4b.logLikelihood
+    a should be (b plusOrMinus 1E-6) //could change due to random splitting of alignment
   }
 
   test("THMM.SI"){

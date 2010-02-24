@@ -363,9 +363,9 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
   var eigen:MatrixExponential=null 
 
   def act{
-    main(None,nodes.foldLeft(Map[Node[A],Double]()){(m,n)=>m+((n,n.lengthTo))})
+    main(None,nodes.foldLeft(Map[Int,Double]()){(m,n)=>m+((n.id,n.lengthTo))})
   }
-  def main(eigen:Option[MatrixExponential],lengths:Map[Node[A],Double]){
+  def main(eigen:Option[MatrixExponential],lengths:Map[Int,Double]){
     case class ExpReq(n:Node[_],e:MatrixExponential,lengthTo:Double,pi:Vector)
       react{
         case Params(l)=>
@@ -392,15 +392,16 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
                   exit
               }
             }
-          }.start forward ExpReq(n,myEigen,lengths(n),pi)
+          }.start forward ExpReq(n,myEigen,lengths(n.id),pi)
           main(Some(myEigen),lengths)
         case Unclean=>
           if (reciever.isDefined){reciever.get forward Unclean} else { reply(Unclean)}
           main(None,lengths)
         case ParamChanged(blName,a:Array[Double])=>
           if (reciever.isDefined){reciever.get forward Unclean} else {reply(Unclean)}
-          val nodeMap = nodes.zip(a).foldLeft(Map[Node[A],Double]()){(m,t)=>m + ((t._1,t._2))}
+          val nodeMap = nodes.zip(a).foldLeft(Map[Int,Double]()){(m,t)=>m + ((t._1.id,t._2))}
           main(eigen,nodeMap)
+        case a:Any => println(this + " WTF " + a)
       }
   }
 }
@@ -505,6 +506,7 @@ abstract class AbstractActorParam[A] extends ActorParamComponent{
           sender ! lowerArray
         case Upper=>
           sender ! upperArray
+        case a:Any => println(this + " WTF " + a)
   }
   def handler:PartialFunction[Any,Unit]= {
      myHandler 
@@ -736,9 +738,10 @@ trait OptPSetter {
 
 
 
-class ActorModel(tree:Tree[_],components:ActorModelComponent){
+class ActorModel(t:Tree[_],components:ActorModelComponent){
   components.start
-  tree.start
+  val tree = t.splitAln(4)
+  tree.foreach{_.start}
 
   val params = (components !? GetParams).asInstanceOf[Params].list.removeDuplicates
   val paramMap = params.foldLeft(Map[ParamName,ActorParamComponent]()){(m,p)=>m+((p.name,p))}
@@ -937,13 +940,18 @@ class ActorModel(tree:Tree[_],components:ActorModelComponent){
     Actor.actor{
       receive{
       case Send => 
-        (tree ! LogLikelihoodCalc(components,self))
-        var ans:Option[Double]=None
-        receive{
-          case LogLikelihood(d) => 
-            ans=Some(d)
+        for (t<-tree){(t ! LogLikelihoodCalc(components,self))}
+        var ans:Double=0.0D
+        var returned = 0
+        while (returned < tree.length){
+          receive{
+            case LogLikelihood(d) => 
+              returned=returned+1
+              println("GOT ONE " +returned)
+              ans=ans+d
+          }
         }
-        reply{ans.get}
+        reply{ans}
       }
       exit
     } !? Send
