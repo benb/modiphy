@@ -34,6 +34,7 @@ class ModelSuite extends FunSuite {
     println("Gamma Log Likelihood " + gammaModel.logLikelihood)
     gammaModel(Alpha)=0.496466D
     gammaModel(Pi)=pi
+    println("WTFWTF")
     gammaModel.logLikelihood should be (-2900.328678 plusOrMinus 1E-6)
   }
   val model2 = GammaModel(tree4)

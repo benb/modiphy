@@ -18,7 +18,7 @@ case class MatReq(n:Node[_],m:Option[Matrix],pi:Option[Vector])
 object NewMatReq{
   def apply(n:Node[_])=MatReq(n,None,None)
 }
-case object Unclean
+case class Unclean(sender:ActorParamComponent)
 case object RequestOpt
 object RequestParam 
 abstract class ParamName
@@ -66,6 +66,7 @@ class BasicActorModel(piParam:ActorPiComponent,sParam:ActorSComponent,reciever:A
     super.start
   }
   def act{
+    finest{this + " STARTING"}
     piParam ! RequestParam
     sParam ! RequestParam
     initialise(None,None)
@@ -73,6 +74,7 @@ class BasicActorModel(piParam:ActorPiComponent,sParam:ActorSComponent,reciever:A
   def initialise(s:Option[Matrix],pi:Option[Vector]){
     finest{"BasicActor initialise " + s + " " + pi}
     if (s.isDefined && pi.isDefined){
+      finest{this + " STARTED"}
       main(s.get,pi.get,None)
     }
     react{
@@ -94,10 +96,10 @@ class BasicActorModel(piParam:ActorPiComponent,sParam:ActorSComponent,reciever:A
         reciever forward MatReq(n,Some(myMat),Some(pi))
         main(s,pi,Some(myMat))
         case ParamChanged(piName,v:Vector)=>
-          reciever forward Unclean
+          reciever forward Unclean(piParam)
           main(s,v.copy,None)
         case ParamChanged(sName,m:Matrix)=>
-          reciever forward Unclean
+          reciever forward Unclean(sParam)
           main(m.copy,pi,None)
      }
   }
@@ -130,13 +132,16 @@ class THMMActorModel(sigmaParam:ActorFullSComponent,numClasses:Int,reciever:Acto
       qStart
   }
   def act{
+    finest{this + " STARTING"}
     sigmaParam ! RequestParam
     initialise(None)
   }
   def initialise(sigma:Option[Matrix]){
     finest{"Sigma Initialize " + sigma}
     react{
-      case ParamChanged(sigmaName,a:Matrix)=>main(a,None)
+      case ParamChanged(sigmaName,a:Matrix)=>
+        finest{this + " STARTED"}
+        main(a,None)
     }
   }
   def main(sigma:Matrix,mat:Option[Matrix]){
@@ -145,7 +150,7 @@ class THMMActorModel(sigmaParam:ActorFullSComponent,numClasses:Int,reciever:Acto
         reciever forward Params(sigmaParam :: l)
         main(sigma,mat)
       case ParamChanged(sigmaName,array:Matrix)=>
-        reciever forward Unclean
+        reciever forward Unclean(sigmaParam)
         main(array,None)
       case MatReq(n,Some(m),Some(p))=>
         val myMat = if (mat.isDefined){
@@ -155,8 +160,8 @@ class THMMActorModel(sigmaParam:ActorFullSComponent,numClasses:Int,reciever:Acto
         }
         reciever forward MatReq(n,Some(myMat),Some(p))
         main(sigma,Some(myMat))
-      case Unclean => 
-        reciever forward Unclean 
+      case Unclean(a) => 
+        reciever forward Unclean(a)
         main(sigma,None)
     }
   }
@@ -192,6 +197,7 @@ class InvarActorModel(priorParam:ActorProbComponent,piParam:ActorPiComponent,num
     newPi
   }
   def act{
+    finest{this + " STARTING"}
     piParam ! RequestParam
     priorParam ! RequestParam
     initialise(None,None)
@@ -199,6 +205,7 @@ class InvarActorModel(priorParam:ActorProbComponent,piParam:ActorPiComponent,num
   def initialise(prior:Option[Double],pi:Option[Vector]){
     finest{"Invar Initialise " + prior + " " + pi}
     if (prior.isDefined && pi.isDefined){
+      finest{this + " STARTED"}
       main(prior.get,pi.get,None,None)
     }
     react{
@@ -212,10 +219,10 @@ class InvarActorModel(priorParam:ActorProbComponent,piParam:ActorPiComponent,num
         reciever forward Params(priorParam :: piParam :: l)
         main(prior,rawpi,processedPi,mat)
       case ParamChanged(priorName,d:Double)=>
-        reciever forward Unclean
+        reciever forward Unclean(priorParam)
         main(d,rawpi,None,None)
       case ParamChanged(piName,v:Vector)=>
-        reciever forward Unclean
+        reciever forward Unclean(piParam)
         main(prior,v,None,None)
       case MatReq(n,Some(m),Some(p))=>
         val myPi = if (processedPi.isDefined){
@@ -230,8 +237,8 @@ class InvarActorModel(priorParam:ActorProbComponent,piParam:ActorPiComponent,num
         }
         reciever forward MatReq(n,Some(myMat),Some(myPi))
         main(prior,rawpi,Some(myPi),Some(myMat))
-      case Unclean => 
-        reciever forward Unclean 
+      case Unclean(a) => 
+        reciever forward Unclean(a)
         main(prior,rawpi,None,None)
     }
   }
@@ -266,9 +273,12 @@ class GammaActorModel(shape:ActorGammaComponent,numClasses:Int,reciever:Actor) e
     myPi
   }
   def act{
+    finest{ this + " STARTING"}
     shape ! RequestParam
     react{
-      case ParamChanged(shapeName,alpha:Double)=>main(alpha,None,None)
+      case ParamChanged(shapeName,alpha:Double)=>
+        finest{ this + " STARTED"}
+        main(alpha,None,None)
     }
   }
   def main(alpha:Double,mat:Option[Matrix],pi:Option[Vector]){
@@ -290,10 +300,10 @@ class GammaActorModel(shape:ActorGammaComponent,numClasses:Int,reciever:Actor) e
         reciever forward MatReq(n,Some(myMat),Some(myPi))
         main(alpha,Some(myMat),Some(myPi))
       case ParamChanged(shapeName,d:Double)=>
-        reciever forward Unclean
+        reciever forward Unclean(shape)
         main(d,None,pi)
-      case Unclean =>
-        reciever forward Unclean
+      case Unclean(a) =>
+        reciever forward Unclean(a)
         main(alpha,None,None)
     }
   }
@@ -317,11 +327,12 @@ class ForkActor[A <: BioEnum](tree:Tree[A],receiverMap:Map[Int,Actor]) extends A
             v ! Params(l)             
           }
           getListReplies(sender,numRec,Nil)
-        case Unclean =>
+        case Unclean(a) =>
           rec.foreach{v=>
-            v ! Unclean
+         //   v ! Unclean(self)
           }
-          getCleanReplies(sender,numRec)
+         // getCleanReplies(a,numRec)
+          a ! Unclean(a)
         case MatReq(n,m,p)=>
           if(receiverMap contains n.id){
             receiverMap(n.id) forward MatReq(n,m,p)
@@ -343,13 +354,13 @@ class ForkActor[A <: BioEnum](tree:Tree[A],receiverMap:Map[Int,Actor]) extends A
     }
   }
 
-  def getCleanReplies(output:OutputChannel[Any],toDo:Int){
+  def getCleanReplies(output:ActorParamComponent,toDo:Int){
     if (toDo==0){
-      output ! Unclean
+      output ! Unclean(output)
       act
     }
     react{
-      case Unclean => getCleanReplies(output,toDo-1)
+      case Unclean(a) => getCleanReplies(output,toDo-1)
     }
   }
 
@@ -399,11 +410,14 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
             }
           }.start forward ExpReq(n,myEigen,lengths(n.id),pi)
           main(Some(myEigen),lengths)
-        case Unclean=>
-          if (reciever.isDefined){reciever.get forward Unclean} else { sender ! Unclean}
+        case Unclean(a)=>
+          if (reciever.isDefined){reciever.get forward Unclean(a)} else {
+            finest{"Sending back to " + a}
+            a ! Unclean(a)
+          }
           main(None,lengths)
         case ParamChanged(blName,a:Array[Double])=>
-          if (reciever.isDefined){reciever.get forward Unclean} else { sender ! Unclean}
+          if (reciever.isDefined){reciever.get forward Unclean(branchLengthParams)} else {branchLengthParams ! Unclean(branchLengthParams)}
           val nodeMap = nodes.zip(a).foldLeft(Map[Int,Double]()){(m,t)=>m + ((t._1.id,t._2))}
           main(eigen,nodeMap)
         case a:Any => println(this + " WTF " + a)
@@ -467,7 +481,7 @@ case class JoinedParamWrapper(p:List[ActorParamComponent]) extends ActorParamCom
  
 }*/
 
-abstract class AbstractActorParam[A] extends ActorParamComponent{
+abstract class AbstractActorParam[A] extends ActorParamComponent with Logging{
   type Param = {
     def getParams:Array[Double]
     def setParams(a:Array[Double]):Unit
@@ -484,26 +498,48 @@ abstract class AbstractActorParam[A] extends ActorParamComponent{
   def upperArray = Array.make(internal.getParams.length,upper)
   //override this if raw params are different!
   def setRaw(p:Array[Double]){internal setParams p}
+  def waitOn(i:Int,o:OutputChannel[Any]){
+    finest{super.toString + " WAITING ON " + i + ":::" + this}
+    react{
+      case Unclean(_)=>
+        finest{"GOT " + i}
+        if (i==1){
+          o ! 'ok
+          act
+        }else {
+          waitOn(i-1,o)
+        }
+    }
+  }
   private val myHandler:PartialFunction[Any,Unit] = {
         case RequestParam=>
           sender ! ParamChanged[A](name,myParam)
         case ParamUpdate(x:Array[Double])=> 
           setRaw(x)
           modelComp.foreach{c=>
-            c !? ParamChanged[A](name,myParam)
+            finest{"SENDING to " + c}
+            c ! ParamChanged[A](name,myParam)
           }
-          reply('ok)
+          waitOn(modelComp.length,sender)
         case ParamUpdate(v:Vector)=>
           setRaw(v.toArray)
           modelComp.foreach{c=>
-            c !? ParamChanged[A](name,myParam)
+            finest{"SENDING to " + c}
+            c ! ParamChanged[A](name,myParam)
           }
-          reply('ok)
+          waitOn(modelComp.length,sender)
         case OptUpdate(x)=>
           internal setParams x
           modelComp.foreach{c=>
-            c !? ParamChanged[A](name,myParam)
+            c ! ParamChanged[A](name,myParam)
           }
+          modelComp.foreach{c=>
+            receive{
+              case Unclean(self) => 
+            }
+          }
+
+
           reply('ok)
         case RequestOpt=>
           sender ! internal.getParams
@@ -511,15 +547,16 @@ abstract class AbstractActorParam[A] extends ActorParamComponent{
           sender ! lowerArray
         case Upper=>
           sender ! upperArray
-        case a:Any => println(this + " WTF " + a)
+        case a:Any => println(super.toString + " WTF " + a)
   }
   def handler:PartialFunction[Any,Unit]= {
      myHandler 
   }
 
   def act{
+    finest{"ACT"}
     loop{
-      react(handler)
+      receive(handler)
     }
   }
 }
