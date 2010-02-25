@@ -137,13 +137,20 @@ class ModelSuite extends FunSuite {
     val (tree5,aln5)=DataParse(pfTree,pfAln.lines,new org.modiphy.sequence.SiteClassAA(5))
     val model3=InvarThmmModel(tree5)
     val start=model3.logLikelihood
+    println("GOT START" + start)
     val startBL = model3(BranchLengths)
+    println("GOT BL" + start)
     val bl = startBL(0)
+    println(bl)
     startBL(0)=10.0D
+    println(startBL)
   //  model3(BranchLengths)=startBL
     model3.logLikelihood should be < (start) // artificially setting a branch length to exp(1.0) should be bad for the likelihood
+    println("OK1")
     startBL(0)=bl
+    println("OK1")
     println(startBL)
+    println("OK1")
   //  model3(BranchLengths)=startBL
     model3.logLikelihood should be (start plusOrMinus 1e-4)
   }
