@@ -80,24 +80,37 @@ class ModelSuite extends FunSuite {
     model4(SingleParam(Sigma(2)))=5.0
     model4(Sigma(2))(1,3) should be (5.0)
   }
- 
+
   test("Copying Params"){
-    
+
     val (tree5,aln5) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(5))
     val (tree5a,aln5a) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(5))
-    val model4 = BranchSpecificThmmModel(tree5)
+    val model4 = InvarThmmModel(tree5)
     model4(Pi)=tree5.aln.getFPi
     val model4b = BranchSpecificThmmModel(tree5a)
     model4b(Pi) << model4(Pi)
-    model4b.logLikelihood should be (model4.logLikelihood plusOrMinus 1E-6)
+    model4b.logLikelihood should be (model4.logLikelihood plusOrMinus 1E-5)
     model4b(Pi)=WAG.pi
-    model4b.logLikelihood should not (be (model4.logLikelihood plusOrMinus 1E-6))
+    model4b.logLikelihood should not (be (model4.logLikelihood plusOrMinus 1E-5))
 
     model4b << model4
-    val a = model4.logLikelihood
-    val b = model4b.logLikelihood
-    a should be (b plusOrMinus 1E-6) //could change due to random splitting of alignment
-  }
+
+    println(model4(Pi))
+    println(model4b(Pi))
+
+    println()
+    println(model4(BranchLengths))
+    println(model4b(BranchLengths))
+
+    model4b(BranchLengths)(0)=3.0
+
+    model4b.logLikelihood should not (be (model4.logLikelihood plusOrMinus 1E-5))
+    model4(BranchLengths) << model4b(BranchLengths)
+                                    
+    model4b.logLikelihood should be (model4.logLikelihood plusOrMinus 1E-5)
+  }                                 
+
+
 
   test("THMM.SI"){
     val (tree5,aln5)=DataParse(pfTree,pfAln.lines,new org.modiphy.sequence.SiteClassAA(5))
@@ -112,7 +125,7 @@ class ModelSuite extends FunSuite {
     val pi = Vector(Array(0.024191,0.002492,0.002932,0.002492,0.001906,0.002492,0.006304,0.023018,0.002346,0.026683,0.034307,0.008943,0.007037,0.014808,0.005278,0.018326,0.013928,0.007477,0.007917,0.020379)).normalize(1)
     println("PI " + pi)
     thmmsi(Pi)=pi
-    thmmsi(Sigma)=sigma
+    thmmsi(Sigma(0))=sigma
     thmmsi(Alpha)=3.270690
     thmmsi(InvarPrior)=0.066963
     thmmsi.logLikelihood should be (-2972.196109 plusOrMinus 1e-1)

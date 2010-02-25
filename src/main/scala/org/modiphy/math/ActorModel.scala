@@ -449,7 +449,7 @@ case class SingleParamWrapper(p:ActorParamComponent) extends ActorParamComponent
   def main(param:Array[Double]){
     react{
     case RequestParam=>
-      sender ! ParamChanged(name,param(0))
+      reply(ParamChanged(name,param(0)))
       main(param)
     case ParamUpdate(x:Array[Double])=>
       val newParam = Array.make(param.length,x(0))
@@ -460,7 +460,7 @@ case class SingleParamWrapper(p:ActorParamComponent) extends ActorParamComponent
       p forward OptUpdate(newParam)
       main(newParam)
     case RequestOpt =>
-      sender ! Array(param(0))
+      reply(Array(param(0)))
       main(param)
     case Lower =>
       sender ! Array(lower)
@@ -516,7 +516,7 @@ abstract class AbstractActorParam[A] extends ActorParamComponent with Logging{
   }
   private val myHandler:PartialFunction[Any,Unit] = {
         case RequestParam=>
-          sender ! ParamChanged[A](name,myParam)
+         reply(ParamChanged(name,myParam))
         case ParamUpdate(x:Array[Double])=> 
           setRaw(x)
           modelComp.foreach{c=>
@@ -538,7 +538,7 @@ abstract class AbstractActorParam[A] extends ActorParamComponent with Logging{
           }
           waitOn(modelComp.length,sender)
         case RequestOpt=>
-          sender ! internal.getParams
+          reply(internal.getParams)
         case Lower=>
           sender ! lowerArray
         case Upper=>
@@ -591,7 +591,7 @@ class ActorFullSComponent(s:Matrix,val name:ParamName) extends AbstractActorPara
   def myParam = s
   private val myHandler:PartialFunction[Any,Unit]={
       case RequestParam=>
-          sender ! ParamChanged(name,myParam)
+          reply(ParamChanged(name,myParam))
       case ParamUpdate(m:Matrix)=>
         setRaw(linearSMatFull(m).toArray)
         modelComp.foreach{c=>
@@ -618,7 +618,7 @@ class ActorTreeComponent[B <: BioEnum](tree:Tree[B],val name:ParamName) extends 
   def myParam = internal.getParams
   private val myHandler:PartialFunction[Any,Unit]={
         case RequestParam=>
-          sender ! ParamChanged(name,myParam)
+          reply(ParamChanged(name,myParam))
         case ParamUpdate(x:Array[Double])=> 
           setRaw(x)
           modelComp.foreach{c=>
@@ -668,7 +668,9 @@ object SimpleModel{
     val s = new ActorSComponent(WAG.S,S)
     val branchLength = new ActorTreeComponent(tree,BranchLengths)
     val components = new BasicActorModel(pi,s, new BasicSingleExpActorModel(tree,branchLength,None))
-    new ActorModel(tree,components)
+    val pList = List(pi,s,branchLength)
+    val pMap = pList.map{p => (p.name,p)}.foldLeft(Map[ParamName,ActorParamComponent]()){_+_}
+    new ActorModel(tree,components,pMap)
   }
 }
 object GammaModel{
@@ -680,7 +682,9 @@ object GammaModel{
     val components = new BasicActorModel(pi,s, 
       new GammaActorModel(alpha,tree.alphabet.numClasses,
        new BasicSingleExpActorModel(tree,branchLength,None)))
-    new ActorModel(tree,components)
+    val pList = List(pi,s,branchLength,alpha)
+    val pMap = pList.map{p => (p.name,p)}.foldLeft(Map[ParamName,ActorParamComponent]()){_+_}
+    new ActorModel(tree,components,pMap)
   }
 }
 object InvarGammaModel{
@@ -694,7 +698,9 @@ object InvarGammaModel{
       new GammaActorModel(alpha,tree.alphabet.numClasses-1,
         new InvarActorModel(invarPrior,pi,tree.alphabet.numClasses,
           new BasicSingleExpActorModel(tree,branchLength,None))))
-     new ActorModel(tree,components)
+    val pList = List(pi,s,branchLength,alpha,invarPrior)
+    val pMap = pList.map{p => (p.name,p)}.foldLeft(Map[ParamName,ActorParamComponent]()){_+_}
+     new ActorModel(tree,components,pMap)
   }
 }
 
@@ -706,13 +712,15 @@ def apply[A <: BioEnum](tree:Tree[A])={
     val branchLength = new ActorTreeComponent(tree,BranchLengths)
     val alpha = new ActorGammaComponent(0.5D,Alpha)
     val invarPrior = new ActorProbComponent(0.2D,InvarPrior)
-    val sigma = new ActorFullSComponent(Matrix(numClasses,numClasses),Sigma)
+    val sigma = new ActorFullSComponent(Matrix(numClasses,numClasses),Sigma(0))
     val components = new BasicActorModel(pi,s,
       new GammaActorModel(alpha,numClasses-1,
         new InvarActorModel(invarPrior,pi,numClasses,
           new THMMActorModel(sigma,numClasses,
             new BasicSingleExpActorModel(tree,branchLength,None)))))
-     new ActorModel(tree,components)
+    val pList = List(pi,s,branchLength,alpha,invarPrior,sigma)
+    val pMap = pList.map{p => (p.name,p)}.foldLeft(Map[ParamName,ActorParamComponent]()){_+_}
+     new ActorModel(tree,components,pMap)
   }
 }
 
@@ -732,12 +740,17 @@ object BranchSpecificThmmModel{
     val branchLength = new ActorTreeComponent(tree,BranchLengths)
     val alpha = new ActorGammaComponent(0.5D,Alpha)
     val invarPrior = new ActorProbComponent(0.2D,InvarPrior)
+    var pList:List[ActorParamComponent] = List(pi,s,branchLength,alpha,invarPrior)
     val modelNums = map.values.toList.removeDuplicates
     val modelMapTmp = modelNums.map{a=>
       val sigma = new ActorFullSComponent(Matrix(numClasses,numClasses),Sigma(a))
+      pList = sigma :: pList
       val ans = new THMMActorModel(sigma,numClasses, new BasicSingleExpActorModel(tree,branchLength,None))
       (a,ans)
     }.foldLeft[Map[Int,Actor]](IntMap[Actor]()){_+_}
+
+    val pMap = pList.map{p => (p.name,p)}.foldLeft(Map[ParamName,ActorParamComponent]()){_+_}
+
       
     val modelMap = (map.keys).map{id=> (id,modelMapTmp(map(id)))}.foldLeft[Map[Int,Actor]](IntMap[Actor]()){_+_}
     val components = new BasicActorModel(pi,s,
@@ -746,7 +759,7 @@ object BranchSpecificThmmModel{
           new ForkActor(tree,modelMap))))
 
 
-     new ActorModel(tree,components)
+     new ActorModel(tree,components,pMap)
 
    
   }
@@ -779,13 +792,13 @@ trait OptPSetter {
 
 
 
-class ActorModel(t:Tree[_],components:ActorModelComponent){
+class ActorModel(t:Tree[_],components:ActorModelComponent,val paramMap:Map[ParamName,ActorParamComponent]) extends Logging{
   components.start
   val tree = t.splitAln(4)
   tree.foreach{_.start}
 
-  val params = (components !? GetParams).asInstanceOf[Params].list.removeDuplicates
-  val paramMap = params.foldLeft(Map[ParamName,ActorParamComponent]()){(m,p)=>m+((p.name,p))}
+   val params = paramMap.values.toList.removeDuplicates.map{_.name}
+  debug{"Param Map " + paramMap}
   def getParam(p:ParamName)={
     p match {
       case SingleParam(p2)=>SingleParamWrapper(paramMap(p2))
@@ -976,7 +989,8 @@ class ActorModel(t:Tree[_],components:ActorModelComponent){
   }
 
 
-  def logLikelihood = {
+  def logLikelihood = {val ans = 
+    {
     object Send
     Actor.actor{
       receive{
@@ -996,6 +1010,8 @@ class ActorModel(t:Tree[_],components:ActorModelComponent){
       exit
     } !? Send
   }.asInstanceOf[Double]
+  if (ans.isNaN){-1E100}else{ans}
+}
 
   def paramString=paramMap.map{t=> t._2.toString}.mkString("\n")
 

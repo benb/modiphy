@@ -18,6 +18,9 @@ abstract class Gradient extends MultivariateVectorialFunction{
   def value(point:Array[Double])=apply(point)
 }
 class FuncWrapper(model:ActorModel,p:OptPSetter) extends MultivariateFunction with MultivariateRealFunction with Logging{
+  def setBest=apply(best)
+  var best:Array[Double]=p.latestArgs
+  var bestLnL = -1E100
   var count = 0
   val length = latestArgs.length
   val lower = (0 until length).map{i=>p.lower(i)}.toArray
@@ -28,6 +31,11 @@ class FuncWrapper(model:ActorModel,p:OptPSetter) extends MultivariateFunction wi
   def apply(point:Array[Double])={
     p(point)
     val ans = model.logLikelihood
+    if (ans > bestLnL){
+      finest{"NEW BEST" + point + " " + ans}
+      best = point.toArray
+      bestLnL = ans
+    }
     if (count % 100==0){
       info{count + " f: " + p + " " + ans}
     }else {
@@ -46,6 +54,9 @@ class FuncWrapper(model:ActorModel,p:OptPSetter) extends MultivariateFunction wi
     if (inBounds(point)){
       apply(point)
     }else {
+      if (inBounds(point.map{_.abs})){
+        apply(point.map{_.abs})
+      }else {
       extra{"f: " + point.mkString(" ") + " out of bounds"}
       extra{"lower " + lower.mkString(" ")}
       extra{"upper " + upper.mkString(" ")}
@@ -53,6 +64,7 @@ class FuncWrapper(model:ActorModel,p:OptPSetter) extends MultivariateFunction wi
       -1e100
     }
   }
+}
   def getNumArguments=p.numArguments
   def latestArgs=p.latestArgs
 }
@@ -268,7 +280,7 @@ object ModelOptimiser extends Logging{
       }else {
         optFactory.optimize(func,func.latestArgs,1E-4,1E-3)
       }
-      model.logLikelihood
+      func.setBest 
   }
   def optimiseSequential[A <: BioEnum](optFactory: => MultivariateMinimum,pListList:List[List[ParamName]],model:ActorModel):Double={
      var start = model.logLikelihood
