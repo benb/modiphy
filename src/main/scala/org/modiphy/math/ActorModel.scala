@@ -18,27 +18,24 @@ case class MatReq(n:Node[_],m:Option[Matrix],pi:Option[Vector])
 object NewMatReq{
   def apply(n:Node[_])=MatReq(n,None,None)
 }
-case class Unclean(sender:ActorParamComponent)
+case class Unclean(sender:Actor)
 case object RequestOpt
 object RequestParam 
 abstract class ParamName
 
 case class Pi(i:Int) extends ParamName
-object Pi extends Pi(0)
 case class S(i:Int) extends ParamName
-object S  extends S(0)
 case class BranchLengths(i:Int) extends ParamName
-object BranchLengths extends BranchLengths(0)
 case class Alpha(i:Int) extends ParamName
-object Alpha extends Alpha(0)
 case class InvarPrior(i:Int) extends ParamName
-object InvarPrior extends InvarPrior(0)
 case class Sigma(i:Int) extends ParamName
-object Sigma extends Sigma(0)
-
 case class SingleParam(p:ParamName) extends ParamName
 //case class JoinedParam(p:List[ParamName]) extends ParamName
 
+object LazyP{
+  type PFact={def apply(i:Int):ParamName}
+  implicit def lazymaker(p:PFact)=p(0)
+}
 
 case class ParamUpdate[A](d:A)
 case class ParamChanged[A](p:ParamName,param:A){
@@ -259,6 +256,7 @@ class GammaActorModel(shape:ActorGammaComponent,numClasses:Int,rec1:Actor) exten
   
   def applyMat(m:Matrix,alpha:Double,pi:Vector):Matrix={
     val r = gamma(alpha)
+    debug{"GAMMA " + alpha + " " + r.mkString(" ")}
     val myMat = Matrix(m.rows*numClasses,m.columns * numClasses)
     val numAlpha = m.rows 
     (0 until numClasses).foreach{i=>
@@ -304,10 +302,14 @@ class GammaActorModel(shape:ActorGammaComponent,numClasses:Int,rec1:Actor) exten
         main(alpha,Some(myMat),Some(myPi))
       case ParamChanged(shapeName,d:Double)=>
         rec1 forward Unclean(shape)
+        debug{"NEWGAMMA " + d}
         main(d,None,pi)
       case Unclean(a) =>
         rec1 forward Unclean(a)
         main(alpha,None,None)
+      case a:Any => 
+        warning{"Gamma WTF " + a}
+        main(alpha,mat,pi)
     }
   }
 }
@@ -332,14 +334,14 @@ class ForkActor[A <: BioEnum](tree:Tree[A],rec1Map:Map[Int,Actor]) extends Actor
           getListReplies(sender,numRec,Nil)
         case Unclean(a) =>
           rec.foreach{v=>
-         //   v ! Unclean(self)
+            v ! Unclean(self)
           }
-         // getCleanReplies(a,numRec)
-          a ! Unclean(a)
+          getCleanReplies(a,numRec,self)
         case MatReq(n,m,p)=>
           if(rec1Map contains n.id){
             rec1Map(n.id) forward MatReq(n,m,p)
           }else {
+            if (! n.isRoot){warning{"Map does not contain " + n.id + " " + n}}
             sender ! MatReq(n,m,p) 
           }
       }
@@ -357,13 +359,14 @@ class ForkActor[A <: BioEnum](tree:Tree[A],rec1Map:Map[Int,Actor]) extends Actor
     }
   }
 
-  def getCleanReplies(output:ActorParamComponent,toDo:Int){
+  def getCleanReplies(output:Actor,toDo:Int,me:Actor){
     if (toDo==0){
       output ! Unclean(output)
       act
     }
     react{
-      case Unclean(a) => getCleanReplies(output,toDo-1)
+      case Unclean(`me`) => 
+        getCleanReplies(output,toDo-1,me)
     }
   }
 
@@ -393,7 +396,8 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
           main(eigen,lengths)
         case MatReq(n,Some(m),Some(pi)) => 
           if (n.isRoot){//don't need exp(qt)
-            sender ! MatReq(n,None,Some(pi))
+            if (rec1.isDefined){rec1.get forward MatReq(n,None,Some(pi))}
+            else { sender ! MatReq(n,None,Some(pi))}
             main(eigen,lengths)
           }
           val myEigen = if (eigen.isEmpty){
@@ -407,7 +411,8 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
               react{
                 case ExpReq(n,e,lengthTo,pi)=> 
                   val ans = e.exp(lengthTo)
-                  sender ! MatReq(n,Some(ans),Some(pi)) 
+                  if (rec1.isDefined){rec1.get forward MatReq(n,Some(ans),Some(pi))}
+                  else { sender ! MatReq(n,Some(ans),Some(pi)) }
                   exit
               }
             }
@@ -415,7 +420,6 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
           main(Some(myEigen),lengths)
         case Unclean(a)=>
           if (rec1.isDefined){rec1.get forward Unclean(a)} else {
-            finest{"Sending back to " + a}
             a ! Unclean(a)
           }
           main(None,lengths)
@@ -423,7 +427,6 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
           if (rec1.isDefined){rec1.get forward Unclean(branchLengthParams)} else {branchLengthParams ! Unclean(branchLengthParams)}
           val nodeMap = nodes.zip(a).foldLeft(Map[Int,Double]()){(m,t)=>m + ((t._1.id,t._2))}
           main(eigen,nodeMap)
-        case a:Any => println(this + " WTF " + a)
       }
   }
 }
@@ -467,9 +470,6 @@ case class SingleParamWrapper(p:ActorParamComponent) extends ActorParamComponent
       main(param)
     case Upper =>
       sender ! Array(upper)
-      main(param)
-    case a:Any =>
-      println(this + "WTF " + a)
       main(param)
     }
   }
@@ -521,20 +521,19 @@ abstract class AbstractActorParam[A] extends ActorParamComponent with Logging{
           setRaw(x)
           modelComp.foreach{c=>
             finest{"SENDING to " + c}
-            c ! ParamChanged[A](name,myParam)
+            c ! ParamChanged(name,myParam)
           }
           waitOn(modelComp.length,sender)
         case ParamUpdate(v:Vector)=>
           setRaw(v.toArray)
           modelComp.foreach{c=>
-            finest{"SENDING to " + c}
-            c ! ParamChanged[A](name,myParam)
+            c ! ParamChanged(name,myParam)
           }
           waitOn(modelComp.length,sender)
         case OptUpdate(x)=>
           internal setParams x
           modelComp.foreach{c=>
-            c ! ParamChanged[A](name,myParam)
+            c ! ParamChanged(name,myParam)
           }
           waitOn(modelComp.length,sender)
         case RequestOpt=>
@@ -543,7 +542,6 @@ abstract class AbstractActorParam[A] extends ActorParamComponent with Logging{
           sender ! lowerArray
         case Upper=>
           sender ! upperArray
-        case a:Any => println(super.toString + " WTF " + a)
   }
   def handler:PartialFunction[Any,Unit]= {
      myHandler 
@@ -605,32 +603,7 @@ class ActorFullSComponent(s:Matrix,val name:ParamName) extends AbstractActorPara
 }
 
 
-class ActorTreeComponent[B <: BioEnum](tree:Tree[B],val name:ParamName) extends AbstractActorParam[Array[Double]]{
-  def lower =0.0
-  def upper = 100.0
-  class TreeParam{
-    val nodes = tree.descendentNodes.toArray
-    var myP=nodes.map{n:Node[B]=>n.lengthTo}
-    def getParams=myP
-    def setParams(a:Array[Double]){Array.copy(a,0,myP,0,Math.min(a.length,myP.length))}
-  }
-  val internal = new TreeParam
-  def myParam = internal.getParams
-  private val myHandler:PartialFunction[Any,Unit]={
-        case RequestParam=>
-          reply(ParamChanged(name,myParam))
-        case ParamUpdate(x:Array[Double])=> 
-          setRaw(x)
-          modelComp.foreach{c=>
-            c ! ParamChanged(name,myParam)
-          }
-          waitOn(modelComp.length,sender)
-          reply('ok)
-  }
-  override def handler={
-    myHandler orElse (super.handler)
-  }
-}
+class ActorTreeComponent[B <: BioEnum](tree:Tree[B],name:ParamName) extends ActorArrayComponent((tree.descendentNodes.map(_.lengthTo).toArray),name,0.0,100.0)
 class ActorDoubleComponent(param:Double,val name:ParamName,val lower:Double,val upper:Double) extends AbstractActorParam[Double]{
   class DoubleParam{
     var myP:Double=param
@@ -642,8 +615,12 @@ class ActorDoubleComponent(param:Double,val name:ParamName,val lower:Double,val 
 
   private val myHandler:PartialFunction[Any,Unit]={
     case ParamUpdate(x:Double)=>
-    internal.myP=x
-    reply('ok)
+      internal.myP=x
+      modelComp.foreach{c=>
+        c ! ParamChanged(name,myParam)
+      }
+      waitOn(modelComp.length,sender)
+      reply('ok)
   }
   override def handler={
     myHandler orElse (super.handler)
@@ -664,9 +641,9 @@ class ActorProbComponent(prob:Double,name:ParamName,min:Double,max:Double) exten
 class ActorGammaComponent(alpha:Double,name:ParamName) extends ActorDoubleComponent(alpha,name,0.01,1000)
 object SimpleModel{
   def apply[A <: BioEnum](tree:Tree[A])={
-    val pi = new ActorPiComponent(WAG.pi,Pi)
-    val s = new ActorSComponent(WAG.S,S)
-    val branchLength = new ActorTreeComponent(tree,BranchLengths)
+    val pi = new ActorPiComponent(WAG.pi,Pi(0))
+    val s = new ActorSComponent(WAG.S,S(0))
+    val branchLength = new ActorTreeComponent(tree,BranchLengths(0))
     val components = new BasicActorModel(pi,s, new BasicSingleExpActorModel(tree,branchLength,None))
     val pList = List(pi,s,branchLength)
     val pMap = pList.map{p => (p.name,p)}.foldLeft(Map[ParamName,ActorParamComponent]()){_+_}
@@ -675,10 +652,10 @@ object SimpleModel{
 }
 object GammaModel{
   def apply[A <: BioEnum](tree:Tree[A])={
-    val pi = new ActorPiComponent(WAG.pi,Pi)
-    val s = new ActorSComponent(WAG.S,S)
-    val branchLength = new ActorTreeComponent(tree,BranchLengths)
-    val alpha = new ActorGammaComponent(0.5D,Alpha)
+    val pi = new ActorPiComponent(WAG.pi,Pi(0))
+    val s = new ActorSComponent(WAG.S,S(0))
+    val branchLength = new ActorTreeComponent(tree,BranchLengths(0))
+    val alpha = new ActorGammaComponent(0.5D,Alpha(0))
     val components = new BasicActorModel(pi,s, 
       new GammaActorModel(alpha,tree.alphabet.numClasses,
        new BasicSingleExpActorModel(tree,branchLength,None)))
@@ -689,11 +666,11 @@ object GammaModel{
 }
 object InvarGammaModel{
   def apply[A <: BioEnum](tree:Tree[A])={
-    val pi = new ActorPiComponent(WAG.pi,Pi)
-    val s = new ActorSComponent(WAG.S,S)
-    val branchLength = new ActorTreeComponent(tree,BranchLengths)
-    val alpha = new ActorGammaComponent(0.5D,Alpha)
-    val invarPrior = new ActorProbComponent(0.2D,InvarPrior)
+    val pi = new ActorPiComponent(WAG.pi,Pi(0))
+    val s = new ActorSComponent(WAG.S,S(0))
+    val branchLength = new ActorTreeComponent(tree,BranchLengths(0))
+    val alpha = new ActorGammaComponent(0.5D,Alpha(0))
+    val invarPrior = new ActorProbComponent(0.2D,InvarPrior(0))
     val components = new BasicActorModel(pi,s,
       new GammaActorModel(alpha,tree.alphabet.numClasses-1,
         new InvarActorModel(invarPrior,pi,tree.alphabet.numClasses,
@@ -707,11 +684,11 @@ object InvarGammaModel{
 object InvarThmmModel{
 def apply[A <: BioEnum](tree:Tree[A])={
   val numClasses = tree.alphabet.numClasses
-    val pi = new ActorPiComponent(WAG.pi,Pi)
-    val s = new ActorSComponent(WAG.S,S)
-    val branchLength = new ActorTreeComponent(tree,BranchLengths)
-    val alpha = new ActorGammaComponent(0.5D,Alpha)
-    val invarPrior = new ActorProbComponent(0.2D,InvarPrior)
+    val pi = new ActorPiComponent(WAG.pi,Pi(0))
+    val s = new ActorSComponent(WAG.S,S(0))
+    val branchLength = new ActorTreeComponent(tree,BranchLengths(0))
+    val alpha = new ActorGammaComponent(0.5D,Alpha(0))
+    val invarPrior = new ActorProbComponent(0.2D,InvarPrior(0))
     val sigma = new ActorFullSComponent(Matrix(numClasses,numClasses),Sigma(0))
     val components = new BasicActorModel(pi,s,
       new GammaActorModel(alpha,numClasses-1,
@@ -735,11 +712,11 @@ object BranchSpecificThmmModel{
   }
   def apply[A <: BioEnum](tree:Tree[A],map:Map[Int,Int]):ActorModel={
     val numClasses = tree.alphabet.numClasses
-    val pi = new ActorPiComponent(WAG.pi,Pi)
-    val s = new ActorSComponent(WAG.S,S)
-    val branchLength = new ActorTreeComponent(tree,BranchLengths)
-    val alpha = new ActorGammaComponent(0.5D,Alpha)
-    val invarPrior = new ActorProbComponent(0.2D,InvarPrior)
+    val pi = new ActorPiComponent(WAG.pi,Pi(0))
+    val s = new ActorSComponent(WAG.S,S(0))
+    val branchLength = new ActorTreeComponent(tree,BranchLengths(0))
+    val alpha = new ActorGammaComponent(0.5D,Alpha(0))
+    val invarPrior = new ActorProbComponent(0.2D,InvarPrior(0))
     var pList:List[ActorParamComponent] = List(pi,s,branchLength,alpha,invarPrior)
     val modelNums = map.values.toList.removeDuplicates
     val modelMapTmp = modelNums.map{a=>
@@ -757,11 +734,15 @@ object BranchSpecificThmmModel{
       new GammaActorModel(alpha,numClasses-1,
         new InvarActorModel(invarPrior,pi,numClasses,
           new ForkActor(tree,modelMap))))
+          //modelMap(1))))
 
 
      new ActorModel(tree,components,pMap)
 
    
+  }
+  def apply[A <: BioEnum](tree:Tree[A],l:List[Int]):ActorModel={
+    apply(tree,(tree::tree.descendentNodes).map{n => (n.id,if (l contains n.id){1}else{0})}.foldLeft(Map[Int,Int]()){_+_})
   }
 }
 class BadParameterException(s:String) extends Exception(s)
@@ -808,7 +789,8 @@ class ActorModel(t:Tree[_],components:ActorModelComponent,val paramMap:Map[Param
   
   def setParamsFrom(other:ActorModel){
     other.paramMap.foreach{t=> val (k,v)=t
-      if (paramMap.contains(k) && k!= BranchLengths){
+      if (paramMap.contains(k) && !k.isInstanceOf[BranchLengths]){
+      debug{"Setting " + k}
           this(k)=(v !? RequestParam).asInstanceOf[ParamChanged[_]]
       }
     }

@@ -14,9 +14,9 @@ class ActorModelSuite extends FunSuite {
   test ("Actor Model should give correct matrix exp"){
     case class Test(n:Node[_])
     class ActorTest extends Actor{
-      val actorPi = new ActorPiComponent(WAG.pi,org.modiphy.math.Pi)
-      val actorS = new ActorSComponent(WAG.S,S)
-      val branchLengthComp =  new ActorTreeComponent(tree,BranchLengths)
+      val actorPi = new ActorPiComponent(WAG.pi,Pi(0))
+      val actorS = new ActorSComponent(WAG.S,S(0))
+      val branchLengthComp =  new ActorTreeComponent(tree,BranchLengths(0))
       val part1 = new BasicActorModel(actorPi,actorS,new BasicSingleExpActorModel(tree,branchLengthComp,None))
       part1.start
       def act{

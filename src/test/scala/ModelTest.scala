@@ -5,6 +5,7 @@ import org.modiphy.tree._
 import ModelData._
 import org.modiphy.math.EnhancedMatrix._
 import tlf.Logging
+import org.modiphy.math.LazyP._
 
 
 class ModelSuite extends FunSuite {
@@ -12,18 +13,50 @@ class ModelSuite extends FunSuite {
   val (tree,aln) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(1))
   val model = org.modiphy.math.SimpleModel(tree)
 
-  Logging.toStdout 
-  Logging setLevel "finest"
+//  Logging.toStdout 
+//  Logging setLevel "finest"
 
 
   val (tree4,aln4) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(4))
   val (tree5,aln5) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(5))
-  val sC=new BasicSMatComponent(WAG.S)
-  val piC = new BasicPiComponent(WAG.pi)
-  val piCG = new FlatPriorPiComponent(piC,tree4.alphabet)
-  val gammaC=new GammaMathComponent(0.5,tree4.alphabet,piCG,sC)
-  val model2Mixture = ModelFact.gammaMixture(WAG.pi,WAG.S,0.5,tree,4)
 
+  test("BS complex model with restricted params should match simpler Sigma model"){
+    val simpleModel = InvarThmmModel(tree5)
+    simpleModel(InvarPrior)=0.123
+    simpleModel(BranchLengths)(1)=0.5462
+    simpleModel(Alpha)=0.3
+    simpleModel(Sigma)=Array.make(10,0.4232)
+
+    val simpleModel2=InvarThmmModel(tree5)
+    simpleModel2 << simpleModel
+    simpleModel2(BranchLengths) << simpleModel(BranchLengths)
+    val lkl1 = simpleModel.logLikelihood
+
+    simpleModel2.logLikelihood should be (lkl1 plusOrMinus 1E-7)
+
+    val complexModel = BranchSpecificThmmModel(tree5,2::3::4::Nil)
+    complexModel.logLikelihood should not (be (simpleModel.logLikelihood plusOrMinus 1E-5))
+    complexModel << simpleModel
+    complexModel(BranchLengths) << simpleModel(BranchLengths)
+    complexModel.logLikelihood should not (be (simpleModel.logLikelihood plusOrMinus 1E-5))
+    complexModel(Sigma(1)) << simpleModel(Sigma(0))
+    complexModel.logLikelihood should be (simpleModel.logLikelihood plusOrMinus 1E-5)
+
+  }
+
+  test("OptUpdate"){
+    val simpleModel = InvarThmmModel(tree5)
+    val start = simpleModel.logLikelihood
+    val opt = simpleModel.optSetter(InvarPrior(0)::BranchLengths(0)::Alpha(0)::Nil)
+    val startP = opt.latestArgs
+    startP(startP.length-1)=0.2
+    opt(startP)
+    simpleModel.logLikelihood should not (be (start plusOrMinus 1E-4))
+    startP(startP.length-1)=0.5
+    opt(startP)
+    simpleModel.logLikelihood should be (start plusOrMinus 1E-4)
+  }
+ 
   test("log likelihood of basic model should match PAML") (model.logLikelihood should be (-6057.892394 plusOrMinus 0.001))//from PAML
   test("TufA Gamma Model"){
     val (tree,aln)=DataParse(tufaTree,tufaAln.lines,new org.modiphy.sequence.SiteClassAA(4))
@@ -31,28 +64,26 @@ class ModelSuite extends FunSuite {
 
     //val gammaModel = ModelFact.gamma(pi,WAG.S,0.496466,tree)
     val gammaModel = GammaModel(tree)//
-    println("Gamma Log Likelihood " + gammaModel.logLikelihood)
-    gammaModel(Alpha)=0.496466D
-    gammaModel(Pi)=pi
-    println("WTFWTF")
+    gammaModel(Alpha(0))=0.496466D
+    gammaModel(Pi(0))=pi
     gammaModel.logLikelihood should be (-2900.328678 plusOrMinus 1E-6)
   }
   val model2 = GammaModel(tree4)
   test("log likelihood of gamma model should match PAML") {
-    model2(Alpha)=0.5//piCG,sC,gammaC,tree4)
+    model2(Alpha(0))=0.5//piCG,sC,gammaC,tree4)
     model2.logLikelihood should be (-5808.929978 plusOrMinus 0.001)
   }//from PAML
     val plusF=aln.getFPi.toArray
   test("updating gamma model to gamma+F model should match PAML"){
     //val plusF=Array(0.038195,0.070238,0.054858,0.072802,0.037939,0.046398,0.080749,0.048962,0.017175,0.043066,0.085106,0.069726,0.015124,0.046142,0.028198,0.073571,0.044604,0.024096,0.049474,0.053576)
-    model2(Pi)=plusF
+    model2(Pi(0))=plusF
     model2.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
   }
   
   test("complex model with restricted params should match simpler model"){
     val model2B = InvarGammaModel(tree5)
-    model2B(InvarPrior)=0.0D
-    model2B(Pi)=plusF
+    model2B(InvarPrior(0))=0.0D
+    model2B(Pi(0))=plusF
     //val model2B = ModelFact.invarThmm(Vector(plusF),WAG.S,0.5,Matrix(5,5),tree5)
    // model2B.getParam("First Prior").head.setParams(Array(0))
     model2B.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
@@ -86,21 +117,14 @@ class ModelSuite extends FunSuite {
     val (tree5,aln5) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(5))
     val (tree5a,aln5a) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(5))
     val model4 = InvarThmmModel(tree5)
-    model4(Pi)=tree5.aln.getFPi
+    model4(Pi(0))=tree5.aln.getFPi
     val model4b = BranchSpecificThmmModel(tree5a)
-    model4b(Pi) << model4(Pi)
+    model4b(Pi(0)) << model4(Pi(0))
     model4b.logLikelihood should be (model4.logLikelihood plusOrMinus 1E-5)
-    model4b(Pi)=WAG.pi
+    model4b(Pi(0))=WAG.pi
     model4b.logLikelihood should not (be (model4.logLikelihood plusOrMinus 1E-5))
 
     model4b << model4
-
-    println(model4(Pi))
-    println(model4b(Pi))
-
-    println()
-    println(model4(BranchLengths))
-    println(model4b(BranchLengths))
 
     model4b(BranchLengths)(0)=3.0
 
@@ -124,49 +148,43 @@ class ModelSuite extends FunSuite {
 
     val pi = Vector(Array(0.024191,0.002492,0.002932,0.002492,0.001906,0.002492,0.006304,0.023018,0.002346,0.026683,0.034307,0.008943,0.007037,0.014808,0.005278,0.018326,0.013928,0.007477,0.007917,0.020379)).normalize(1)
     println("PI " + pi)
-    thmmsi(Pi)=pi
+    thmmsi(Pi(0))=pi
     thmmsi(Sigma(0))=sigma
-    thmmsi(Alpha)=3.270690
-    thmmsi(InvarPrior)=0.066963
+    thmmsi(Alpha(0))=3.270690
+    thmmsi(InvarPrior(0))=0.066963
     thmmsi.logLikelihood should be (-2972.196109 plusOrMinus 1e-1)
     //can't hope for much better as we only know params/bls to a certain number of decimal places
     //this log-likelihood is taken from an optimised model of Leaphy's
   }
 
   test("BS complex model with restricted params should match simpler model"){
-    model2(Pi)=plusF
+    model2(Pi(0))=plusF
     model2.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
   //  val model2B = ModelFact.invarThmmBS(Vector(plusF),WAG.S,0.5,Matrix(5,5),tree5)
     val typ = new org.modiphy.sequence.SiteClassAA(5)
     val (tree5a,aln5a) = DataParse(treeStr,alnStr.lines,typ)
     var i= -1
     val model2C=BranchSpecificThmmModel(tree5a,(tree5a::tree5a.descendentNodes).foldLeft(Map[Int,Int]()){(m,n)=>i=i+1;m+((n.id,i))})
-    model2C(InvarPrior)=0.0
-    model2C(Pi)=plusF
+    model2C(InvarPrior(0))=0.0
+    model2C(Pi(0))=plusF
     model2C.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
   }
 
-  test("Branch Length changes"){
+ test("Branch Length changes"){
     val (tree5,aln5)=DataParse(pfTree,pfAln.lines,new org.modiphy.sequence.SiteClassAA(5))
     val model3=InvarThmmModel(tree5)
     val start=model3.logLikelihood
-    println("GOT START" + start)
-    val startBL = model3(BranchLengths)
-    println("GOT BL" + start)
+    val startBL = model3(BranchLengths(0))
     val bl = startBL(0)
-    println(bl)
     startBL(0)=10.0D
-    println(startBL)
   //  model3(BranchLengths)=startBL
     model3.logLikelihood should be < (start) // artificially setting a branch length to exp(1.0) should be bad for the likelihood
-    println("OK1")
     startBL(0)=bl
-    println("OK1")
     println(startBL)
-    println("OK1")
   //  model3(BranchLengths)=startBL
     model3.logLikelihood should be (start plusOrMinus 1e-4)
   }
+
 /*
     val mat = Matrix(4,4)
     val thmmMath = new THMMGammaMathComponent(gammaC,mat,tree4.alphabet)
