@@ -11,6 +11,90 @@ import tlf.Logging
 
 abstract class ActorModelComponent extends Actor with Logging{
 }
+
+trait SimpleActorModelComponent extends ActorModelComponent{
+  def params:List[ActorParamComponent]
+  def rec1:Option[Actor]
+  lazy val numParams = params.length
+  lazy val paramNames=params.map{_.name}
+  lazy val pActorMap=paramNames.zip(params).foldLeft(Map[ParamName,ActorParamComponent]()){_+_}
+  var pMap:Map[ParamName,ParamChanged[_]]=null
+  override def start={
+    params.foreach{p=>
+      p.start
+      p addActor this
+    }
+    if (rec1.isDefined){rec1.get.start}
+    super.start
+  }
+  def act{
+    params.foreach{p=>
+      p ! RequestParam
+    } 
+    initialise(Nil,0)
+  }
+
+
+  def initialise(l:List[ParamChanged[_]],length:Int){
+    if (numParams ==length){
+      pMap = l.map{p=>(p.name,p)}.foldLeft(Map[ParamName,ParamChanged[_]]()){_+_}
+      l.foreach{p=>
+        updateParam(p)
+      }
+      main
+    }
+    react{
+      case p:ParamChanged[_] => initialise(p::l,length+1)
+    }
+  }
+  def main{
+    loop{
+      react(myHandler.orElse { case a:Any => println("WTF " + a)})
+    }
+  }
+
+ def matReq(m:MatReq):MatReq
+ def updateParam(p:ParamChanged[_])
+
+ def sendUnclean(p:ParamName)={
+    if (rec1.isDefined){ rec1.get forward Unclean(pActorMap(p))}
+ }
+ /**
+   called when a downstream component has a parameter changed
+ */
+ def unclean:Unit
+ def myHandler = handlers
+  lazy val handlers = {
+
+    val mainHandler:PartialFunction[Any,Unit]={
+      case m:MatReq=>
+        val ans = matReq(m)
+        if (rec1.isDefined){rec1.get forward ans}
+        else {sender ! ans}
+      case Unclean(a)=>
+        unclean
+        if (rec1.isDefined){rec1.get forward Unclean(a)}
+        else {a ! Unclean(a)}
+      }
+ 
+
+      paramNames.map{p=>
+      {
+        case ParamChanged(`p`,param)=>
+        sendUnclean(p)
+        updateParam(ParamChanged(`p`,param))
+      }:PartialFunction[Any,Unit]
+    }.foldLeft(mainHandler){_ orElse _}
+  }
+  
+  def problem(s:String)={
+    warning{s}
+  }
+
+
+  
+
+}
 case class Params(list:List[ActorParamComponent])
 object GetParams extends Params(Nil)
 class MatBuilder(m:Option[Map[Node[_],Matrix]])
@@ -38,7 +122,7 @@ object LazyP{
 }
 
 case class ParamUpdate[A](d:A)
-case class ParamChanged[A](p:ParamName,param:A){
+case class ParamChanged[A](name:ParamName,param:A){
   def toParamUpdate = ParamUpdate(param)
 }
 
@@ -51,70 +135,54 @@ object Upper
 */
 case class OptUpdate(d:Array[Double])
 
-class BasicActorModel(piParam:ActorPiComponent,sParam:ActorSComponent,rec1:Actor) extends ActorModelComponent{
+class BasicActorModel(piParam:ActorPiComponent,sParam:ActorSComponent,rec:Actor) extends ActorModelComponent with SimpleActorModelComponent{
+  val params = piParam :: sParam :: Nil
   val piName = piParam.name
   val sName = sParam.name
-  override def start={
-    piParam.start
-    sParam.start
-    piParam addActor this
-    sParam addActor this
-    rec1.start
-    super.start
-  }
-  def act{
-    finest{this + " STARTING"}
-    piParam ! RequestParam
-    sParam ! RequestParam
-    initialise(None,None)
-  }
-  def initialise(s:Option[Matrix],pi:Option[Vector]){
-    finest{"BasicActor initialise " + s + " " + pi}
-    if (s.isDefined && pi.isDefined){
-      finest{this + " STARTED"}
-      main(s.get,pi.get,None)
-    }
-    react{
-      case ParamChanged(piName,v:Vector)=>initialise(s,Some(v))
-      case ParamChanged(sName,m:Matrix)=>initialise(Some(m),pi)
+  val rec1 = Some(rec)
+  var pi:Vector = null
+  var sMat:Matrix = null
+  var mat:Option[Matrix]=None
+  def updateParam(p:ParamChanged[_]){
+    p match {
+      case ParamChanged(`piName`,v:Vector)=>
+        pi = v
+        unclean
+      case ParamChanged(`sName`,m:Matrix) =>
+        sMat = m
+        unclean
     }
   }
-  def main(s:Matrix,pi:Vector,mat:Option[Matrix]){
-    react{
-      case Params(l)=>
-        rec1 forward Params(piParam :: sParam :: l)
-        main(s,pi,mat)
-      case MatReq(n,oldM,oldPi)=>
-        val myMat = if (mat.isDefined){
-          mat.get
-        }else {
-          s.sToQ(pi)
-        }
-        rec1 forward MatReq(n,Some(myMat),Some(pi))
-        main(s,pi,Some(myMat))
-        case ParamChanged(piName,v:Vector)=>
-          rec1 forward Unclean(piParam)
-          main(s,v.copy,None)
-        case ParamChanged(sName,m:Matrix)=>
-          rec1 forward Unclean(sParam)
-          main(m.copy,pi,None)
-     }
+  def unclean{mat=None}
+  def matReq(m:MatReq)={
+    val myMat = if (mat.isDefined){
+      mat.get
+    }else {
+      mat = Some(sMat.sToQ(pi))
+        mat.get
+      }
+    MatReq(m.n,Some(myMat),Some(pi))
   }
 }
-
-class THMMActorModel(sigmaParam:ActorFullSComponent,numClasses:Int,rec1:Actor) extends ActorModelComponent{
+   
+class THMMActorModel(sigmaParam:ActorFullSComponent,numClasses:Int,rec:Actor) extends SimpleActorModelComponent{
   val sigmaName = sigmaParam.name
-  override def start={
-    sigmaParam.start
-    sigmaParam addActor this
-    rec1.start
-    super.start
+  val params = sigmaParam :: Nil
+  val rec1 = Some(rec)
+  var mat:Option[Matrix]=None
+  var sigma:Matrix = null
+  def updateParam(p:ParamChanged[_]){
+    p match {
+      case ParamChanged(`sigmaName`,m:Matrix)=>
+        sigma = m
+        unclean
+    }
   }
+  def unclean{ mat=None }
   /**
    pi must be the new length, m is pi.length - numAA
   */
   def applyMat(m:Matrix,pi:Vector,sigma:Matrix):Matrix={
-
    val qStart = m.copy
    val numAlpha = m.rows / numClasses
    for (i <- 0 until numClasses){
@@ -128,41 +196,16 @@ class THMMActorModel(sigmaParam:ActorFullSComponent,numClasses:Int,rec1:Actor) e
       qStart.fixDiag
       qStart
   }
-  def act{
-    finest{this + " STARTING"}
-   // sigmaParam ! RequestParam
-  //  initialise(None)
-    main(sigmaParam.myParam,None)
-  }
-  def initialise(sigma:Option[Matrix]){
-    finest{"Sigma Initialize " + sigma}
-    react{
-      case ParamChanged(sigmaName,a:Matrix)=>
-        finest{this + " STARTED"}
-        main(a,None)
-    }
-    initialise(None)
 
-  }
-  def main(sigma:Matrix,mat:Option[Matrix]){
-    react{
-      case Params(l)=> 
-        rec1 forward Params(sigmaParam :: l)
-        main(sigma,mat)
-      case ParamChanged(sigmaName,array:Matrix)=>
-        rec1 forward Unclean(sigmaParam)
-        main(array,None)
-      case MatReq(n,Some(m),Some(p))=>
-        val myMat = if (mat.isDefined){
-          mat.get
-        }else {
-          applyMat(m,p,sigma)
-        }
-        rec1 forward MatReq(n,Some(myMat),Some(p))
-        main(sigma,Some(myMat))
-      case Unclean(a) => 
-        rec1 forward Unclean(a)
-        main(sigma,None)
+  def matReq(m:MatReq)={
+    m match {
+      case MatReq(n,Some(m),Some(pi))=>
+        if (mat.isDefined){mat}
+        else {mat = Some(applyMat(m,pi,sigma))}
+        MatReq(n,mat,Some(pi))
+      case m:MatReq=>
+        problem(m + " is not defined")
+        m
     }
   }
 }
@@ -209,8 +252,8 @@ class InvarActorModel(priorParam:ActorProbComponent,piParam:ActorPiComponent,num
       main(prior.get,pi.get,None,None)
     }
     react{
-      case ParamChanged(priorName,d:Double)=>initialise(Some(d),pi)
-      case ParamChanged(piName,v:Vector)=>initialise(prior,Some(v))
+      case ParamChanged(`priorName`,d:Double)=>initialise(Some(d),pi)
+      case ParamChanged(`piName`,v:Vector)=>initialise(prior,Some(v))
     }
   }
   def main(prior:Double,rawpi:Vector,processedPi:Option[Vector],mat:Option[Matrix]){
@@ -218,10 +261,10 @@ class InvarActorModel(priorParam:ActorProbComponent,piParam:ActorPiComponent,num
       case Params(l)=> 
         rec1 forward Params(priorParam :: piParam :: l)
         main(prior,rawpi,processedPi,mat)
-      case ParamChanged(priorName,d:Double)=>
+      case ParamChanged(`priorName`,d:Double)=>
         rec1 forward Unclean(priorParam)
         main(d,rawpi,None,None)
-      case ParamChanged(piName,v:Vector)=>
+      case ParamChanged(`piName`,v:Vector)=>
         rec1 forward Unclean(piParam)
         main(prior,v,None,None)
       case MatReq(n,Some(m),Some(p))=>
@@ -300,7 +343,7 @@ class GammaActorModel(shape:ActorGammaComponent,numClasses:Int,rec1:Actor) exten
         }
         rec1 forward MatReq(n,Some(myMat),Some(myPi))
         main(alpha,Some(myMat),Some(myPi))
-      case ParamChanged(shapeName,d:Double)=>
+      case ParamChanged(`shapeName`,d:Double)=>
         rec1 forward Unclean(shape)
         debug{"NEWGAMMA " + d}
         main(d,None,pi)
@@ -423,7 +466,7 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
             a ! Unclean(a)
           }
           main(None,lengths)
-        case ParamChanged(blName,a:Array[Double])=>
+        case ParamChanged(`blName`,a:Array[Double])=>
           if (rec1.isDefined){rec1.get forward Unclean(branchLengthParams)} else {branchLengthParams ! Unclean(branchLengthParams)}
           val nodeMap = nodes.zip(a).foldLeft(Map[Int,Double]()){(m,t)=>m + ((t._1.id,t._2))}
           main(eigen,nodeMap)
