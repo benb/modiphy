@@ -213,16 +213,29 @@ class THMMActorModel(sigmaParam:ActorFullSComponent,numClasses:Int,rec:Actor) ex
 
 
 
-class InvarActorModel(priorParam:ActorProbComponent,piParam:ActorPiComponent,numClasses:Int,rec1:Actor) extends ActorModelComponent{
+class InvarActorModel(priorParam:ActorProbComponent,piParam:ActorPiComponent,numClasses:Int,rec:Actor) extends SimpleActorModelComponent{
   val priorName=priorParam.name
   val piName = piParam.name
-  override def start={
-    priorParam.start
-    priorParam addActor this
-    piParam.start
-    piParam addActor this
-    rec1.start
-    super.start
+  val params = priorParam :: piParam :: Nil
+  var rec1=Some(rec)
+  var processedPi:Option[Vector]=None
+  var mat:Option[Matrix]=None
+  var prior:Double = 0.0D
+  var pi:Vector = null
+
+  def updateParam(p:ParamChanged[_]){
+    p match {
+      case ParamChanged(`priorName`,d:Double)=>
+        prior = d
+        unclean
+      case ParamChanged(`piName`,v:Vector)=>
+        pi=v
+        unclean
+    }
+  }
+  def unclean{
+    processedPi = None
+    mat = None
   }
   /**
    pi must be the new length, m is pi.length - numAA
@@ -233,59 +246,35 @@ class InvarActorModel(priorParam:ActorProbComponent,piParam:ActorPiComponent,num
     mat.viewPart(0,0,m.rows,m.rows).assign(m).normalize(pi)
     mat
   }
-  def applyPi(pi:Vector,oldPi:Vector,prior:Double):Vector={
+  def applyPi(oldPi:Vector):Vector={
     val newPi = Vector(oldPi.size + pi.size)
     newPi.viewPart(0,oldPi.size).assign(oldPi * (1.0D-prior))
     newPi.viewPart(oldPi.size,pi.size).assign(pi * prior)
     newPi
   }
-  def act{
-    finest{this + " STARTING"}
-    piParam ! RequestParam
-    priorParam ! RequestParam
-    initialise(None,None)
-  }
-  def initialise(prior:Option[Double],pi:Option[Vector]){
-    finest{"Invar Initialise " + prior + " " + pi}
-    if (prior.isDefined && pi.isDefined){
-      finest{this + " STARTED"}
-      main(prior.get,pi.get,None,None)
-    }
-    react{
-      case ParamChanged(`priorName`,d:Double)=>initialise(Some(d),pi)
-      case ParamChanged(`piName`,v:Vector)=>initialise(prior,Some(v))
-    }
-  }
-  def main(prior:Double,rawpi:Vector,processedPi:Option[Vector],mat:Option[Matrix]){
-    react{
-      case Params(l)=> 
-        rec1 forward Params(priorParam :: piParam :: l)
-        main(prior,rawpi,processedPi,mat)
-      case ParamChanged(`priorName`,d:Double)=>
-        rec1 forward Unclean(priorParam)
-        main(d,rawpi,None,None)
-      case ParamChanged(`piName`,v:Vector)=>
-        rec1 forward Unclean(piParam)
-        main(prior,v,None,None)
+
+   def matReq(m:MatReq)={
+     m match{
       case MatReq(n,Some(m),Some(p))=>
         val myPi = if (processedPi.isDefined){
           processedPi.get
         }else{
-          applyPi(rawpi,p,prior)
+          processedPi=Some(applyPi(p))
+          processedPi.get
         }
         val myMat = if (mat.isDefined){
           mat.get
         }else {
-          applyMat(m,myPi)
+          mat = Some(applyMat(m,myPi))
+          mat.get
         }
-        rec1 forward MatReq(n,Some(myMat),Some(myPi))
-        main(prior,rawpi,Some(myPi),Some(myMat))
-      case Unclean(a) => 
-        rec1 forward Unclean(a)
-        main(prior,rawpi,None,None)
+        MatReq(n,mat,processedPi)
+      case m:MatReq =>
+        problem(m + " not completely defined")
+        m
+      }
     }
   }
-}
 
 class GammaActorModel(shape:ActorGammaComponent,numClasses:Int,rec1:Actor) extends ActorModelComponent{
   val shapeName = shape.name
