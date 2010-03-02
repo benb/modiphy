@@ -13,15 +13,17 @@ class ModelSuite extends FunSuite {
   val (tree,aln) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(1))
   val model = org.modiphy.math.SimpleModel(tree)
 
-  Logging.toStdout 
-  Logging setLevel "finest"
+  //Logging.toStdout 
+  //Logging setLevel "info"
 
 
   val (tree4,aln4) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(4))
   val (tree5,aln5) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(5))
 
   test("BS complex model with restricted params should match simpler Sigma model"){
+    println("OK1")
     val simpleModel = InvarThmmModel(tree5)
+    simpleModel(InvarPrior)=0.123
     simpleModel(InvarPrior)=0.123
     simpleModel(BranchLengths)(1)=0.5462
     simpleModel(Alpha)=0.3
@@ -41,7 +43,6 @@ class ModelSuite extends FunSuite {
     complexModel.logLikelihood should not (be (simpleModel.logLikelihood plusOrMinus 1E-5))
     complexModel(Sigma(1)) << simpleModel(Sigma(0))
     complexModel.logLikelihood should be (simpleModel.logLikelihood plusOrMinus 1E-5)
-
   }
 
   test("OptUpdate"){

@@ -18,6 +18,8 @@ class ActorModelSuite extends FunSuite {
       val actorS = new ActorSComponent(WAG.S,S(0))
       val branchLengthComp =  new ActorTreeComponent(tree,BranchLengths(0))
       val part1 = new BasicActorModel(actorPi,actorS,new BasicSingleExpActorModel(tree,branchLengthComp,None))
+      actorPi.start
+      actorS.start
       part1.start
       def act{
         loop{

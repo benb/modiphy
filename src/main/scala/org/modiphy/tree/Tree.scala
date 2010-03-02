@@ -71,7 +71,7 @@ import scala.actors.Actor
 import scala.actors.Actor._
 
 trait Node[A <: BioEnum] extends Actor with Logging{
-  start
+  val me = this
   def isLeaf=false
   val id:Int
   val isRoot=false
@@ -104,6 +104,11 @@ trait Node[A <: BioEnum] extends Actor with Logging{
   def cromulent:Boolean= lengthTo > -Math.EPS_DOUBLE && children.foldLeft(true){(a,b)=>a && b.cromulent}
 
   def splitAln(i:Int):List[Node[A]]
+
+  override def start={
+   children.foreach{_.start}
+   super.start
+  }
   
 }
 
@@ -145,16 +150,14 @@ trait RootNode[A <: BioEnum] extends INode[A]{
   }
   def fPi = aln.getFPi
 
-
   override def act{
     react {
-      case LogLikelihoodCalc(model,actor) => {
-        //println("ROOT GOT REQ " + sender)
-        
+      case LogLikelihoodCalc(model,actor) =>
         children.foreach{c => c ! LikelihoodCalc(model)}
         model ! NewMatReq(self.asInstanceOf[Node[A]]) 
         act2(Nil,0,actor,None)
-      }
+      case a:Any =>
+        println(this + " received unexpected message: " + a)
     }
   }
   def act2(pl:List[List[Vector]],done:Int,requester:Actor,pi:Option[Vector]){
@@ -171,10 +174,12 @@ trait RootNode[A <: BioEnum] extends INode[A]{
         //println("2")
         act2(pl2::pl,done+1,requester,pi)
       }
-      case MatReq(self,_,p) =>{
+      case MatReq(`me`,_,p) =>{
         //println("3")
         act2(pl,done+1,requester,p)
       }
+      case a:Any => 
+        println(this + " received unexpected message: " + a)
     }
   }
   else {
@@ -234,19 +239,20 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
 
   def act{
     react {
-      case LikelihoodCalc(model) => {
+      case LikelihoodCalc(model) => 
         //println("INode got")
         children.foreach{c => c ! LikelihoodCalc(model)}
         model ! NewMatReq(self.asInstanceOf[Node[A]])
         qMat(Nil,0,sender,model,None)
-      }
+      case a:Any => 
+        println(this + " WTF " + a)
     }
   }
   def qMat(pl:List[List[Vector]],done:Int,requester:OutputChannel[Any],matExp:ActorModelComponent,myEMat:Option[Matrix]){
     //println("DONE " + done)
     if (done < numChildren+1){
     react{
-      case MatReq(self,mat,pi) =>{
+      case MatReq(`me`,mat,pi) =>{
         //println("CASE 1")
         qMat(pl,done+1,requester,matExp,mat)
       }
@@ -255,10 +261,12 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
         plCalc ! PartialLikelihoods(pl2,eMat)
         qMat(pl,done,requester,matExp,myEMat)
       }
-      case CalculatedPartialLikelihoods(pl2)=>{
+      case CalculatedPartialLikelihoods(pl2)=>
         //println("CASE 3")
         qMat(pl2::pl,done+1,requester,matExp,myEMat)
-      }
+      case a:Any => 
+        println(this + " received unexpected message: " + a)
+      
     }
   }
   else {
@@ -403,20 +411,23 @@ class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Doubl
   }
   def act{
     react {
-      case LikelihoodCalc(model) => {
+      case LikelihoodCalc(model) => 
         //println("LeafNode Got")
         model ! NewMatReq(self.asInstanceOf[Node[A]])
         qMat(sender,model)
-      }
+      case a:Any => 
+        println(this + " received unexpected message: " + a)
+      
     }
   }
   def qMat(requester:OutputChannel[Any],matExp:ActorModelComponent){
     //println("LeafNode Got2")
     react{
-      case MatReq(self,eMat,pi) =>{
+      case MatReq(`me`,eMat,pi) =>
         requester ! PartialLikelihoods(likelihoods,eMat.get)
         act
-      }
+      case a:Any => 
+        println(this + " received unexpected message: " + a)
     }
   }
 }
