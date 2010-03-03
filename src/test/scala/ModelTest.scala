@@ -169,6 +169,31 @@ class ModelSuite extends FunSuite {
     model2C(InvarPrior(0))=0.0
     model2C(Pi(0))=plusF
     model2C.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
+
+    val model2D = InvarThmmModel(tree5a) from model2C
+    model2D.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
+
+    //trying to set BS params using JoinedParam
+    model2D(InvarPrior)=0.1
+    model2D(SingleParam(Sigma))=0.1
+    val sigmaList = (tree5a::tree5a.descendentNodes).map{n=>Sigma(n.id)}
+    val array = model2C.optGet(JoinedParam(sigmaList))
+    model2C(InvarPrior)=0.1
+    model2C(JoinedParam(sigmaList))=Array.make(array.length,0.1)
+    model2D.logLikelihood should be (model2C.logLikelihood plusOrMinus 0.0001)
+
+    model2C(SingleParam(All(Sigma)))=0.2
+    model2D(SingleParam(Sigma))=0.2
+    
+    println(model2C)
+    println("----")
+    println(model2D)
+
+
+    model2D.logLikelihood should be (model2C.logLikelihood plusOrMinus 0.0001)
+
+
+
   }
 
  test("Branch Length changes"){

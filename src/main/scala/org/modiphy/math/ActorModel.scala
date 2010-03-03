@@ -89,19 +89,41 @@ object NewMatReq{
 case class Unclean(sender:Actor)
 case object RequestOpt
 object RequestParam 
-abstract class ParamName
-
-case class Pi(i:Int) extends ParamName
-case class S(i:Int) extends ParamName
-case class BranchLengths(i:Int) extends ParamName
-case class Alpha(i:Int) extends ParamName
-case class InvarPrior(i:Int) extends ParamName
-case class Sigma(i:Int) extends ParamName
+sealed trait ParamName
+trait ConcreteParamName extends ParamName{
+  def i:Int
+}
+case class Pi(i:Int) extends ConcreteParamName
+case class S(i:Int) extends ConcreteParamName
+case class BranchLengths(i:Int) extends ConcreteParamName
+case class Alpha(i:Int) extends ConcreteParamName
+case class InvarPrior(i:Int) extends ConcreteParamName
+case class Sigma(i:Int) extends ConcreteParamName
 case class SingleParam(p:ParamName) extends ParamName
-//case class JoinedParam(p:List[ParamName]) extends ParamName
+case class JoinedParam(p:List[ParamName]) extends ParamName
+
+trait ParamMatcher extends ParamName{
+  def matches(p2:ParamName):Boolean
+}
+case class All(p:ConcreteParamName) extends ParamMatcher{
+  def matches(p2:ParamName)={
+    p2!=null && (p2.getClass==p.getClass) 
+  }
+}
+case class AllMatches(p:ConcreteParamName,f:Int=>Boolean) extends ParamMatcher{
+  def matches(p2:ParamName)={
+    p2!=null && (p2.getClass==p.getClass) && f(p2.asInstanceOf[ConcreteParamName].i)
+  }
+}
+//This doesn't seem ideal and may be improved...
+case class AllSingle(p:ConcreteParamName) extends ParamMatcher{
+  def matches(p2:ParamName)={
+    p2!=null && (p2.getClass==p.getClass) 
+  }
+}
 
 object LazyP{
-  type PFact={def apply(i:Int):ParamName}
+  type PFact={def apply(i:Int):ConcreteParamName}
   implicit def lazymaker(p:PFact)=p(0)
 }
 
@@ -475,6 +497,58 @@ case class SingleParamWrapper(p:ActorParamComponent) extends ActorParamComponent
     }
   }
 }
+
+case class JoinedParamWrapper(pList:List[ActorParamComponent]) extends ActorParamComponent{
+  start
+  val name = JoinedParam(pList.map{_.name})
+  val paramArray=getParam2D.toArray
+  val numParams =paramArray.map{_.size}
+    def getParam2D= pList.map{p=>(p !? RequestOpt).asInstanceOf[Array[Double]]}
+    def flatten(a:Array[Array[Double]]):Array[Double]={
+      flatten(a.toList)
+    }
+    def flatten(a:List[Array[Double]]):Array[Double]={
+      //jeez this is lazy - but it probably isn't going to slow things down too much
+      a.map{_.toList}.flatten[Double].toArray 
+    }
+    def setParam(from:Array[Double],to:Array[Array[Double]])={
+      val iter = from.elements
+      for (i<-0 until to.length){
+        for (j<-0 until to(i).length){
+          to(i)(j)=iter.next
+        }
+      }
+    }
+  lazy val lower = pList.map{p=>(p !? Lower).asInstanceOf[Array[Double]].toList}.flatten[Double].toArray
+  lazy val upper = pList.map{p=>(p !? Upper).asInstanceOf[Array[Double]].toList}.flatten[Double].toArray
+  def act{
+    loop{
+    react{
+    case RequestParam=>
+      reply(ParamChanged(name,flatten(getParam2D)))
+    case ParamUpdate(x:Array[Double])=>
+      val to = paramArray.map{i=>new Array[Double](i.size)}.toArray
+      setParam(x,to)
+      pList.elements.zip(to.elements).foreach{t=>
+        val (pActor,pArray)=t
+        pActor forward OptUpdate(pArray)
+      }
+    case OptUpdate(x:Array[Double]) =>
+      val to = paramArray.map{i=>new Array[Double](i.size)}
+      setParam(x,to)
+      pList.elements.zip(to.elements).foreach{t=>
+        val (pActor,pArray)=t
+        pActor forward OptUpdate(pArray)
+      }
+    case RequestOpt =>
+      reply(flatten(getParam2D))
+    case Lower =>
+      reply(lower)
+    case Upper =>
+      reply(upper)
+    }}
+  }
+}
 /*
 case class JoinedParamWrapper(p:List[ActorParamComponent]) extends ActorParamComponent{
  start
@@ -705,10 +779,8 @@ def apply[A <: BioEnum](tree:Tree[A])={
 
 object BranchSpecificThmmModel{
   def apply[A <: BioEnum](tree:Tree[A]):ActorModel={
-    var i = -1
     val nodeMap=tree.descendentNodes.foldLeft[Map[Int,Int]](IntMap[Int]()){(m,n)=>
-        i=i+1
-        m + ((n.id,i))
+        m + ((n.id,n.id))
     }
     apply(tree,nodeMap)
   }
@@ -785,10 +857,13 @@ class ActorModel(t:Tree[_],components:ActorModelComponent,val paramMap:Map[Param
 
 
   debug{"Param Map " + paramMap}
-  def getParam(p:ParamName)={
+  def getParam(p:ParamName):ActorParamComponent={
     val ans = p match {
-      case SingleParam(p2)=>SingleParamWrapper(paramMap(p2))
-      case p => paramMap(p)
+      case SingleParam(p2)=>SingleParamWrapper(getParam(p2))
+      case JoinedParam(p2)=>JoinedParamWrapper(p2.map{getParam})
+      case m:AllSingle => JoinedParamWrapper( paramMap.filter{m matches _._1}.map{t=>SingleParamWrapper(t._2)}.toList)
+      case m:ParamMatcher => JoinedParamWrapper( paramMap.filter{m matches _._1}.map{_._2}.toList)
+      case p  => paramMap(p)
     }
     ans
   }
@@ -801,6 +876,13 @@ class ActorModel(t:Tree[_],components:ActorModelComponent,val paramMap:Map[Param
       }
     }
   }
+
+  def from(other:ActorModel)={
+    this << other
+    apply(BranchLengths(0)) << other(BranchLengths(0))
+    this
+  }
+
   def <<(other:ActorModel){setParamsFrom(other)}
 
   val paramLengthMap = paramMap.keys.map{t=>(t,optGet(t).length)}.foldLeft(Map[ParamName,Int]()){(m,p)=>m+((p._1,p._2))}
@@ -1016,8 +1098,20 @@ class ActorModel(t:Tree[_],components:ActorModelComponent,val paramMap:Map[Param
     import ModelOptimiser._
     ModelOptimiser.optimise(getConjugateDirection,params,this)
   }
-  
-
+  import scala.reflect.Manifest
+  def optimise(params:List[List[ParamName]])(implicit m:Manifest[List[List[ParamName]]]):Double={
+    var end = logLikelihood
+    var start = end
+    do {
+      start=end
+      params.foreach{pset=>
+        optimise(pset) 
+      }
+      end = logLikelihood
+    } while (end - start > 0.001)
+    end
+   
+  }
   
 }
 

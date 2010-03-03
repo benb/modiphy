@@ -113,42 +113,6 @@ class SingleFunction(m:MultFunction) extends UnivariateFunction{
   
 }
 
-class JoinedParam(p:Array[ParamControl]) extends ParamControl{
-  def this(p2:List[ParamControl])=this(p2.toArray)
-  val lengths = p.map{_.getParams.length}
-  val pointers = lengths.foldLeft(List(0)){(p,a)=> (a+p.head)::p}.reverse
-
-  val subArrays = p.map{_.getParams.toArray}
-
-
-  val backing = new Array[Double](lengths.foldLeft(0){_+_})
-  def update{
-    var pointer = 0
-    for (t<-lengths.zip(p)){
-      println(t._2.getParams.length + " " + 0 + " " + pointer + " " + t._1 + " " + backing.length)
-      Array.copy(t._2.getParams,0,backing,pointer,t._1)
-      pointer+=t._1
-    }
-  }
-  def getParams={
-    update
-    backing.toArray //copy
-  }
-  def setParams(a:Array[Double])={
-    for (t<-pointers.zip(pointers.tail).zip(p.toList)){
-      t._2.softSetParams(a.subArray(t._1._1,t._1._2))
-    }
-  }
-  def softSetParams(a:Array[Double])=setParams(a)
-  def view=null
-  val name = "Joined param: " + p.map{_.name}.mkString(" ")
-  val lowerB = p.toList.map{i=>i.lowerBounds.toList}.flatten[Double].toArray
-  val upperB = p.toList.map{i=>i.upperBounds.toList}.flatten[Double].toArray
-  override def lowerBound(i:Int)=lowerB(i)
-  override def upperBound(i:Int)=upperB(i)
-}
-
-
 
 class RestrictedParam(p:ParamControl,f:Array[Double]=>Array[Double],initialParam:Array[Double]) extends ParamControl{
   var currParam = initialParam.toArray

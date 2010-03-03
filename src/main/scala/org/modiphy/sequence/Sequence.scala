@@ -13,7 +13,7 @@ abstract class BioEnum(names:String*) extends Enumeration(names: _*){
   def unknown:Value
 }
 
-class SiteClassDNA(override val numClasses:Int) extends BioEnum("A","G","C","T","N","-"){
+case class SiteClassDNA(override val numClasses:Int) extends BioEnum("A","G","C","T","N","-"){
   type Base = Value
   val A,G,C,T,N,GAP=Value
   override val matLength=numClasses*4
@@ -25,7 +25,7 @@ class SiteClassDNA(override val numClasses:Int) extends BioEnum("A","G","C","T",
 }
 
 object DNA extends SiteClassDNA(1)
-class SiteClassAA(override val numClasses:Int) extends BioEnum("A","R","N","D","C","Q","E","G","H","I","L","K","M","F","P","S","T","W","Y","V","X","-"){
+case class SiteClassAA(override val numClasses:Int) extends BioEnum("A","R","N","D","C","Q","E","G","H","I","L","K","M","F","P","S","T","W","Y","V","X","-"){
   type AminoAcid = Value
   val A,R,N,D,C,Q,E,G,H,I,L,K,M,F,P,S,T,W,Y,V,X,GAP=Value
   override val matLength=numClasses*20
