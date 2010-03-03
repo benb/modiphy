@@ -171,10 +171,26 @@ class BasicActorModel(piParam:ActorPiComponent,sParam:ActorSComponent,rec:Actor)
     val myMat = if (mat.isDefined){
       mat.get
     }else {
-      mat = Some(sMat.sToQ(pi).normalize(pi))
+      mat = Some(sMat.sToQ(pi))
         mat.get
       }
     MatReq(m.n,Some(myMat),Some(pi))
+  }
+}
+class NormaliserActorModel(rec:Actor) extends SimpleActorModelComponent{
+  val params = Nil
+  val rec1 = Some(rec)
+  var mat:Option[Matrix]=None
+  def updateParam(p:ParamChanged[_]){
+  }
+  def unclean{mat=None}
+  def matReq(m:MatReq)={
+    if (mat.isDefined){
+      MatReq(m.n,mat,m.pi)
+    }else {
+      mat = Some(m.m.get.normalize(m.pi.get))
+      MatReq(m.n,mat,m.pi)
+    }
   }
 }
    
@@ -256,7 +272,7 @@ class InvarActorModel(priorParam:ActorProbComponent,piParam:ActorPiComponent,num
     val newMatSize = pi.size
     val mat = Matrix(newMatSize,newMatSize)
     mat.viewPart(0,0,m.rows,m.rows).assign(m)
-    mat.normalize(pi)
+    mat
   }
   def applyPi(oldPi:Vector):Vector={
     val newPi = Vector(oldPi.size + pi.size)
@@ -303,7 +319,7 @@ class GammaActorModel(shape:ActorGammaComponent,numClasses:Int,rec:Actor) extend
     val myMat = Matrix(m.rows*numClasses,m.columns * numClasses)
     val numAlpha = m.rows 
     (0 until numClasses).foreach{i=>
-      myMat.viewPart(i * numAlpha,i * numAlpha,numAlpha,numAlpha).assign(m.normalize(pi,r(i)))
+      myMat.viewPart(i * numAlpha,i * numAlpha,numAlpha,numAlpha).assign(m) * r(i)
     }
     myMat
   }
@@ -728,7 +744,7 @@ object SimpleModel{
     val pi = new ActorPiComponent(WAG.pi,Pi(0))
     val s = new ActorSComponent(WAG.S,S(0))
     val branchLength = new ActorTreeComponent(tree,BranchLengths(0))
-    val components = new BasicActorModel(pi,s, new BasicSingleExpActorModel(tree,branchLength,None))
+    val components = new BasicActorModel(pi,s, new NormaliserActorModel(new BasicSingleExpActorModel(tree,branchLength,None)))
     val pList = List(pi,s,branchLength)
     val pMap = pList.map{p => (p.name,p)}.foldLeft(Map[ParamName,ActorParamComponent]()){_+_}
     new ActorModel(tree,components,pMap)
@@ -742,7 +758,8 @@ object GammaModel{
     val alpha = new ActorGammaComponent(0.5D,Alpha(0))
     val components = new BasicActorModel(pi,s, 
       new GammaActorModel(alpha,tree.alphabet.numClasses,
-       new BasicSingleExpActorModel(tree,branchLength,None)))
+       new NormaliserActorModel(
+       new BasicSingleExpActorModel(tree,branchLength,None))))
     val pList = List(pi,s,branchLength,alpha)
     val pMap = pList.map{p => (p.name,p)}.foldLeft(Map[ParamName,ActorParamComponent]()){_+_}
     new ActorModel(tree,components,pMap)
@@ -758,7 +775,8 @@ object InvarGammaModel{
     val components = new BasicActorModel(pi,s,
       new GammaActorModel(alpha,tree.alphabet.numClasses-1,
         new InvarActorModel(invarPrior,pi,tree.alphabet.numClasses,
-          new BasicSingleExpActorModel(tree,branchLength,None))))
+         new NormaliserActorModel(
+          new BasicSingleExpActorModel(tree,branchLength,None)))))
     val pList = List(pi,s,branchLength,alpha,invarPrior)
     val pMap = pList.map{p => (p.name,p)}.foldLeft(Map[ParamName,ActorParamComponent]()){_+_}
      new ActorModel(tree,components,pMap)
@@ -777,8 +795,9 @@ def apply[A <: BioEnum](tree:Tree[A])={
     val components = new BasicActorModel(pi,s,
       new GammaActorModel(alpha,numClasses-1,
         new InvarActorModel(invarPrior,pi,numClasses,
+         new NormaliserActorModel(
           new THMMActorModel(sigma,numClasses,
-            new BasicSingleExpActorModel(tree,branchLength,None)))))
+            new BasicSingleExpActorModel(tree,branchLength,None))))))
     val pList = List(pi,s,branchLength,alpha,invarPrior,sigma)
     val pMap = pList.map{p => (p.name,p)}.foldLeft(Map[ParamName,ActorParamComponent]()){_+_}
      new ActorModel(tree,components,pMap)
@@ -815,7 +834,8 @@ object BranchSpecificThmmModel{
     val components = new BasicActorModel(pi,s,
       new GammaActorModel(alpha,numClasses-1,
         new InvarActorModel(invarPrior,pi,numClasses,
-          new ForkActor(tree,modelMap))))
+          new NormaliserActorModel(
+          new ForkActor(tree,modelMap)))))
           //modelMap(1))))
 
 
