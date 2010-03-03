@@ -806,12 +806,12 @@ class SerialMatPi[A <: BioEnum](m:Model[A],node:Node[A]) extends MatrixPi[A]{
   val array = new Array[Matrix](descendentNodes.length)
   val (qMats,eig) = if (m.nodeDependent){
     val q = m.qMat(node)
-    val e = new MatExpYang(q,getPi)
+    val e = new MatExpYang(q,getPi,Some(1.0))
     (Stream.const(q).take(array.length),
      Stream.const(e).take(array.length).toList)
   }else {
     val q = descendentNodes.map{m.qMat}
-    val e = q.map{new MatExpYang(_,getPi)}
+    val e = q.map{new MatExpYang(_,getPi,Some(1.0))}
     (q,e.toList)
   }
     node.descendentNodes.zip(eig).foreach{t=>

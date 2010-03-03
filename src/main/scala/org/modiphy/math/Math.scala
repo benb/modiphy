@@ -38,16 +38,20 @@ trait MatrixExponential{
   def pi:Vector
   def u:Matrix
   def v:Matrix
-  def scale:Double
   def q:Matrix
   lazy val qNorm = u * d * v
   def rawD:Matrix
-  def normFact = - dense.diagonal(q).zDotProduct(pi) / scale
-  def normFunc = new DoubleFunction(){def apply(v:Double)=v/normFact}
-  //println("Normfact " + normFact)
-  lazy val d = rawD.copy.assign(normFunc)
+  def scale:Option[Double]
+  lazy val d = {
+    if (scale.isDefined){
+      def normFact = - dense.diagonal(q).zDotProduct(pi) / scale.get
+      def normFunc = new DoubleFunction(){def apply(v:Double)=v/normFact}
+      rawD.copy.assign(normFunc)
+    }else {
+      rawD
+    }
+  }
   def exp(t:Double)={
-    val funcExp = new DoubleFunction(){def apply(v:Double)=Math.exp(t* v)}
     (u * d.expVals(t)) * v
   }
 }
@@ -103,30 +107,30 @@ trait CachedMatrixExponential extends MatrixExponential{
   }
   def exit { actor.exit }
 }
-class MatExpNormal(val q:Matrix,val pi:Vector,val scale:Double) extends MatrixExponential{
-  def this(q:Matrix,pi:Vector)= this(q,pi,1.0D)
+class MatExpNormal(val q:Matrix,val pi:Vector,val scale:Option[Double]) extends MatrixExponential{
   val eigen = new EigenvalueDecomposition(q)  
   val algebra = new Algebra
   val u = eigen.getV
   val rawD = eigen.getD
   val v = algebra.inverse(u)
 }
-class MatExpScale(m:MatrixExponential,val scale:Double) extends MatrixExponential{
+class MatExpScale(m:MatrixExponential,val s:Double) extends MatrixExponential{
   def pi = m.pi
   def u = m.u
   def v = m.v
   def q = m.q
   def rawD = m.rawD
+  val scale = Some(s)
 }
-class BasicMatExpScale(val u:Matrix,val rawD:Matrix,val v:Matrix,val pi:Vector,val scale:Double) extends MatrixExponential{
+class BasicMatExpScale(val u:Matrix,val rawD:Matrix,val v:Matrix,val pi:Vector, s:Double) extends MatrixExponential{
   def this(u:Matrix,rawD:Vector,v:Matrix,pi:Vector,scale:Double)= this(u,sparse.diagonal(rawD),v,pi,scale)
+  val scale = Some(s)
   def q = u * rawD * v
 }
 
 
-class MatExpYang(val q:Matrix,val pi:Vector,val scale:Double) extends MatrixExponential{
+class MatExpYang(val q:Matrix,val pi:Vector,val scale:Option[Double]) extends MatrixExponential{
   import cern.colt.matrix.DoubleFactory2D.sparse
-  def this(q:Matrix,pi:Vector)=this(q,pi,1.0D)
 
     val funcRoot = new DoubleFunction(){def apply(v:Double)=Math.sqrt(v)}
   val funcRec = new DoubleFunction(){def apply(v:Double)=1.0D/v}

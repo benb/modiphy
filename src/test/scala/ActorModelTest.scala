@@ -34,7 +34,7 @@ class ActorModelSuite extends FunSuite {
       actor.start
       val ans = (actor !? Test(tree.children(0))).asInstanceOf[MatReq]
       val mat1 = ans.m.get
-      val me = new MatExpYang(WAG.S.sToQ(WAG.pi),WAG.pi)
+      val me = new MatExpYang(WAG.S.sToQ(WAG.pi),WAG.pi,Some(1.0))
       val mat2 = me.exp(tree.children(0).lengthTo)
 
       mat1.elements.zip(mat2.elements).foreach{t=>

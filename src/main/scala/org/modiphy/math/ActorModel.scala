@@ -171,7 +171,7 @@ class BasicActorModel(piParam:ActorPiComponent,sParam:ActorSComponent,rec:Actor)
     val myMat = if (mat.isDefined){
       mat.get
     }else {
-      mat = Some(sMat.sToQ(pi))
+      mat = Some(sMat.sToQ(pi).normalize(pi))
         mat.get
       }
     MatReq(m.n,Some(myMat),Some(pi))
@@ -255,8 +255,8 @@ class InvarActorModel(priorParam:ActorProbComponent,piParam:ActorPiComponent,num
   def applyMat(m:Matrix,pi:Vector):Matrix={
     val newMatSize = pi.size
     val mat = Matrix(newMatSize,newMatSize)
-    mat.viewPart(0,0,m.rows,m.rows).assign(m).normalize(pi)
-    mat
+    mat.viewPart(0,0,m.rows,m.rows).assign(m)
+    mat.normalize(pi)
   }
   def applyPi(oldPi:Vector):Vector={
     val newPi = Vector(oldPi.size + pi.size)
@@ -303,7 +303,7 @@ class GammaActorModel(shape:ActorGammaComponent,numClasses:Int,rec:Actor) extend
     val myMat = Matrix(m.rows*numClasses,m.columns * numClasses)
     val numAlpha = m.rows 
     (0 until numClasses).foreach{i=>
-      myMat.viewPart(i * numAlpha,i * numAlpha,numAlpha,numAlpha).assign(m)* r(i) //(m.normalize(pi,r(i))))
+      myMat.viewPart(i * numAlpha,i * numAlpha,numAlpha,numAlpha).assign(m.normalize(pi,r(i)))
     }
     myMat
   }
@@ -432,7 +432,7 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
             main(eigen,lengths)
           }
           val myEigen = if (eigen.isEmpty){
-            val ans = new MatExpNormal(m,pi)
+            val ans = new MatExpNormal(m,pi,None)
             ans
           }else {
             eigen.get
