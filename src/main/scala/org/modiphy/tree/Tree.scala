@@ -126,6 +126,10 @@ object ReadTree{
 
 trait RootNode[A <: BioEnum] extends INode[A]{
   val children:List[Node[A]]
+  import scala.collection.immutable.IntMap
+  val nodeMap=(this::descendentNodes).foldLeft[Map[Int,Node[A]]](IntMap[Node[A]]()){(m,n)=> m + ((n.id,n))}
+  def apply(i:Int)=nodeMap(i)
+
   override val isRoot=true
   override def toString="("+children.mkString(",")+");"
 

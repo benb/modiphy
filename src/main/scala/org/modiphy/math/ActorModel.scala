@@ -55,6 +55,10 @@ trait SimpleActorModelComponent extends ActorModelComponent{
   lazy val handlers = {
 
     val mainHandler:PartialFunction[Any,Unit]={
+      case m:QMatReq=>
+        val ans = matReq(m).toQMatReq
+        if (rec1.isDefined){rec1.get forward ans}
+        else {sender ! ans}
       case m:MatReq=>
         val ans = matReq(m)
         if (rec1.isDefined){rec1.get forward ans}
@@ -82,7 +86,10 @@ trait SimpleActorModelComponent extends ActorModelComponent{
 case class Params(list:List[ActorParamComponent])
 object GetParams extends Params(Nil)
 class MatBuilder(m:Option[Map[Node[_],Matrix]])
-case class MatReq(n:Node[_],m:Option[Matrix],pi:Option[Vector])
+case class MatReq(n:Node[_],m:Option[Matrix],pi:Option[Vector]){
+  def toQMatReq=QMatReq(n,m,pi)
+}
+case class QMatReq(n2:Node[_],m2:Option[Matrix],pi2:Option[Vector]) extends MatReq(n2,m2,pi2) //used for skipping exponentiation
 object NewMatReq{
   def apply(n:Node[_])=MatReq(n,None,None)
 }
@@ -205,8 +212,7 @@ class THMMActorModel(sigmaParam:ActorFullSComponent,numClasses:Int,rec:Actor) ex
 
   def matReq(m:MatReq)={
     m match {
-      case MatReq(n,Some(m),Some(pi))=>
-        if (mat.isDefined){mat}
+      case MatReq(n,Some(m),Some(pi))=> if (mat.isDefined){mat}
         else {mat = Some(applyMat(m,pi,sigma))}
         MatReq(n,mat,Some(pi))
       case m:MatReq=>
@@ -417,6 +423,8 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
   def main(eigen:Option[MatrixExponential],lengths:Map[Int,Double]){
     case class ExpReq(n:Node[_],e:MatrixExponential,lengthTo:Double,pi:Vector)
       react{
+        case q:QMatReq =>
+          sender ! q
         case MatReq(n,Some(m),Some(pi)) => 
           if (n.isRoot){//don't need exp(qt)
             if (rec1.isDefined){rec1.get forward MatReq(n,None,Some(pi))}
@@ -856,6 +864,26 @@ class ActorModel(t:Tree[_],components:ActorModelComponent,val paramMap:Map[Param
   components.start
 
 
+  def qMat(i:Int)={
+    case class GetQ(i:Int)
+
+
+    val actor = Actor.actor{
+      receive{
+        case GetQ(i)=>
+        val baseTree = tree(0)
+        components ! QMatReq(baseTree(i),None,None)
+        var matrix:Matrix=null
+        receive{
+          case QMatReq(node,Some(m),Some(pi))=>
+            matrix = m
+          }
+        reply(matrix)
+        exit
+        }
+      }
+    (actor !? GetQ(i)).asInstanceOf[Matrix]
+    }
   debug{"Param Map " + paramMap}
   def getParam(p:ParamName):ActorParamComponent={
     val ans = p match {
