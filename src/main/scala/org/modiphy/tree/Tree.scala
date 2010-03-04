@@ -90,6 +90,7 @@ trait Node[A <: BioEnum] extends Actor with Logging{
   def restrictTo(allowed:Set[String]):Node[A]
   def descendentNodes:List[Node[A]]
   def setBranchLengths(l:List[Double]):Node[A]
+  def setBranchLengths(m:Map[Int,Double]):Node[A]
   def getBranchLengths:List[Double]
   def branchTo:String
 
@@ -140,9 +141,18 @@ trait RootNode[A <: BioEnum] extends INode[A]{
   }
   override def setBranchLengths(l:List[Double]):Tree[A]={
     var listPtr = l
-    val newchildren = children.map{c=>val c2 = c.setBranchLengths(listPtr); listPtr = listPtr.drop(c.descendentNodes.size + 1);c2}
+    val newchildren = children.map{c=>
+      val c2 = c.setBranchLengths(listPtr)
+      listPtr = listPtr.drop(c.descendentNodes.size + 1)
+      c2
+    }
     factory(newchildren,aln,l.head)
   }
+  override def setBranchLengths(m:Map[Int,Double]):Tree[A]={
+    val newChildren = children.map{c=>c.setBranchLengths(m)}
+    factory(newChildren,aln,0.0)
+  }
+
   override def removeUseless:INode[A] with RootNode[A]=super.removeUseless.iNode.get.setRoot
   override def restrictTo(allowed:Set[String]):INode[A] with RootNode[A]=super.restrictTo(allowed).iNode.get.setRoot
   override val cromulent = children.foldLeft(true){(a,b) => a && b.cromulent}
@@ -356,6 +366,10 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
     val newchildren = children.map{c=>val c2 = c.setBranchLengths(listPtr); listPtr = listPtr.drop(c.descendentNodes.size + 1);c2}
     factory(newchildren,aln,l.head)
   }
+  def setBranchLengths(m:Map[Int,Double])={
+    val newChildren = children.map{c=>c.setBranchLengths(m)}
+    factory(newChildren,aln,m(id))
+  }
 
   def getBranchLengths={
     lengthTo :: children.map{c=>c.getBranchLengths}.flatten[Double]
@@ -394,6 +408,9 @@ class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Doubl
   //   println("Node " + this + " setting branch length " + l.head)
      new Leaf[A](name,aln,l.head,id)
  }
+  def setBranchLengths(m:Map[Int,Double])={
+    new Leaf[A](name,aln,m(id),id)
+  }
   def child(i:Int)=None
   def descendents=List(name)
   def resize(bl:Double) = new Leaf[A](name,aln,bl,id)

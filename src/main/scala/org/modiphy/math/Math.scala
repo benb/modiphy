@@ -201,8 +201,11 @@ class EnhancedMatrix(d:DoubleMatrix2D){
   }
   def normalize(v:Vector):Matrix=normalize(v,1.0D)
   def normalize(v:Vector,overall:Double):Matrix={
-    val sum = -dense.diagonal(d).zDotProduct(v)
+    val sum = rate(v)
     d.copy.assign(new DoubleFunction(){def apply(d:Double)= overall * d/sum})
+  }
+  def rate(v:Vector):Double={
+    -dense.diagonal(d).zDotProduct(v)
   }
 
   def exists(f: Double=>Boolean):Boolean={
