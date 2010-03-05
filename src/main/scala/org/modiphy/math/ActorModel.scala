@@ -1259,13 +1259,13 @@ class ActorModel(t:Tree[_],components:ActorModelComponent,val paramMap:Map[Param
     val ans = rawReq(QMatReq(myTree(nodeID),None,None)).asInstanceOf[QMatReq]
     val qMat = ans.m.get
     val pi = ans.pi.get
-    qMat.rate(pi)-1.0
+    Math.max(qMat.rate(pi),1.0)-1.0
   }
 
   def switchingBranchLengths={
     val myTree = currentTree
     val branchLengths=apply(BranchLengths(0)).toList
-    (myTree::myTree.descendentNodes).map{_.id}.map{i=> (i,switchingRate(i) * myTree(i).lengthTo)}.foldLeft(Map[Int,Double]()){_+_}
+    myTree.descendentNodes.map{i:Node[_]=>i.id}.map{i=> (i,switchingRate(i) * myTree(i).lengthTo)}.foldLeft(Map[Int,Double]()){_+_}
   }
   def switchingTree={
     t setBranchLengths switchingBranchLengths
