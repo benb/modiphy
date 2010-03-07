@@ -13,15 +13,6 @@ class LikelihoodCalc[A <: BioEnum](tree:Node[A],model:Matrix,alphabet:A){
 
 object BasicLikelihoodCalc{
   val func = new cern.colt.function.DoubleDoubleFunction{def apply(x:Double,y:Double)=x*y}
-  def apply[A<:BioEnum](matMap:MatrixPi[A],myNode:Node[A]):List[Vector]={
-   val partialLikelihoods:List[List[Vector]]=myNode.children.map{_.likelihoods(matMap)}
-    val intermediates=partialLikelihoods.zip(myNode.children.toList).map{t=>
-      val (siteVectorList,c)=t // list of vectors  1 for each site
-      val matrix = matMap.getMat(c) //e^Qt
-      partialLikelihoodCalc(siteVectorList,matrix)
-    }.toList
-    combinePartialLikelihoods(intermediates)
-  }
 
   def partialLikelihoodCalc(end:List[Vector],matrix:Matrix)={
     val width = matrix.rows

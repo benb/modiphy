@@ -95,10 +95,6 @@ trait Node[A <: BioEnum] extends Actor with Logging{
   def branchTo:String
 
   def nodes=this::descendentNodes
-  def likelihoods(m:MatrixPi[A]):List[Vector]=
-  {
-   BasicLikelihoodCalc(m,this) 
-  }
 
   def iNode:Option[INode[A]]=None
 
@@ -158,10 +154,6 @@ trait RootNode[A <: BioEnum] extends INode[A]{
   override val cromulent = children.foldLeft(true){(a,b) => a && b.cromulent}
   override def splitAln(i:Int)=super.splitAln(i).map{_.asInstanceOf[INode[A]].setRoot}
 
-  def logLikelihood(m:MatrixPi[A])={
-     realLikelihoods(m).zip(aln.pCount).foldLeft(0.0D){(i,j)=>i+Math.log(j._1)*j._2}
-
-  }
   def fPi = aln.getFPi
 
   override def act{
@@ -297,18 +289,6 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
   }
 
   override def iNode=Some(this)
-  def realLikelihoods(m:MatrixPi[A]) = {
-    val rl = 
-    likelihoods(m).map{vec=>
-      val ans = m.getPi.elements.zipWithIndex.map{t=>
-        val(p,i)=t
-        vec(i)*p
-      }.foldLeft(0.0D){_+_}
-      ans
-    }
-   // println("Serial likelihoods " + rl)
-    rl
-  }
         
 
   val name=""
@@ -401,7 +381,6 @@ class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Doubl
         vec
     }.toList
   }
-  override def likelihoods(m:MatrixPi[A]):List[Vector]=likelihoods
 
   def descendentNodes=List()
   def setBranchLengths(l:List[Double])={
