@@ -699,7 +699,36 @@ abstract class AbstractActorParam[A] extends ActorParamComponent with Logging{
   }
 }
 class ActorPiComponent(pi:Vector,val name:ParamName) extends AbstractActorParam[Vector]{
+  class PiParam(pi:Vector){
+
+    var medianIndex=0
+    def fromFit(array:Array[Double],medianIndex:Int)={
+      val exponentiated =  array.map{i=>Math.exp(i)}
+      val total = (0.0D /: exponentiated){_+_} + Math.exp(0.0D)
+      ((0 to medianIndex-1 ).map{i=> exponentiated(i)/total}.toList ++ List(Math.exp(0.0D)/total) ++ (medianIndex to array.length-1).map{i=> exponentiated(i)/total}).toArray
+    }
+  
+    def toFit(pi:Vector):(List[Double],Int)={
+      val t  = (pi.toList.zipWithIndex.toList.sort{_._1<_._1})(pi.size/2)
+      medianIndex = t._2
+      def toFitness={i:Int=>Math.log(pi(i)/pi(medianIndex))}
+      ((0 to medianIndex-1).map{toFitness}.toList ++ (medianIndex+1 to pi.size-1).map{toFitness}.toList,
+       medianIndex)
+    }
+    
+    def setParams(a:Array[Double]){pi assign fromFit(a,medianIndex)}
+    def getParams={
+      val (l,m)=toFit(pi)
+      medianIndex=m
+      l.toArray
+    }
+    def view=pi.copy
+    def setPi(p:Array[Double]){pi assign p}
+
+  
+  }
   val internal = new PiParam(pi)
+
   def lower = -10 // this is log-odds scaled prob
   def upper = 10
   def myParam = pi
@@ -709,7 +738,12 @@ class ActorPiComponent(pi:Vector,val name:ParamName) extends AbstractActorParam[
   override def toString=name.toString + " " + internal.view
 }
 class ActorSComponent(s:Matrix,val name:ParamName) extends AbstractActorParam[Matrix] with SMatUtil{
-  val internal = new SMatParam(s,name.toString)
+  class SMatParam(s:Matrix) extends SMatUtil{
+    var cache:Option[Array[Double]]=None
+    def getParams={ if (cache.isEmpty){cache = Some(linearSMat(s).toArray)}; cache.get}
+    def setParams(a:Array[Double]) = setSMat(a,s)
+  }
+  val internal = new SMatParam(s)
   def myParam = s
   def lower = 0.0
   def upper = 200
@@ -728,7 +762,12 @@ class ActorSComponent(s:Matrix,val name:ParamName) extends AbstractActorParam[Ma
 
 }
 class ActorFullSComponent(s:Matrix,val name:ParamName) extends AbstractActorParam[Matrix] with SMatUtil{
-  val internal = new FullSMatParam(s,name.toString)
+  class FullSMatParam(s:Matrix) extends SMatUtil{
+    var cache:Option[Array[Double]]=None
+    def getParams={ if (cache.isEmpty){cache = Some(linearSMatFull(s).toArray)}; cache.get}
+    def setParams(a:Array[Double]) = setSMat(a,s)
+  }
+  val internal = new FullSMatParam(s)
   def lower = 0.0D
   def upper = 200
   def myParam = s
