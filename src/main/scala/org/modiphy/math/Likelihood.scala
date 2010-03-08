@@ -36,4 +36,15 @@ object BasicLikelihoodCalc{
     ans
 
   }
+  def likelihoods(pl:List[Vector],pi:Vector)={
+    pl.map{vec=>
+     pi.elements.zipWithIndex.map{t=>
+        val(p,i)=t
+        vec(i)*p
+     }.foldLeft(0.0D){_+_}
+  }
+
+  def logLikelihood(pl:List[Vector],pi:Vector)={
+    likelihoods(pl,pi).foldLeft
+  }
 }
