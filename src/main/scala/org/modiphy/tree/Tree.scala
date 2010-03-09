@@ -78,7 +78,7 @@ trait Node[A <: BioEnum] extends Actor with Logging{
   val aln:Alignment[A]
   val alphabet:A=aln.alphabet
   
-  def lengthTo(n:Node[A]):Double
+  def lengthTo:Double
   def child(i:Int):Option[Node[A]]
   def children:List[Node[A]]
   def name:String
@@ -97,6 +97,8 @@ trait Node[A <: BioEnum] extends Actor with Logging{
   def nodes=this::descendentNodes
 
   def iNode:Option[INode[A]]=None
+
+  def cromulent:Boolean= lengthTo > -Math.EPS_DOUBLE && children.foldLeft(true){(a,b)=>a && b.cromulent}
 
   def splitAln(i:Int):List[Node[A]]
 
@@ -147,10 +149,9 @@ trait RootNode[A <: BioEnum] extends INode[A]{
     factory(newChildren,aln,0.0)
   }
 
-  def lengthTo(n:Node[A])=n.lengthTo(this)
-
   override def removeUseless:INode[A] with RootNode[A]=super.removeUseless.iNode.get.setRoot
   override def restrictTo(allowed:Set[String]):INode[A] with RootNode[A]=super.restrictTo(allowed).iNode.get.setRoot
+  override val cromulent = children.foldLeft(true){(a,b) => a && b.cromulent}
   override def splitAln(i:Int)=super.splitAln(i).map{_.asInstanceOf[INode[A]].setRoot}
 
   def fPi = aln.getFPi
@@ -240,7 +241,6 @@ abstract class MatExpActor extends Actor
 class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val lengthTo:Double,val id:Int) extends Node[A]{ 
   val plCalc = new PartialLikelihoodCalc
   plCalc.start
-  def lengthTo(n:Node[A])=lengthTo
 
 
   def act{
@@ -298,8 +298,8 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
   def numChildren = children.size
   def childElements:Iterator[Node[A]] = children.elements
   def child(i:Int)=if (i < children.length){Some(children(i))}else{None}
-  def length(i:Int):Double=children(i).lengthTo(this)
-  def length(n:Node[A]):Double=children.find{node=>node==n}.get.lengthTo(this)
+  def length(i:Int):Double=children(i).lengthTo
+  def length(n:Node[A]):Double=children.find{node=>node==n}.get.lengthTo
   def restrictTo(allowed:Set[String])={
     val newChildren=children.filter{child=>child.descendents.exists{name=>allowed contains name}}map{_.restrictTo(allowed)}
     //println(children.toString + " => " + newChildren.toString)
@@ -313,7 +313,7 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
         child
       }else if (child.numChildren==1){
         var endchild = child
-        var bl = child.lengthTo(this)
+        var bl = child.lengthTo
         while (endchild.numChildren==1){
           endchild=endchild.child(0).get
           bl= bl + endchild.lengthTo
@@ -370,7 +370,6 @@ class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Doubl
 
   override def isLeaf=true
   def children:List[Node[A]]=Nil
-  def lengthTo(n:Node[A])=lengthTo
 
   val sequence:List[alphabet.Value]=aln.getPatterns(name).asInstanceOf[List[alphabet.Value]]
   lazy val likelihoods:List[Vector]={
