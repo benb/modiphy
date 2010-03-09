@@ -2,12 +2,14 @@ package org.modipht.newtree
 import org.modiphy.math._
 import scala.actors.Actor._ 
 import scala.actors._ 
+import org.modiphy.math.EnhancedMatrix._
 
 case object BranchLength
 case class UpdateDist(d:Double)
 case class Unclean[A <: BioEnum](direction:Node[A])
 case object UpdateMat
 case class LikelihoodCalcDir[A <: BioEnum](model:ActorModelComponend,b:DirBranch[A])
+case class CalculatedPartialLikelihoods(pl:List[Vector])
 
 class DirBranch[A <: BioEnum](val to:Node[A],var dist:Double,val from:Node[A]) extends Actor{
   def act{
@@ -90,12 +92,15 @@ class INode[A](val id:Int) extends Node[A]{
         main(m)
       case LogLikelihoodCalc(model,actor) =>
         if (m.contains(None)){
+          sender ! BasicLikelihoodCalc.logLikelihood(m(None),model.pi)
+        }else {
+          var i = 0
+          branchEnds.filter(_ != branch).foreach{c => c ! LikelihoodCalc(model);i=i+1}
+          logLikelihood(m,Nil,i,sender,model.pi)
         }
-        branchEnds.foreach{c => c ! LikelihoodCalc(model)}
-        logLikelihood(Nil,0,actor,None)
       case LikelihoodCalcDir(model,branch)=>
         if (m.contains(branch)){
-          sender ! CalculatedPartialLikelihoods(m(branch))
+          sender ! CalculatedPartialLikelihoods(m(Some(branch)))
         }else {
         //request partial likelihoods along each branch
           var i=0
@@ -104,22 +109,33 @@ class INode[A](val id:Int) extends Node[A]{
         }
       }
     }
-    def partialLikelihoods(branch:DirBranch,cache:Cache,plList:List[List[Vector]],toDo:Int,replyTo:OutputChannel[Any]){
+    
+    def logLikelihood(cache:Cache,plList:List[List[Vector]],toDo:Int,replyTo:OutputChannel[Any],pi:Vector){
       if (toDo==0){
-        val ans = BasicLikelihoodCalc.combinePartialLikelihoods(pl2)
+        val ans = BasicLikelihoodCalc.combinePartialLikelihoods(plList)
+        replyTo ! BasicLikelihoodCalc.logLikelihood(plList,pi)
+        main(cache + ((None,ans)))
+      }else {
+        react{
+          case CalculatedPartialLikelihoods(pl)=>
+            logLikelihood(cache,pl::plList,toDo-1,replyTo,pi)
+        }
+      }
+    }
+
+    def partialLikelihoods(branch:DirBranch[A],cache:Cache,plList:List[List[Vector]],toDo:Int,replyTo:OutputChannel[Any]){
+      if (toDo==0){
+        val ans = BasicLikelihoodCalc.combinePartialLikelihoods(plList)
         replyTo ! CalculatedPartialLikelihoods(ans)
-        main(cache + ((branch,ans)))
+        main(cache + ((Some(branch),ans)))
       }else {
         react{
           case CalculatedPartialLikelihoods(pl) =>
             partialLikelihoods(branch,cache,pl::plList,toDo-1,replyTo)
         }
       }
-
     }
 
-  def logLikelihood(
-  }
 }
 class Leaf[A](val id:Int) extends Node[A]{
   var branchEnd:Option[DirBranch[A]]=None
