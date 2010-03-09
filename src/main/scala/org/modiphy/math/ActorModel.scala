@@ -976,7 +976,7 @@ trait OptPSetter {
 class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val paramMap:Map[ParamName,ActorParamComponent]) extends Logging{
 
   val tree = List(t)//t.splitAln(6)
-  tree.foreach{_.start}
+  tree.foreach{_.startTree}
   val params = paramMap.keys.toList
   paramMap.values.foreach{_.start}
   components.start

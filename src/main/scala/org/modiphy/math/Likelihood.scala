@@ -28,7 +28,7 @@ object BasicLikelihoodCalc{
   def combinePartialLikelihoods(intermediates:List[List[Vector]])={
     val ans = intermediates.head
     intermediates.tail.foreach{list2=>
-      ans.zip(list2).map{t=> // not really a map but used for parallel reasons
+      ans.zip(list2).foreach{t=> 
         val (vec,vec2)=t
         vec.assign(vec2,func)
       }

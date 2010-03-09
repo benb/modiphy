@@ -14,6 +14,7 @@ class ActorModelSuite extends FunSuite {
   test ("Actor Model should give correct matrix exp"){
     case class Test(b:Branch[_])
     class ActorTest extends Actor{
+      tree.startTree
       val actorPi = new ActorPiComponent(WAG.pi,Pi(0))
       val actorS = new ActorSComponent(WAG.S,S(0))
       val branchLengthComp =  new ActorTreeComponent(tree,BranchLengths(0))
@@ -41,8 +42,11 @@ class ActorModelSuite extends FunSuite {
         t._1 should be (t._2 plusOrMinus 1E-7) //could be MatExpNormal or other impl that might not give exactly the same answer
       }
 
-       val mat3 = (actor !? Test(tree.bList.head.to.bList.head.myBranch)).asInstanceOf[MatReq].m.get
-           mat3.elements.zip(me.exp(tree.bList.head.to.bList.head.dist).elements).foreach{t=>
+      val b1= tree.bList.filter{!_.down.isInstanceOf[Leaf[_]]}.head
+      val b2 = b1.down.bList.filter{_.myBranch != b1.myBranch}.head
+
+       val mat3 = (actor !? Test(b2.myBranch)).asInstanceOf[MatReq].m.get
+           mat3.elements.zip(me.exp(b2.dist).elements).foreach{t=>
            t._1 should be (t._2 plusOrMinus 1E-7)
          }
     }

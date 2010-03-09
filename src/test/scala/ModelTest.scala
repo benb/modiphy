@@ -11,6 +11,7 @@ import org.modiphy.math.LazyP._
 class ModelSuite extends FunSuite {
    
   val (tree,aln) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(1))
+  println("TREE: " + tree)
   val model = org.modiphy.math.SimpleModel(tree)
 
   //Logging.toStdout 
@@ -20,44 +21,7 @@ class ModelSuite extends FunSuite {
   val (tree4,aln4) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(4))
   val (tree5,aln5) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(5))
 
-  test("BS complex model with restricted params should match simpler Sigma model"){
-    println("OK1")
-    val simpleModel = InvarThmmModel(tree5)
-    simpleModel(InvarPrior)=0.123
-    simpleModel(InvarPrior)=0.123
-    simpleModel(BranchLengths)(1)=0.5462
-    simpleModel(Alpha)=0.3
-    simpleModel(Sigma)=Array.make(10,0.4232)
 
-    val simpleModel2=InvarThmmModel(tree5)
-    simpleModel2 << simpleModel
-    simpleModel2(BranchLengths) << simpleModel(BranchLengths)
-    val lkl1 = simpleModel.logLikelihood
-
-    simpleModel2.logLikelihood should be (lkl1 plusOrMinus 1E-7)
-
-    val complexModel = BranchSpecificThmmModel(tree5,2::3::4::Nil)
-    complexModel.logLikelihood should not (be (simpleModel.logLikelihood plusOrMinus 1E-5))
-    complexModel << simpleModel
-    complexModel(BranchLengths) << simpleModel(BranchLengths)
-    complexModel.logLikelihood should not (be (simpleModel.logLikelihood plusOrMinus 1E-5))
-    complexModel(Sigma(1)) << simpleModel(Sigma(0))
-    complexModel.logLikelihood should be (simpleModel.logLikelihood plusOrMinus 1E-5)
-  }
-
-  test("OptUpdate"){
-    val simpleModel = InvarThmmModel(tree5)
-    val start = simpleModel.logLikelihood
-    val opt = simpleModel.optSetter(InvarPrior(0)::BranchLengths(0)::Alpha(0)::Nil)
-    val startP = opt.latestArgs
-    startP(startP.length-1)=0.2
-    opt(startP)
-    simpleModel.logLikelihood should not (be (start plusOrMinus 1E-4))
-    startP(startP.length-1)=0.5
-    opt(startP)
-    simpleModel.logLikelihood should be (start plusOrMinus 1E-4)
-  }
- 
   test("log likelihood of basic model should match PAML") (model.logLikelihood should be (-6057.892394 plusOrMinus 0.001))//from PAML
   test("TufA Gamma Model"){
     val (tree,aln)=DataParse(tufaTree,tufaAln.lines,new org.modiphy.sequence.SiteClassAA(4))
@@ -211,6 +175,44 @@ class ModelSuite extends FunSuite {
     model3.logLikelihood should be (start plusOrMinus 1e-4)
   }
 
+  test("BS complex model with restricted params should match simpler Sigma model"){
+    println("OK1")
+    val simpleModel = InvarThmmModel(tree5)
+    simpleModel(InvarPrior)=0.123
+    simpleModel(InvarPrior)=0.123
+    simpleModel(BranchLengths)(1)=0.5462
+    simpleModel(Alpha)=0.3
+    simpleModel(Sigma)=Array.make(10,0.4232)
+
+    val simpleModel2=InvarThmmModel(tree5)
+    simpleModel2 << simpleModel
+    simpleModel2(BranchLengths) << simpleModel(BranchLengths)
+    val lkl1 = simpleModel.logLikelihood
+
+    simpleModel2.logLikelihood should be (lkl1 plusOrMinus 1E-7)
+
+    val complexModel = BranchSpecificThmmModel(tree5,2::3::4::Nil)
+    complexModel.logLikelihood should not (be (simpleModel.logLikelihood plusOrMinus 1E-5))
+    complexModel << simpleModel
+    complexModel(BranchLengths) << simpleModel(BranchLengths)
+    complexModel.logLikelihood should not (be (simpleModel.logLikelihood plusOrMinus 1E-5))
+    complexModel(Sigma(1)) << simpleModel(Sigma(0))
+    complexModel.logLikelihood should be (simpleModel.logLikelihood plusOrMinus 1E-5)
+  }
+
+  test("OptUpdate"){
+    val simpleModel = InvarThmmModel(tree5)
+    val start = simpleModel.logLikelihood
+    val opt = simpleModel.optSetter(InvarPrior(0)::BranchLengths(0)::Alpha(0)::Nil)
+    val startP = opt.latestArgs
+    startP(startP.length-1)=0.2
+    opt(startP)
+    simpleModel.logLikelihood should not (be (start plusOrMinus 1E-4))
+    startP(startP.length-1)=0.5
+    opt(startP)
+    simpleModel.logLikelihood should be (start plusOrMinus 1E-4)
+  }
+ 
 /*
     val mat = Matrix(4,4)
     val thmmMath = new THMMGammaMathComponent(gammaC,mat,tree4.alphabet)
