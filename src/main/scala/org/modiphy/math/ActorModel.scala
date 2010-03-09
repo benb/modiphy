@@ -12,8 +12,8 @@ import tlf.Logging
 abstract class ActorModelComponent extends Actor with Logging{
 }
 
-case class SwitchingRate(n:Int) extends NodeMessage
-sealed trait NodeMessage{
+case class SwitchingRate(n:Int) extends BranchMessage
+sealed trait BranchMessage{
   def n:Int
 }
 
@@ -100,14 +100,14 @@ trait SimpleActorModelComponent extends ActorModelComponent{
 case class Params(list:List[ActorParamComponent])
 object GetParams extends Params(Nil)
 class MatBuilder(m:Option[Map[Node[_],Matrix]])
-case class MatReq(n:Node[_],m:Option[Matrix],pi:Option[Vector]){
-  def toQMatReq=QMatReq(n,m,pi)
+case class MatReq(b:Branch[_],m:Option[Matrix],pi:Option[Vector]){
+  def toQMatReq=QMatReq(b,m,pi)
 }
-case class QMatReq(n:Node[_],m:Option[Matrix],pi:Option[Vector]){// extends MatReq(n2,m2,pi2) //used for skipping exponentiation
-  def toMatReq=MatReq(n,m,pi)
+case class QMatReq(b:Branch[_],m:Option[Matrix],pi:Option[Vector]){// extends MatReq(n2,m2,pi2) //used for skipping exponentiation
+  def toMatReq=MatReq(b,m,pi)
 }
 object NewMatReq{
-  def apply(n:Node[_])=MatReq(n,None,None)
+  def apply(b:Branch[_])=MatReq(b,None,None)
 }
 case class Unclean(sender:Actor)
 case object RequestOpt
@@ -190,7 +190,7 @@ class BasicActorModel(piParam:ActorPiComponent,sParam:ActorSComponent,rec:Actor)
       mat = Some(sMat.sToQ(pi))
         mat.get
       }
-    MatReq(m.n,Some(myMat),Some(pi))
+    MatReq(m.b,Some(myMat),Some(pi))
   }
 }
 class NormaliserActorModel(rec:Actor) extends SimpleActorModelComponent{
@@ -202,10 +202,10 @@ class NormaliserActorModel(rec:Actor) extends SimpleActorModelComponent{
   def unclean{mat=None}
   def matReq(m:MatReq)={
     if (mat.isDefined){
-      MatReq(m.n,mat,m.pi)
+      MatReq(m.b,mat,m.pi)
     }else {
       mat = Some(m.m.get.normalize(m.pi.get))
-      MatReq(m.n,mat,m.pi)
+      MatReq(m.b,mat,m.pi)
     }
   }
 }
@@ -247,14 +247,14 @@ class THMMActorModel(sigmaParam:ActorFullSComponent,numClasses:Int,rec:Actor) ex
 
   def matReq(m:MatReq)={
     m match {
-      case MatReq(n,Some(m),Some(pi))=>
+      case MatReq(b,Some(m),Some(pi))=>
         if (mat.isDefined){mat}
         else {
           val (myMat,switch) = applyMat(m,pi,sigma)
           mat = Some(myMat)
           switchingRate=Some(switch)
         }
-        MatReq(n,mat,Some(pi))
+        MatReq(b,mat,Some(pi))
       case m:MatReq=>
         problem(m + " is not defined")
         m
@@ -315,7 +315,7 @@ class InvarActorModel(priorParam:ActorProbComponent,piParam:ActorPiComponent,num
 
    def matReq(m:MatReq)={
      m match{
-      case MatReq(n,Some(m),Some(p))=>
+      case MatReq(b,Some(m),Some(p))=>
         val myPi = if (processedPi.isDefined){
           processedPi.get
         }else{
@@ -328,7 +328,7 @@ class InvarActorModel(priorParam:ActorProbComponent,piParam:ActorPiComponent,num
           mat = Some(applyMat(m,myPi))
           mat.get
         }
-        MatReq(n,mat,processedPi)
+        MatReq(b,mat,processedPi)
       case m:MatReq =>
         problem(m + " not completely defined")
         m
@@ -416,21 +416,21 @@ class ForkActor[A <: BioEnum](tree:Tree[A],rec1Map:Map[Int,Actor]) extends Actor
             v !? Unclean(self)
           }
           reply(Unclean(a))
-        case QMatReq(n,m,p)=>
-          if (rec1Map contains n.id){
-            rec1Map(n.id) forward QMatReq(n,m,p)
+        case QMatReq(b,m,p)=>
+          if (rec1Map contains b.id){
+            rec1Map(b.id) forward QMatReq(b,m,p)
           }else {
-            warning{"Map does not contain " + n.id + " " + n}
-            sender ! QMatReq(n,m,p) 
+            warning{"Map does not contain " + b.id + " " + b}
+            sender ! QMatReq(b,m,p) 
           }
-        case MatReq(n,m,p)=>
-          if(rec1Map contains n.id){
-            rec1Map(n.id) forward MatReq(n,m,p)
+        case MatReq(b,m,p)=>
+          if(rec1Map contains b.id){
+            rec1Map(b.id) forward MatReq(b,m,p)
           }else {
-            if (! n.isRoot){warning{"Map does not contain " + n.id + " " + n}}
-            sender ! MatReq(n,m,p) 
+            warning{"Map does not contain " + b.id + " " + b}
+            sender ! MatReq(b,m,p) 
           }
-        case m:NodeMessage=>
+        case m:BranchMessage=>
           if (rec1Map contains m.n){
             rec1Map(m.n) forward m
           }else {
@@ -469,7 +469,6 @@ class ForkActor[A <: BioEnum](tree:Tree[A],rec1Map:Map[Int,Actor]) extends Actor
 
 class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:ActorTreeComponent[A],rec1:Option[Actor]) extends ActorModelComponent{
   val blName = branchLengthParams.name
-  val nodes = tree.descendentNodes.toArray //root has no length
 
   override def start={
     branchLengthParams addActor this
@@ -479,20 +478,15 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
   var eigen:MatrixExponential=null 
 
   def act{
-    main(None,nodes.foldLeft(Map[Int,Double]()){(m,n)=>m+((n.id,n.lengthTo))})
+    main(None)
   }
-  def main(eigen:Option[MatrixExponential],lengths:Map[Int,Double]){
-    case class ExpReq(n:Node[_],e:MatrixExponential,lengthTo:Double,pi:Vector)
+  def main(eigen:Option[MatrixExponential]){
+    case class ExpReq(b:Branch[_],e:MatrixExponential,lengthTo:Double,pi:Vector)
       react{
         case q:QMatReq =>
           sender ! q
-          main(eigen,lengths)
+          main(eigen)
         case MatReq(n,Some(m),Some(pi)) => 
-          if (n.isRoot){//don't need exp(qt)
-            if (rec1.isDefined){rec1.get forward MatReq(n,None,Some(pi))}
-            else { sender ! MatReq(n,None,Some(pi))}
-            main(eigen,lengths)
-          }
           val myEigen = if (eigen.isEmpty){
             val ans = new MatExpNormal(m,pi,None)
             ans
@@ -509,17 +503,16 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
                   exit
               }
             }
-          }.start forward ExpReq(n,myEigen,lengths(n.id),pi)
-          main(Some(myEigen),lengths)
+          }.start forward ExpReq(n,myEigen,(n !? BranchLength).asInstanceOf[Double],pi)
+          main(Some(myEigen))
         case Unclean(a)=>
           if (rec1.isDefined){rec1.get forward Unclean(a)} else {
             reply(Unclean(a))
           }
-          main(None,lengths)
+          main(None)
         case ParamChanged(`blName`,a:Array[Double])=>
           if (rec1.isDefined){rec1.get forward Unclean(branchLengthParams)} else {reply(Unclean(branchLengthParams))}
-          val nodeMap = nodes.zip(a).foldLeft(Map[Int,Double]()){(m,t)=>m + ((t._1.id,t._2))}
-          main(eigen,nodeMap)
+          main(eigen)
       }
   }
 }
@@ -788,7 +781,26 @@ class ActorFullSComponent(s:Matrix,val name:ParamName) extends AbstractActorPara
 }
 
 
-class ActorTreeComponent[B <: BioEnum](tree:Tree[B],name:ParamName) extends ActorArrayComponent((tree.descendentNodes.map(_.lengthTo).toArray),name,0.0,100.0)
+class ActorTreeComponent[B <: BioEnum](tree:Tree[B],val name:ParamName) extends AbstractActorParam[Array[Double]]{
+  class TreeParam{
+    var myP=tree.getBranchLengths
+    val branches = tree.descendentBranches.toArray
+    def getParams = myP.toList.sort{(t1,t2)=>t1._1 < t2._2}.map{_._2}.toArray
+    def setParams(a:Array[Double]){
+      myP.foreach{t=>
+        if (a(t._1)!=t._2){
+          myP(t._1)=a(t._1)
+          branches(t._1) !? UpdateDist(a(t._1))
+        }
+      }
+    }
+  }
+  val internal = new TreeParam
+  def myParam = internal.getParams
+  def lower = 0.0
+  def upper = 100.0
+}
+
 class ActorDoubleComponent(param:Double,val name:ParamName,val lower:Double,val upper:Double) extends AbstractActorParam[Double]{
   class DoubleParam{
     var myP:Double=param
@@ -890,13 +902,13 @@ def apply[A <: BioEnum](tree:Tree[A])={
 }
 
 object BranchSpecificThmmModel{
-  def apply[A <: BioEnum](tree:Tree[A]):ActorModel={
-    val nodeMap=tree.descendentNodes.foldLeft[Map[Int,Int]](IntMap[Int]()){(m,n)=>
+  def apply[A <: BioEnum](tree:Tree[A]):ActorModel[A]={
+    val branchMap=tree.descendentBranches.foldLeft[Map[Int,Int]](IntMap[Int]()){(m,n)=>
         m + ((n.id,n.id))
     }
-    apply(tree,nodeMap)
+    apply(tree,branchMap)
   }
-  def apply[A <: BioEnum](tree:Tree[A],map:Map[Int,Int]):ActorModel={
+  def apply[A <: BioEnum](tree:Tree[A],map:Map[Int,Int]):ActorModel[A]={
     val numClasses = tree.alphabet.numClasses
     val pi = new ActorPiComponent(WAG.pi,Pi(0))
     val s = new ActorSComponent(WAG.S,S(0))
@@ -928,8 +940,8 @@ object BranchSpecificThmmModel{
 
    
   }
-  def apply[A <: BioEnum](tree:Tree[A],l:List[Int]):ActorModel={
-    apply(tree,(tree::tree.descendentNodes).map{n => (n.id,if (l contains n.id){1}else{0})}.foldLeft(Map[Int,Int]()){_+_})
+  def apply[A <: BioEnum](tree:Tree[A],l:List[Int]):ActorModel[A]={
+    apply(tree,tree.descendentBranches.map{n => (n.id,if (l contains n.id){1}else{0})}.foldLeft(Map[Int,Int]()){_+_})
   }
 }
 class BadParameterException(s:String) extends Exception(s)
@@ -961,9 +973,9 @@ trait OptPSetter {
 
 
 
-class ActorModel(t:Tree[_],components:ActorModelComponent,val paramMap:Map[ParamName,ActorParamComponent]) extends Logging{
+class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val paramMap:Map[ParamName,ActorParamComponent]) extends Logging{
 
-  val tree = t.splitAln(6)
+  val tree = List(t)//t.splitAln(6)
   tree.foreach{_.start}
   val params = paramMap.keys.toList
   paramMap.values.foreach{_.start}
@@ -994,7 +1006,7 @@ class ActorModel(t:Tree[_],components:ActorModelComponent,val paramMap:Map[Param
       receive{
         case GetQ(i)=>
         val baseTree = tree(0)
-        components ! QMatReq(baseTree(i),None,None)
+        components ! QMatReq(baseTree.descendentBranches(i),None,None)
         var matrix:Matrix=null
         receive{
           case QMatReq(node,Some(m),Some(pi))=>
@@ -1015,7 +1027,7 @@ class ActorModel(t:Tree[_],components:ActorModelComponent,val paramMap:Map[Param
       receive{
         case GetQ(i)=>
         val baseTree = tree(0)
-        components ! MatReq(baseTree(i),None,None)
+        components ! MatReq(baseTree.descendentBranches(i),None,None)
         var matrix:Matrix=null
         receive{
           case MatReq(node,Some(m),Some(pi))=>
@@ -1040,7 +1052,7 @@ class ActorModel(t:Tree[_],components:ActorModelComponent,val paramMap:Map[Param
     ans
   }
   
-  def setParamsFrom(other:ActorModel){
+  def setParamsFrom[B <: BioEnum](other:ActorModel[B]){
     other.paramMap.foreach{t=> val (k,v)=t
       if (paramMap.contains(k) && !k.isInstanceOf[BranchLengths]){
       debug{"Setting " + k}
@@ -1049,13 +1061,13 @@ class ActorModel(t:Tree[_],components:ActorModelComponent,val paramMap:Map[Param
     }
   }
 
-  def from(other:ActorModel)={
+  def from[B <: BioEnum](other:ActorModel[B])={
     this << other
     apply(BranchLengths(0)) << other(BranchLengths(0))
     this
   }
 
-  def <<(other:ActorModel){setParamsFrom(other)}
+  def <<[B <: BioEnum](other:ActorModel[B]){setParamsFrom(other)}
 
   val paramLengthMap = paramMap.keys.map{t=>(t,optGet(t).length)}.foldLeft(Map[ParamName,Int]()){(m,p)=>m+((p._1,p._2))}
 
@@ -1241,10 +1253,17 @@ class ActorModel(t:Tree[_],components:ActorModelComponent,val paramMap:Map[Param
     {
     object Send
     Actor.actor{
+      components ! NewMatReq(tree(0).bList.head.myBranch)
+      //in theory we could play with the pi values
+      var pi:Vector=null 
+      receive{
+        case MatReq(_,_,Some(pi2))=>
+          pi = pi2
+      }
       receive{
       case Send => 
         for (t<-tree){
-          t ! LogLikelihoodCalc(components,self)
+          t ! LogLikelihoodCalc(components,pi)
         }
         var ans:Double=0.0D
         var returned = 0
@@ -1293,9 +1312,9 @@ class ActorModel(t:Tree[_],components:ActorModelComponent,val paramMap:Map[Param
 //    (components !? SwitchingRate(nodeID)).asInstanceOf[Option[Double]].get
 //  }
 
-  def switchingRate(nodeID:Int)={
+  def switchingRate(branchID:Int)={
     val myTree=tree(0)
-    val ans = rawReq(QMatReq(myTree(nodeID),None,None)).asInstanceOf[QMatReq]
+    val ans = rawReq(QMatReq(myTree.descendentBranches(branchID),None,None)).asInstanceOf[QMatReq]
     val qMat = ans.m.get
     val pi = ans.pi.get
     Math.max(qMat.rate(pi),1.0)-1.0
@@ -1303,14 +1322,13 @@ class ActorModel(t:Tree[_],components:ActorModelComponent,val paramMap:Map[Param
 
   def switchingBranchLengths={
     val myTree = currentTree
-    val branchLengths=apply(BranchLengths(0)).toList
-    myTree.descendentNodes.map{i:Node[_]=>i.id}.map{i=> (i,switchingRate(i) * myTree(i).lengthTo)}.foldLeft(Map[Int,Double]()){_+_}
+    myTree.descendentBranches.map{i=> (i.id,switchingRate(i.id) * i.dist)}.foldLeft(Map[Int,Double]()){_+_}
   }
   def switchingTree={
-    t setBranchLengths switchingBranchLengths
+    t.copy.setBranchLengths(switchingBranchLengths)
   }
   def currentTree={
-    t setBranchLengths (apply(BranchLengths(0)).toList)
+    t.copy.setBranchLengths((apply(BranchLengths(0)).toList))
   }
   
 }

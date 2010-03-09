@@ -1,4 +1,4 @@
-package org.modiphy.newtree
+package org.modiphy.tree
 import org.modiphy.math._
 import scala.actors.Actor._ 
 import scala.actors._ 
@@ -13,9 +13,9 @@ case class UncleanNode[A <: BioEnum](direction:Node[A])
 case object UpdateMat
 case class LikelihoodCalcDir[A <: BioEnum](model:ActorModelComponent,b:DirBranch[A])
 case class LikelihoodCalc(model:ActorModelComponent)
+case class LogLikelihood(d:Double)
 case class LogLikelihoodCalc(model:ActorModelComponent,pi:Vector)
 case class CalculatedPartialLikelihoods(pl:List[Vector])
-case class NewMatReq[A <: BioEnum](dir:DirBranch[A])
 /**
   Used internally for parsing trees
 */
@@ -34,11 +34,13 @@ class TreeParser[A <: BioEnum](aln:Alignment[A]) extends JavaTokenParsers{
 
 class TreeGen[A <: BioEnum]{
   var nodeCount:Int= -1
+  var branchCount:Int= -1
   def getINode(children:List[Node[A]],aln:Alignment[A], lengthTo:Double)={
     nodeCount += 1;
-    val iNode =  new INode[A](nodeCount,lengthTo)
+    val iNode =  new INode[A](nodeCount,lengthTo,aln)
     children.foreach{c =>
-      new Branch(c,iNode,c.initialLengthTo)
+      branchCount += 1;
+      new Branch(c,iNode,c.initialLengthTo,branchCount)
     }
     iNode
   }
@@ -71,7 +73,8 @@ object DataParse{
 }
 
 
-class DirBranch[A <: BioEnum](val to:Node[A],var dist:Double,val from:Node[A]) extends Actor{
+class DirBranch[A <: BioEnum](val to:Node[A],var dist:Double,val from:Node[A],val myBranch:Branch[A]) extends Actor{
+  def id = myBranch.id.toString + "->" + to.id
   private var started=false
   override def start={
     if (!started){
@@ -81,6 +84,10 @@ class DirBranch[A <: BioEnum](val to:Node[A],var dist:Double,val from:Node[A]) e
     }else {
       self
     }
+  }
+  override def toString={
+    println(super.toString + " " + dist)
+    to.dirToString(this)+":"+dist
   }
 
 
@@ -106,7 +113,7 @@ class DirBranch[A <: BioEnum](val to:Node[A],var dist:Double,val from:Node[A]) e
           //get PL up to 'descendent' node
           from ! LikelihoodCalc(model)
           //get Matrix
-          model ! NewMatReq(this)
+          model ! NewMatReq(myBranch)
           getAns1(sender)
         }else {
           sender ! CalculatedPartialLikelihoods(pl.get)
@@ -133,7 +140,7 @@ class DirBranch[A <: BioEnum](val to:Node[A],var dist:Double,val from:Node[A]) e
   }
 }
 
-class Branch[A <: BioEnum](a:Node[A],b:Node[A],var dist:Double) extends Actor{
+class Branch[A <: BioEnum](a:Node[A],b:Node[A],var dist:Double,val id:Int) extends Actor{
   private var started=false
   override def start={
     if (!started){
@@ -144,8 +151,8 @@ class Branch[A <: BioEnum](a:Node[A],b:Node[A],var dist:Double) extends Actor{
     }
   }
 
-  val endA = new DirBranch(a,dist,b)
-  val endB = new DirBranch(b,dist,a)
+  val endA = new DirBranch(a,dist,b,this)
+  val endB = new DirBranch(b,dist,a,this)
   b addBranch endA
   a addBranch endB 
   def act{
@@ -153,8 +160,8 @@ class Branch[A <: BioEnum](a:Node[A],b:Node[A],var dist:Double) extends Actor{
       react{
         case BranchLength=>reply(dist)
         case UpdateDist(d)=>
-          a !? UpdateDist(d)
-          b !? UpdateDist(d)
+          endA !? UpdateDist(d)
+          endB !? UpdateDist(d)
           reply('ok)
       }
     }
@@ -163,9 +170,11 @@ class Branch[A <: BioEnum](a:Node[A],b:Node[A],var dist:Double) extends Actor{
 
 
 abstract class Node[A <: BioEnum] extends Actor{
+  def dirToString(dir:DirBranch[A]):String
   def initialLengthTo:Double
   def addBranch(b:DirBranch[A])
   def bList:List[DirBranch[A]]
+  def id:Int
   private var started=false
   override def start={
     if (!started){
@@ -176,8 +185,45 @@ abstract class Node[A <: BioEnum] extends Actor{
       self
     }
   }
+ def descendentBranches(dir:DirBranch[A]):List[Branch[A]]
 }
-class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double) extends Node[A]{
+class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignment[A]) extends Node[A]{
+ def alphabet = aln.alphabet
+ override def toString={
+   "(" + branchEnds.mkString(",") + ");"
+ }
+ def dirToString(branch:DirBranch[A])={
+   println("node(" + id + ") " + branch.id + " " + branchX(branch).map{_.id})
+   "(" + branchX(branch).mkString(",") + ")"
+ }
+ def copy=DataParse(this.toString,aln)._1
+ def descendentBranches(dir:DirBranch[A]) = {
+   println("node " + this + "Coming from " + dir)
+   branchX(dir).map{_.myBranch} ++ branchX(dir).map{b=> b.to.descendentBranches(b)}.flatten[Branch[A]]
+ }
+ lazy val descendentBranches={
+   println("GETTING DESCENDENT BR")
+   val ans = branchEnds.map{_.myBranch} ++ branchEnds.map{b=> b.to.descendentBranches(b)}.flatten[Branch[A]].sort{(a,b)=> a.id < b.id}
+   println("GOT DESCENDENT BR")
+   ans
+ }
+ def getBranchLengths={
+   import scala.collection.immutable.IntMap
+   descendentBranches.map{b=>(b.id,b.dist)}.foldLeft[Map[Int,Double]](IntMap[Double]()){_+_}
+ }
+ def setBranchLengths(bl:List[Double])={
+   descendentBranches.zip(bl).foreach{t=>
+     t._1.dist = t._2
+   }
+   this
+ }
+ def setBranchLengths(f:Int=>Double)={
+   descendentBranches.foreach{b=>
+     b.dist = f(b.id)
+   }
+ }
+ def branchX(dir:DirBranch[_])=branchEnds.filter{_.myBranch != dir.myBranch}
+ 
  private var branchEnds:List[DirBranch[A]]=Nil  
  def bList = branchEnds
   def addBranch(branch:DirBranch[A]){
@@ -197,7 +243,7 @@ class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double) extends Node[A]
       case LikelihoodCalcDir(model,branch)=>
         //request partial likelihoods along each branch
         var i=0
-        branchEnds.filter(_ != branch).foreach{c => c ! LikelihoodCalc(model);i=i+1}
+        branchX(branch).foreach{c => c ! LikelihoodCalc(model);i=i+1}
         partialLikelihoods(branch,Nil,i,sender)
       }
     }
@@ -205,7 +251,7 @@ class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double) extends Node[A]
     def logLikelihood(plList:List[List[Vector]],toDo:Int,replyTo:OutputChannel[Any],pi:Vector){
       if (toDo==0){
         val ans = BasicLikelihoodCalc.combinePartialLikelihoods(plList)
-        replyTo ! BasicLikelihoodCalc.logLikelihood(ans,pi)
+        replyTo ! LogLikelihood(BasicLikelihoodCalc.logLikelihood(ans,pi))
         main
       }else {
         react{
@@ -230,7 +276,10 @@ class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double) extends Node[A]
 
 }
 class Leaf[A <: BioEnum](val id:Int,aln:Alignment[A],val name:String,val initialLengthTo:Double) extends Node[A]{
+  def descendentBranches(n:DirBranch[A])=Nil
   
+  override def toString=name
+  def dirToString(d:DirBranch[A])=name
   var branchEnd:Option[DirBranch[A]]=None
   def bList=branchEnd.toList
   def addBranch(d:DirBranch[A]){
@@ -255,7 +304,5 @@ class Leaf[A <: BioEnum](val id:Int,aln:Alignment[A],val name:String,val initial
           sender ! CalculatedPartialLikelihoods(likelihoods)          
       }
     }
-  }
-
-
+  } 
 }

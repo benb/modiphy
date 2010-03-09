@@ -12,7 +12,7 @@ class ActorModelSuite extends FunSuite {
   val (tree,data)=DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(1))
 
   test ("Actor Model should give correct matrix exp"){
-    case class Test(n:Node[_])
+    case class Test(b:Branch[_])
     class ActorTest extends Actor{
       val actorPi = new ActorPiComponent(WAG.pi,Pi(0))
       val actorS = new ActorSComponent(WAG.S,S(0))
@@ -24,7 +24,7 @@ class ActorModelSuite extends FunSuite {
       def act{
         loop{
           react{
-            case Test(node) => part1 forward NewMatReq(node)
+            case Test(branch) => part1 forward NewMatReq(branch)
             }
           }
         }
@@ -32,17 +32,17 @@ class ActorModelSuite extends FunSuite {
 
       val actor = new ActorTest
       actor.start
-      val ans = (actor !? Test(tree.children(0))).asInstanceOf[MatReq]
+      val ans = (actor !? Test(tree.bList.head.myBranch)).asInstanceOf[MatReq]
       val mat1 = ans.m.get
       val me = new MatExpYang(WAG.S.sToQ(WAG.pi),WAG.pi,Some(1.0))
-      val mat2 = me.exp(tree.children(0).lengthTo)
+      val mat2 = me.exp(tree.bList.head.dist)
 
       mat1.elements.zip(mat2.elements).foreach{t=>
         t._1 should be (t._2 plusOrMinus 1E-7) //could be MatExpNormal or other impl that might not give exactly the same answer
       }
 
-       val mat3 = (actor !? Test(tree.children(0).children(1))).asInstanceOf[MatReq].m.get
-           mat3.elements.zip(me.exp(tree.children(0).children(1).lengthTo).elements).foreach{t=>
+       val mat3 = (actor !? Test(tree.bList.head.to.bList.head.myBranch)).asInstanceOf[MatReq].m.get
+           mat3.elements.zip(me.exp(tree.bList.head.to.bList.head.dist).elements).foreach{t=>
            t._1 should be (t._2 plusOrMinus 1E-7)
          }
     }
