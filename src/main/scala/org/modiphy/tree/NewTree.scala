@@ -223,6 +223,7 @@ class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignmen
    descendentBranches.foreach{b=>
      b.dist = f(b.id)
    }
+   this
  }
  def branchX(dir:DirBranch[_])=branchEnds.filter{_.myBranch != dir.myBranch}
  
