@@ -195,6 +195,9 @@ class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignmen
  lazy val nodeList={
    (descendentBranches.map{_.a} ++ descendentBranches.map{_.b}).removeDuplicates.sort{_.id < _.id}
  }
+ lazy val iNodeList={
+   nodeList.filter{_.isInstanceOf[INode[A]]}.map{_.asInstanceOf[INode[A]]}
+ }
  lazy val descendentBranches={
    (branchEnds.map{_.myBranch} ++ branchEnds.map{b=> b.down.descendentBranches(b)}.flatten[Branch[A]]).sort{(a,b)=> a.id < b.id}
  }

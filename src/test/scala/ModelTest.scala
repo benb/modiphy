@@ -23,6 +23,15 @@ class ModelSuite extends FunSuite {
 
 
   test("log likelihood of basic model should match PAML") (model.logLikelihood should be (-6057.892394 plusOrMinus 0.001))//from PAML
+  test("log likelihood of basic model should match PAML regardless of 'root' node") {
+    val trees = tree.iNodeList.map{_.copy}
+    trees.foreach{t=>
+      SimpleModel(t).logLikelihood should be (-6057.892394 plusOrMinus 0.001)
+    }
+  }
+
+
+
   test("TufA Gamma Model"){
     val (tree,aln)=DataParse(tufaTree,tufaAln.lines,new org.modiphy.sequence.SiteClassAA(4))
     val pi = Vector(0.066487,0.050798,0.021011,0.069415,0.001862,0.033511,0.095479,0.089628,0.012500,0.061436,0.093617,0.053457,0.032979,0.038830,0.051064,0.027926,0.067287,0.000266,0.025532,0.106915)
