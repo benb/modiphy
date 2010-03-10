@@ -45,7 +45,7 @@ object BasicLikelihoodCalc{
    }
  }
 
-  def logLikelihood(pl:List[Vector],pi:Vector)={
-    likelihoods(pl,pi).foldLeft(0.0D){_+Math.log(_)}
+  def logLikelihood[A <: BioEnum](pl:List[Vector],pi:Vector,aln:Alignment[A])={
+    likelihoods(pl,pi).zip(aln.pCount).foldLeft(0.0D){(i,j)=>i+Math.log(j._1)*j._2}
   }
 }

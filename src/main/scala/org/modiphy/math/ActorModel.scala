@@ -785,12 +785,13 @@ class ActorTreeComponent[B <: BioEnum](tree:Tree[B],val name:ParamName) extends 
   class TreeParam{
     var myP=tree.getBranchLengths
     val branches = tree.descendentBranches.toArray
-    def getParams = myP.toList.sort{(t1,t2)=>t1._1 < t2._2}.map{_._2}.toArray
+    def getParams = myP.toArray//.toList.sort{(t1,t2)=>t1._1 < t2._2}.map{_._2}.toArray
     def setParams(a:Array[Double]){
-      myP.foreach{t=>
-        if (a(t._1)!=t._2){
-          myP(t._1)=a(t._1)
-          branches(t._1) !? UpdateDist(a(t._1))
+      myP.zip(a).zipWithIndex.foreach{t=>
+        val ((oldP,newP),index)=t
+        if (oldP!=newP){
+          myP(index)=newP
+          branches(index) !? UpdateDist(newP)
         }
       }
     }
@@ -1249,7 +1250,8 @@ class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val para
   }
 
 
-  def logLikelihood = {val ans = 
+  def logLikelihood = {
+   val ans = 
     {
     object Send
     Actor.actor{

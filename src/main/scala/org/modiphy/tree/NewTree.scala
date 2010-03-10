@@ -5,6 +5,7 @@ import scala.actors._
 import org.modiphy.math.EnhancedMatrix._
 import org.modiphy.sequence._
 import scala.util.parsing.combinator._
+import tlf._
 
 case object BranchLength
 case class UpdateDist(d:Double)
@@ -76,7 +77,6 @@ object DataParse{
 class DirBranch[A <: BioEnum](val down:Node[A],var dist:Double,val up:Node[A],val myBranch:Branch[A]) extends Actor{
   def id = myBranch.id.toString + "->" + up.id
   override def toString={
-    println(super.toString + " " + dist)
     down.dirToString(this)+":"+dist
   }
 
@@ -99,11 +99,8 @@ class DirBranch[A <: BioEnum](val down:Node[A],var dist:Double,val up:Node[A],va
         reply('ok)
         main(None)
       case LikelihoodCalc(model)=>
-        println("LikelihoodCalc " + id)
         if (!pl.isDefined){
-          println("LikelihoodCalc Update " + id)
           //get PL up to 'descendent' node
-          println("Sending LikelihoodCalcDir to " + down.id)
           down ! LikelihoodCalcDir(model,this)
           //get Matrix
           model ! NewMatReq(myBranch)
@@ -118,26 +115,24 @@ class DirBranch[A <: BioEnum](val down:Node[A],var dist:Double,val up:Node[A],va
       }
     }
   def getAns1(replyTo:OutputChannel[Any]){
-    println("branch " + id + " waiting on MatReq")
     react{
       case MatReq(_,Some(mat),Some(pi))=>
         getAns2(replyTo,mat,pi)
     }
   }
   def getAns2(replyTo:OutputChannel[Any],mat:Matrix,pi:Vector){
-    println("branch " + id + " waiting on PL")
     react{
       case CalculatedPartialLikelihoods(pl)=>
         val ans = BasicLikelihoodCalc.partialLikelihoodCalc(pl,mat)
         replyTo ! CalculatedPartialLikelihoods(ans)
-        main(Some(ans))
+        //main(Some(ans))
+        main(None)
     }
   }
 }
 
 class Branch[A <: BioEnum](val a:Node[A],val b:Node[A],var dist:Double,val id:Int) extends Actor{
   override def start={
-    println("Branch " + id + " starting")
     endA.start
     endB.start
     super.start
@@ -151,11 +146,11 @@ class Branch[A <: BioEnum](val a:Node[A],val b:Node[A],var dist:Double,val id:In
     loop{  
       react{
         case BranchLength=>
-          println("Requested branch length " + dist)
           reply(dist)
         case UpdateDist(d)=>
           endA !? UpdateDist(d)
           endB !? UpdateDist(d)
+          dist=d
           reply('ok)
       }
     }
@@ -163,7 +158,7 @@ class Branch[A <: BioEnum](val a:Node[A],val b:Node[A],var dist:Double,val id:In
 }
 
 
-abstract class Node[A <: BioEnum] extends Actor{
+abstract class Node[A <: BioEnum] extends Actor with Logging{
   def dirToString(dir:DirBranch[A]):String
   def initialLengthTo:Double
   def addBranch(b:DirBranch[A])
@@ -176,17 +171,13 @@ abstract class Node[A <: BioEnum] extends Actor{
 class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignment[A]) extends Node[A]{
  
  def startTree={
-   println("Branches " + descendentBranches.map{_.id})
    descendentBranches.foreach{_.start}
-   println("Nodes " + nodeList.map{_.id})
    nodeList.filter{_ != this}.foreach{n=>
-     println("STARTING " + n.id)
      n.start
    }
    super.start
  }
  override def start={
-   println("node " + id + " starting")
    super.start
  }
  
@@ -195,12 +186,10 @@ class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignmen
    "(" + branchEnds.reverse.mkString(",") + ");" //reverse to match original tree ordering
  }
  def dirToString(branch:DirBranch[A])={
-   println("node(" + id + ") " + branch.id + " " + branchX(branch).map{_.id})
    "(" + branchX(branch).reverse.mkString(",") + ")"
  }
  def copy=DataParse(this.toString,aln)._1
  def descendentBranches(dir:DirBranch[A]) = {
-   println("node " + this + "Coming from " + dir)
    branchX(dir).map{_.myBranch} ++ branchX(dir).map{b=> b.down.descendentBranches(b)}.flatten[Branch[A]]
  }
  lazy val nodeList={
@@ -210,8 +199,7 @@ class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignmen
    (branchEnds.map{_.myBranch} ++ branchEnds.map{b=> b.down.descendentBranches(b)}.flatten[Branch[A]]).sort{(a,b)=> a.id < b.id}
  }
  def getBranchLengths={
-   import scala.collection.immutable.IntMap
-   descendentBranches.map{b=>(b.id,b.dist)}.foldLeft[Map[Int,Double]](IntMap[Double]()){_+_}
+   descendentBranches.map{_.dist}.toArray//.foldLeft[Map[Int,Double]](IntMap[Double]()){_+_}
  }
  def setBranchLengths(bl:List[Double])={
    descendentBranches.zip(bl).foreach{t=>
@@ -240,26 +228,26 @@ class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignmen
   def main{
     react{
       case LogLikelihoodCalc(model,pi) =>
-        println("Calc Log Likelihood " + id)
+        debug{"Calc Log Likelihood " + id}
         var i = 0
         branchEnds.foreach{c => c ! LikelihoodCalc(model);i=i+1}
         logLikelihood(Nil,i,sender,pi)
       case LikelihoodCalcDir(model,branch)=>
-        println("LikelihoodCalcDir " + id)
+        debug{"LikelihoodCalcDir " + id}
         //request partial likelihoods along each branch
         var i=0
         branchX(branch).foreach{c => c ! LikelihoodCalc(model);i=i+1}
         partialLikelihoods(branch,Nil,i,sender)
       case a:Any => 
-        println("Node WTF " + a)
+        println("Node received unexpected message " + a)
       }
     }
     
     def logLikelihood(plList:List[List[Vector]],toDo:Int,replyTo:OutputChannel[Any],pi:Vector){
       if (toDo==0){
-        println("Combining " + plList.length + " partialLikelihoods")
         val ans = BasicLikelihoodCalc.combinePartialLikelihoods(plList)
-        replyTo ! LogLikelihood(BasicLikelihoodCalc.logLikelihood(ans,pi))
+        val ans2 = BasicLikelihoodCalc.logLikelihood(ans,pi,aln)
+        replyTo ! LogLikelihood(ans2)
         main
       }else {
         react{
@@ -271,7 +259,6 @@ class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignmen
 
     def partialLikelihoods(branch:DirBranch[_],plList:List[List[Vector]],toDo:Int,replyTo:OutputChannel[Any]){
       if (toDo==0){
-        println("Combining " + plList.length + " partialLikelihoods")
         val ans = BasicLikelihoodCalc.combinePartialLikelihoods(plList)
         replyTo ! CalculatedPartialLikelihoods(ans)
         main
@@ -286,7 +273,6 @@ class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignmen
 }
 class Leaf[A <: BioEnum](val id:Int,aln:Alignment[A],val name:String,val initialLengthTo:Double) extends Node[A]{
   override def start={
-    println("Leaf " + id + " starting")
     super.start
   }
   def descendentBranches(n:DirBranch[A])=Nil
@@ -314,11 +300,9 @@ class Leaf[A <: BioEnum](val id:Int,aln:Alignment[A],val name:String,val initial
     loop{
       react{
         case LikelihoodCalcDir(model,dir)=>
-          println("Leaf " + id + " got LikelihoodCalcDir")
           sender ! CalculatedPartialLikelihoods(likelihoods)          
-          println("Leaf " + id + " sent CalculatedPartialLikelihoods")
         case a:Any =>
-          println("Leaf Node WTF " + a)
+          println("Leaf Node received unexpected message " + a)
       }
     }
   } 
