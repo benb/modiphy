@@ -96,14 +96,20 @@ class ModelSuite extends FunSuite {
     model4b(Pi(0)) << model4(Pi(0))
     model4b.logLikelihood should be (model4.logLikelihood plusOrMinus 1E-5)
     model4b(Pi(0))=WAG.pi
+    println("SET PI")
     model4b.logLikelihood should not (be (model4.logLikelihood plusOrMinus 1E-5))
+    println("OK")
 
     model4b << model4
+    println("COPIED PARAMS")
 
     model4b(BranchLengths)(0)=3.0
+    println("SET BL")
 
     model4b.logLikelihood should not (be (model4.logLikelihood plusOrMinus 1E-5))
+    println("OK")
     model4(BranchLengths) << model4b(BranchLengths)
+    println("COPIED BL")
                                     
     model4b.logLikelihood should be (model4.logLikelihood plusOrMinus 1E-5)
   }                                 

@@ -138,6 +138,11 @@ class Branch[A <: BioEnum](val a:Node[A],val b:Node[A],var dist:Double,val id:In
     super.start
   }
 
+  var chainedBranches:List[Branch[_]]=Nil
+  def chain(b:Branch[_]){
+    chainedBranches=b::chainedBranches
+  }
+
   val endA = new DirBranch(a,dist,b,this)
   val endB = new DirBranch(b,dist,a,this)
   b addBranch endA
@@ -150,6 +155,9 @@ class Branch[A <: BioEnum](val a:Node[A],val b:Node[A],var dist:Double,val id:In
         case UpdateDist(d)=>
           endA !? UpdateDist(d)
           endB !? UpdateDist(d)
+          chainedBranches.foreach{b=>
+            b !? UpdateDist(d)
+          }
           dist=d
           reply('ok)
       }
@@ -170,6 +178,15 @@ abstract class Node[A <: BioEnum] extends Actor with Logging{
 
 class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignment[A]) extends Node[A]{
  
+ def splitAln(i:Int)={
+   aln.split(i).map{this.copy(_).chainFrom(this)}
+ }
+ def chainFrom[B<:BioEnum] (other:INode[B])={
+   descendentBranches.zip(other.descendentBranches).foreach{t=>
+     t._2 chain t._1
+   }
+   this
+ }
  def startTree={
    descendentBranches.foreach{_.start}
    nodeList.filter{_ != this}.foreach{n=>
@@ -189,6 +206,7 @@ class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignmen
    "(" + branchX(branch).reverse.mkString(",") + ")"
  }
  def copy=DataParse(this.toString,aln)._1
+ def copy[B <: BioEnum](newAln:Alignment[B])=DataParse(this.toString,newAln)._1
  def descendentBranches(dir:DirBranch[A]) = {
    branchX(dir).map{_.myBranch} ++ branchX(dir).map{b=> b.down.descendentBranches(b)}.flatten[Branch[A]]
  }
