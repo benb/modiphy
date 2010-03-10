@@ -467,8 +467,36 @@ class ForkActor[A <: BioEnum](tree:Tree[A],rec1Map:Map[Int,Actor]) extends Actor
 
 }
 
-class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:ActorTreeComponent[A],rec1:Option[Actor]) extends ActorModelComponent{
+
+class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:ActorTreeComponent[A],rec1:Option[Actor],myBranches:List[Branch[A]]) extends ActorModelComponent{
+  def this(tree:Tree[A],branchLengthParams:ActorTreeComponent[A],rec1:Option[Actor])=this(tree,branchLengthParams,rec1,tree.descendentBranches)
   val blName = branchLengthParams.name
+  case class ExpReq(b:Branch[_],pi:Vector)
+  case object Exit
+
+  class CacheActor(rec1:Option[Actor],lengthTo:Double,e:MatrixExponential) extends Actor{
+    def act{
+      react{
+        case ExpReq(n,pi)=>
+          val ans = e.exp(lengthTo)
+          val m = MatReq(n,Some(ans),Some(pi))
+          if (rec1.isDefined){rec1.get forward m}
+          else { sender ! m }
+          done(ans)
+      }
+    }
+    def done(ans:Matrix){
+      react{
+        case ExpReq(n,pi)=>
+          val m = MatReq(n,Some(ans),Some(pi))
+          if (rec1.isDefined){rec1.get forward m}
+          else { sender ! m }
+          done(ans)
+        case Exit=>
+          exit
+      }
+    }
+  }
 
   override def start={
     branchLengthParams addActor this
@@ -478,14 +506,13 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
   var eigen:MatrixExponential=null 
 
   def act{
-    main(None)
+    main(None,Map[Double,CacheActor]())
   }
-  def main(eigen:Option[MatrixExponential]){
-    case class ExpReq(b:Branch[_],e:MatrixExponential,lengthTo:Double,pi:Vector)
+  def main(eigen:Option[MatrixExponential],cache:Map[Double,CacheActor]){
       react{
         case q:QMatReq =>
           sender ! q
-          main(eigen)
+          main(eigen,cache)
         case MatReq(n,Some(m),Some(pi)) => 
           val myEigen = if (eigen.isEmpty){
             val ans = new MatExpNormal(m,pi,None)
@@ -493,26 +520,35 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
           }else {
             eigen.get
           }
-          new Actor{
-            def act{
-              react{
-                case ExpReq(n,e,lengthTo,pi)=> 
-                  val ans = e.exp(lengthTo)
-                  if (rec1.isDefined){rec1.get forward MatReq(n,Some(ans),Some(pi))}
-                  else { sender ! MatReq(n,Some(ans),Some(pi)) }
-                  exit
-              }
-            }
-          }.start forward ExpReq(n,myEigen,(n !? BranchLength).asInstanceOf[Double],pi)
-          main(Some(myEigen))
+          val branchLength = (n !? BranchLength).asInstanceOf[Double]
+          val (newCache,actor)=if (cache.contains(branchLength)){
+            val actor = cache(branchLength)
+            (cache,actor)
+
+          }else {
+            val actor =new CacheActor(rec1,branchLength,myEigen)
+            actor.start
+            (cache + ((branchLength,actor)),actor)
+          }
+          actor forward ExpReq(n,pi)
+          main(Some(myEigen),newCache)
         case Unclean(a)=>
+          val updateTree = myBranches.map{_ !! UpdateMat}
+          updateTree.foreach{_()}
           if (rec1.isDefined){rec1.get forward Unclean(a)} else {
             reply(Unclean(a))
           }
-          main(None)
+          cache.values.foreach{_ ! Exit}
+          main(None,Map[Double,CacheActor]())
         case ParamChanged(`blName`,a:Array[Double])=>
           if (rec1.isDefined){rec1.get forward Unclean(branchLengthParams)} else {reply(Unclean(branchLengthParams))}
-          main(eigen)
+          val arraySet = a.foldLeft(Set[Double]()){_+_}
+          val removables = cache.filterKeys{! arraySet.contains(_)}
+          removables.foreach{_._2 ! Exit}
+          val newCache = cache -- removables.elements.map{_._1}
+          main(eigen,newCache)
+        case a:Any=>
+          println(this + " received unexpected param " + a)
       }
   }
 }
@@ -838,7 +874,8 @@ class ActorProbComponent(prob:Double,name:ParamName,min:Double,max:Double) exten
 }
 class ActorGammaComponent(alpha:Double,name:ParamName) extends ActorDoubleComponent(alpha,name,0.01,1000)
 object SimpleModel{
-  def apply[A <: BioEnum](tree:Tree[A])={
+  def apply[A <: BioEnum](preTree:Tree[A])={
+    val tree = preTree.copy
     val pi = new ActorPiComponent(WAG.pi,Pi(0))
     val s = new ActorSComponent(WAG.S,S(0))
     val branchLength = new ActorTreeComponent(tree,BranchLengths(0))
@@ -849,7 +886,8 @@ object SimpleModel{
   }
 }
 object GammaModel{
-  def apply[A <: BioEnum](tree:Tree[A])={
+  def apply[A <: BioEnum](preTree:Tree[A])={
+    val tree = preTree.copy
     val pi = new ActorPiComponent(WAG.pi,Pi(0))
     val s = new ActorSComponent(WAG.S,S(0))
     val branchLength = new ActorTreeComponent(tree,BranchLengths(0))
@@ -864,7 +902,8 @@ object GammaModel{
   }
 }
 object InvarGammaModel{
-  def apply[A <: BioEnum](tree:Tree[A])={
+  def apply[A <: BioEnum](preTree:Tree[A])={
+    val tree = preTree.copy
     val pi = new ActorPiComponent(WAG.pi,Pi(0))
     val s = new ActorSComponent(WAG.S,S(0))
     val branchLength = new ActorTreeComponent(tree,BranchLengths(0))
@@ -882,7 +921,8 @@ object InvarGammaModel{
 }
 
 object InvarThmmModel{
-def apply[A <: BioEnum](tree:Tree[A])={
+def apply[A <: BioEnum](preTree:Tree[A])={
+    val tree = preTree.copy
   val numClasses = tree.alphabet.numClasses
     val pi = new ActorPiComponent(WAG.pi,Pi(0))
     val s = new ActorSComponent(WAG.S,S(0))
@@ -909,7 +949,8 @@ object BranchSpecificThmmModel{
     }
     apply(tree,branchMap)
   }
-  def apply[A <: BioEnum](tree:Tree[A],map:Map[Int,Int]):ActorModel[A]={
+  def apply[A <: BioEnum](preTree:Tree[A],map:Map[Int,Int]):ActorModel[A]={
+    val tree = preTree.copy
     val numClasses = tree.alphabet.numClasses
     val pi = new ActorPiComponent(WAG.pi,Pi(0))
     val s = new ActorSComponent(WAG.S,S(0))
@@ -978,7 +1019,7 @@ class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val para
 
   val tree = t.splitAln(6)
   tree.foreach{_.startTree}
-  t.startTree // needs branches
+  t.startTree // needs branches to be started
   val params = paramMap.keys.toList
   paramMap.values.foreach{_.start}
   components.start

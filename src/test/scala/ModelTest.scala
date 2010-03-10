@@ -14,8 +14,8 @@ class ModelSuite extends FunSuite {
   println("TREE: " + tree)
   val model = org.modiphy.math.SimpleModel(tree)
 
-  //Logging.toStdout 
-  //Logging setLevel "info"
+//  Logging.toStdout 
+//  Logging setLevel "debug"
 
 
   val (tree4,aln4) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(4))
@@ -138,31 +138,52 @@ class ModelSuite extends FunSuite {
   }
 
   test("BS complex model with restricted params should match simpler model"){
+    var c =0
     model2(Pi(0))=plusF
+    println("OK " + c); c+=1
     model2.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
+    println("OK " + c); c+=1
   //  val model2B = ModelFact.invarThmmBS(Vector(plusF),WAG.S,0.5,Matrix(5,5),tree5)
-    val typ = new org.modiphy.sequence.SiteClassAA(5)
+    val typ = org.modiphy.sequence.SiteClassAA(5)
+    println("OK " + c); c+=1
     val (tree5a,aln5a) = DataParse(treeStr,alnStr.lines,typ)
+    println("OK " + c); c+=1
     var i= -1
+    println("OK " + c); c+=1
     val model2C=BranchSpecificThmmModel(tree5a)
+    println("OK " + c); c+=1
     model2C(InvarPrior(0))=0.0
+    println("OK " + c); c+=1
     model2C(Pi(0))=plusF
+    println("OK " + c); c+=1
     model2C.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
+    println("OK " + c); c+=1
 
     val model2D = InvarThmmModel(tree5a) from model2C
+    println("OK " + c); c+=1
     model2D.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
+    println("OK " + c); c+=1
 
     //trying to set BS params using JoinedParam
     model2D(InvarPrior)=0.1
+    println("OK " + c); c+=1
     model2D(SingleParam(Sigma))=0.1
+    println("OK " + c); c+=1
     val sigmaList = tree5a.descendentBranches.map{n=>Sigma(n.id)}
+    println("OK " + c); c+=1
     val array = model2C.optGet(JoinedParam(sigmaList))
+    println("OK " + c); c+=1
     model2C(InvarPrior)=0.1
+    println("OK " + c); c+=1
     model2C(JoinedParam(sigmaList))=Array.make(array.length,0.1)
+    println("OK " + c); c+=1
     model2D.logLikelihood should be (model2C.logLikelihood plusOrMinus 0.0001)
+    println("OK " + c); c+=1
 
     model2C(SingleParam(All(Sigma)))=0.2
+    println("OK " + c); c+=1
     model2D(SingleParam(Sigma))=0.2
+    println("OK " + c); c+=1
     
     println(model2C)
     println("----")

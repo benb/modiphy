@@ -10,7 +10,6 @@ import tlf._
 case object BranchLength
 case class UpdateDist(d:Double)
 case class Unclean[A <: BioEnum](direction:DirBranch[A])
-case class UncleanNode[A <: BioEnum](direction:Node[A])
 case object UpdateMat
 case class LikelihoodCalcDir[A <: BioEnum](model:ActorModelComponent,b:DirBranch[A])
 case class LikelihoodCalc(model:ActorModelComponent)
@@ -80,6 +79,8 @@ class DirBranch[A <: BioEnum](val down:Node[A],var dist:Double,val up:Node[A],va
     down.dirToString(this)+":"+dist
   }
 
+  lazy val reverse=myBranch.other(this)
+
 
   def act{
     main(None)
@@ -92,10 +93,13 @@ class DirBranch[A <: BioEnum](val down:Node[A],var dist:Double,val up:Node[A],va
         main(pl)
       case UpdateDist(d)=>
         dist=d
+        up !? Unclean(this)
         reply('ok)
         main(None)
       case UpdateMat=>
-        up !? Unclean(this)
+        if (pl.isDefined){
+          up !? Unclean(this)
+        }
         reply('ok)
         main(None)
       case LikelihoodCalc(model)=>
@@ -109,9 +113,8 @@ class DirBranch[A <: BioEnum](val down:Node[A],var dist:Double,val up:Node[A],va
           sender ! CalculatedPartialLikelihoods(pl.get)
           main(pl)
         }
-       case UncleanNode(node)=>
-         up !? Unclean(this)
-         reply('ok)
+       case a:Any =>
+         println("dirbranch " + id + " unexpected msg " + a)
       }
     }
   def getAns1(replyTo:OutputChannel[Any]){
@@ -125,8 +128,8 @@ class DirBranch[A <: BioEnum](val down:Node[A],var dist:Double,val up:Node[A],va
       case CalculatedPartialLikelihoods(pl)=>
         val ans = BasicLikelihoodCalc.partialLikelihoodCalc(pl,mat)
         replyTo ! CalculatedPartialLikelihoods(ans)
-        //main(Some(ans))
-        main(None)
+        main(Some(ans))
+        //main(None)
     }
   }
 }
@@ -138,6 +141,7 @@ class Branch[A <: BioEnum](val a:Node[A],val b:Node[A],var dist:Double,val id:In
     super.start
   }
 
+
   var chainedBranches:List[Branch[_]]=Nil
   def chain(b:Branch[_]){
     chainedBranches=b::chainedBranches
@@ -145,6 +149,11 @@ class Branch[A <: BioEnum](val a:Node[A],val b:Node[A],var dist:Double,val id:In
 
   val endA = new DirBranch(a,dist,b,this)
   val endB = new DirBranch(b,dist,a,this)
+
+  def other(b:DirBranch[A])={
+    if (b==endA){endB}else{endA}
+  }
+
   b addBranch endA
   a addBranch endB 
   def act{
@@ -160,6 +169,15 @@ class Branch[A <: BioEnum](val a:Node[A],val b:Node[A],var dist:Double,val id:In
           }
           dist=d
           reply('ok)
+        case UpdateMat =>
+          endA !? UpdateMat
+          endB !? UpdateMat
+          chainedBranches.foreach{b=>
+            b!? UpdateMat
+          }
+          reply('ok)
+       case a:Any =>
+         println("branch " + id + " unexpected msg " + a)
       }
     }
   }
@@ -259,6 +277,10 @@ class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignmen
         var i=0
         branchX(branch).foreach{c => c ! LikelihoodCalc(model);i=i+1}
         partialLikelihoods(branch,Nil,i,sender)
+      case Unclean(dir)=>
+        branchX(dir).map{_.reverse}.foreach{ _ !? UpdateMat}
+        reply('ok)
+        main
       case a:Any => 
         println("Node received unexpected message " + a)
       }
@@ -322,6 +344,8 @@ class Leaf[A <: BioEnum](val id:Int,aln:Alignment[A],val name:String,val initial
       react{
         case LikelihoodCalcDir(model,dir)=>
           sender ! CalculatedPartialLikelihoods(likelihoods)          
+        case Unclean(dir)=>
+          reply('ok)
         case a:Any =>
           println("Leaf Node received unexpected message " + a)
       }
