@@ -477,27 +477,23 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
 
   class CacheActor(rec1:Option[Actor],lengthTo:Double,e:MatrixExponential) extends Actor{
     def act{
-      react{
-        case ExpReq(n,pi)=>
-          val ans = e.exp(lengthTo)
-          val m = MatReq(n,Some(ans),Some(pi))
-          if (rec1.isDefined){rec1.get forward m}
-          else { sender ! m }
-          done(ans)
+      val ans = e.exp(lengthTo)
+      loop{
+        react{
+          case ExpReq(n,pi)=>
+            println(this + " got MatReq from " + sender)
+            val m = MatReq(n,Some(ans),Some(pi))
+            if (rec1.isDefined){rec1.get forward m}
+            else { sender ! m }
+          case Exit=>
+            exit
+          case a:Any=>
+            println("WEIRD MSG " + a)         
+
+          }
+        }
       }
     }
-    def done(ans:Matrix){
-      react{
-        case ExpReq(n,pi)=>
-          val m = MatReq(n,Some(ans),Some(pi))
-          if (rec1.isDefined){rec1.get forward m}
-          else { sender ! m }
-          done(ans)
-        case Exit=>
-          exit
-      }
-    }
-  }
 
   override def start={
     branchLengthParams addActor this
@@ -525,7 +521,6 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
           val (newCache,actor)=if (cache.contains(branchLength)){
             val actor = cache(branchLength)
             (cache,actor)
-
           }else {
             val actor =new CacheActor(rec1,branchLength,myEigen)
             actor.start
