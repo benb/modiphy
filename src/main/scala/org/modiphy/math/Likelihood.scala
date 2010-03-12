@@ -12,7 +12,6 @@ class LikelihoodCalc[A <: BioEnum](tree:Node[A],model:Matrix,alphabet:A){
 }
 
 object BasicLikelihoodCalc{
-  val func = new cern.colt.function.DoubleDoubleFunction{def apply(x:Double,y:Double)=x*y}
 
   def partialLikelihoodCalc(end:List[Vector],matrix:Matrix)={
     val width = matrix.rows
@@ -25,8 +24,10 @@ object BasicLikelihoodCalc{
         ret
       }
   }
+
+  val func = new cern.colt.function.DoubleDoubleFunction{def apply(x:Double,y:Double)=x*y}
   def combinePartialLikelihoods(intermediates:List[List[Vector]])={
-    val ans = intermediates.head
+    val ans = intermediates.head.map{_.copy}
     intermediates.tail.foreach{list2=>
       ans.zip(list2).foreach{t=> 
         val (vec,vec2)=t
@@ -38,6 +39,7 @@ object BasicLikelihoodCalc{
   }
   def likelihoods(pl:List[Vector],pi:Vector)={
     pl.map{vec=>
+    val vec2=vec.copy
      pi.elements.zipWithIndex.map{t=>
         val(p,i)=t
         vec(i)*p

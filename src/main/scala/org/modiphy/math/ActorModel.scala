@@ -74,6 +74,7 @@ trait SimpleActorModelComponent extends ActorModelComponent{
         }
         else {sender ! ans}
       case m:MatReq=>
+        println(this + " got MatReq from " + sender)
         val ans = matReq(m)
         if (rec1.isDefined){rec1.get forward ans}
         else {sender ! ans}
@@ -1017,7 +1018,7 @@ trait OptPSetter {
 
 class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val paramMap:Map[ParamName,ActorParamComponent]) extends Logging{
 
-  val tree = t.splitAln(6)
+  val tree = t.splitAln(1)
   tree.foreach{_.startTree}
   t.startTree // needs branches to be started
   val params = paramMap.keys.toList

@@ -74,7 +74,7 @@ object DataParse{
 
 
 class DirBranch[A <: BioEnum](val down:Node[A],var dist:Double,val up:Node[A],val myBranch:Branch[A]) extends Actor{
-  def id = myBranch.id.toString + "->" + up.id
+  def id = down.id + "--" + myBranch.id.toString + "->" + up.id
   override def toString={
     down.dirToString(this)+":"+dist
   }
@@ -87,29 +87,46 @@ class DirBranch[A <: BioEnum](val down:Node[A],var dist:Double,val up:Node[A],va
   }
   //partial likelihoods go up the tree - so down -> to
   def main(pl:Option[List[Vector]]){
+//    if (myBranch.id==0){println("node " + id + " " + pl.isDefined)}
     react{
       case BranchLength=>
+      if (myBranch.id==0){println("node " + id + " BranchLength")}
         reply(dist)
         main(pl)
       case UpdateDist(d)=>
+      if (myBranch.id==0){println("node " + id + " " + UpdateDist(d))}
+        println(id + " unclean")
         dist=d
-        up !? Unclean(this)
+        if (pl.isDefined){
+          up !? Unclean(this)
+        }else {
+          println(id + " already unclean so stopping")
+        }
         reply('ok)
         main(None)
       case UpdateMat=>
+      println("node " + id + " " + UpdateMat)
         if (pl.isDefined){
+          println(id + " Waiting")
           up !? Unclean(this)
+          println(id + " Got")
         }
         reply('ok)
         main(None)
       case LikelihoodCalc(model)=>
-        if (!pl.isDefined){
+      if (myBranch.id==0){println("node " + id + " LikelihoodCalc")}
+      if (myBranch.id==2){println("node " + id + " LikelihoodCalc")}
+        
+        if (pl.isEmpty){
+          //if(myBranch.id==0){println("Branch " + this.id + " recalculating")}
+          println("Branch " + this.id + " recalculating")
           //get PL up to 'descendent' node
           down ! LikelihoodCalcDir(model,this)
           //get Matrix
           model ! NewMatReq(myBranch)
           getAns1(sender)
         }else {
+          println("Branch " + this.id + " cached")
           sender ! CalculatedPartialLikelihoods(pl.get)
           main(pl)
         }
@@ -118,18 +135,21 @@ class DirBranch[A <: BioEnum](val down:Node[A],var dist:Double,val up:Node[A],va
       }
     }
   def getAns1(replyTo:OutputChannel[Any]){
+    println(id + " getAns1")
     react{
       case MatReq(_,Some(mat),Some(pi))=>
         getAns2(replyTo,mat,pi)
     }
   }
   def getAns2(replyTo:OutputChannel[Any],mat:Matrix,pi:Vector){
+    println(id + " getAns2")
     react{
       case CalculatedPartialLikelihoods(pl)=>
         val ans = BasicLikelihoodCalc.partialLikelihoodCalc(pl,mat)
         replyTo ! CalculatedPartialLikelihoods(ans)
-        main(Some(ans))
-        //main(None)
+        //main(Some(ans))
+    println(id + " getAns3")
+        main(None)
     }
   }
 }
@@ -160,11 +180,13 @@ class Branch[A <: BioEnum](val a:Node[A],val b:Node[A],var dist:Double,val id:In
     loop{  
       react{
         case BranchLength=>
+          if (id==0){ println("Branch " + id + " length " + dist)}
           reply(dist)
         case UpdateDist(d)=>
           endA !? UpdateDist(d)
           endB !? UpdateDist(d)
           chainedBranches.foreach{b=>
+            println("Sending to chained " + id)
             b !? UpdateDist(d)
           }
           dist=d
@@ -195,6 +217,15 @@ abstract class Node[A <: BioEnum] extends Actor with Logging{
 }
 
 class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignment[A]) extends Node[A]{
+
+ var started=false 
+ override def start={
+   if (started==true){
+     println("STARTED TWICE")
+   }
+   started=true
+   super.start
+ }
  
  def splitAln(i:Int)={
    aln.split(i).map{this.copy(_).chainFrom(this)}
@@ -210,10 +241,7 @@ class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignmen
    nodeList.filter{_ != this}.foreach{n=>
      n.start
    }
-   super.start
- }
- override def start={
-   super.start
+   this.start
  }
  
  def alphabet = aln.alphabet

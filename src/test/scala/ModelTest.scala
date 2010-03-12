@@ -90,6 +90,7 @@ class ModelSuite extends FunSuite {
 
     val (tree5,aln5) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(5))
     val (tree5a,aln5a) = DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(5))
+    println(tree5a)
     val model4 = InvarThmmModel(tree5)
     model4(Pi(0))=tree5.aln.getFPi
     val model4b = BranchSpecificThmmModel(tree5a)
@@ -204,7 +205,9 @@ class ModelSuite extends FunSuite {
     val bl = startBL(0)
     startBL(0)=10.0D
   //  model3(BranchLengths)=startBL
-    model3.logLikelihood should be < (start) // artificially setting a branch length to exp(1.0) should be bad for the likelihood
+    println("Setting")
+    model3.logLikelihood should be < (start) // artificially setting a branch length to 10.0 should be bad for the likelihood
+    println("Resetting")
     startBL(0)=bl
     println(startBL)
   //  model3(BranchLengths)=startBL
