@@ -194,8 +194,8 @@ class Branch[A <: BioEnum](val a:Node[A],val b:Node[A],var dist:Double,val id:In
         case UpdateMat =>
           endA !? UpdateMat
           endB !? UpdateMat
-          chainedBranches.foreach{b=>
-            b!? UpdateMat
+          chainedBranches.foreach{
+            _ !? UpdateMat
           }
           reply('ok)
        case a:Any =>

@@ -56,8 +56,8 @@ trait SimpleActorModelComponent extends ActorModelComponent{
  def updateParam(p:ParamChanged[_])
 
  def sendUnclean(p:ParamName)={
-    if (rec1.isDefined){ rec1.get forward Unclean(pActorMap(p))}
-    else {reply(Unclean(pActorMap(p)))}
+    if (rec1.isDefined){ rec1.get !? Unclean(pActorMap(p))}
+    reply(Unclean(pActorMap(p)))
  }
  /**
    called when a downstream component has a parameter changed
@@ -74,14 +74,13 @@ trait SimpleActorModelComponent extends ActorModelComponent{
         }
         else {sender ! ans}
       case m:MatReq=>
-        println(this + " got MatReq from " + sender)
         val ans = matReq(m)
         if (rec1.isDefined){rec1.get forward ans}
         else {sender ! ans}
       case Unclean(a)=>
         unclean
-        if (rec1.isDefined){rec1.get forward Unclean(a)}
-        else {reply(Unclean(a))}
+        if (rec1.isDefined){rec1.get !? Unclean(a)}
+        reply(Unclean(a))
       }
       paramNames.map{p=>
       {
@@ -413,9 +412,9 @@ class ForkActor[A <: BioEnum](tree:Tree[A],rec1Map:Map[Int,Actor]) extends Actor
           }
           getListReplies(sender,numRec,Nil)
         case Unclean(a:ActorParamComponent) =>
-          rec.foreach{v=>
-            v !? Unclean(self)
-          }
+          rec.map{
+           _ !! Unclean(self)
+          }.toList.foreach{_()}
           reply(Unclean(a))
         case QMatReq(b,m,p)=>
           if (rec1Map contains b.id){
@@ -481,7 +480,6 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
       loop{
         react{
           case ExpReq(n,pi)=>
-            println(this + " got MatReq from " + sender)
             val m = MatReq(n,Some(ans),Some(pi))
             if (rec1.isDefined){rec1.get forward m}
             else { sender ! m }
@@ -531,17 +529,17 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
         case Unclean(a)=>
           val updateTree = myBranches.map{_ !! UpdateMat}
           updateTree.foreach{_()}
-          if (rec1.isDefined){rec1.get forward Unclean(a)} else {
-            reply(Unclean(a))
-          }
+          if (rec1.isDefined){rec1.get !? Unclean(a)}
           cache.values.foreach{_ ! Exit}
+          reply(Unclean(a))
           main(None,Map[Double,CacheActor]())
         case ParamChanged(`blName`,a:Array[Double])=>
-          if (rec1.isDefined){rec1.get forward Unclean(branchLengthParams)} else {reply(Unclean(branchLengthParams))}
+          if (rec1.isDefined){rec1.get !? Unclean(branchLengthParams)}
           val arraySet = a.foldLeft(Set[Double]()){_+_}
           val removables = cache.filterKeys{! arraySet.contains(_)}
           removables.foreach{_._2 ! Exit}
           val newCache = cache -- removables.elements.map{_._1}
+          reply(Unclean(branchLengthParams))
           main(eigen,newCache)
         case a:Any=>
           println(this + " received unexpected param " + a)
@@ -574,11 +572,13 @@ case class SingleParamWrapper(p:ActorParamComponent) extends ActorParamComponent
       main(param)
     case ParamUpdate(x:Array[Double])=>
       val newParam = Array.make(param.length,x(0))
-      p forward OptUpdate(newParam)
+      p !? OptUpdate(newParam)
+      reply('ok)
       main(newParam)
     case OptUpdate(x:Array[Double]) =>
       val newParam = Array.make(param.length,x(0))
-      p forward OptUpdate(newParam)
+      p !? OptUpdate(newParam)
+      reply('ok)
       main(newParam)
     case RequestOpt =>
       reply(Array(param(0)))
@@ -628,13 +628,15 @@ case class JoinedParamWrapper(pList:List[ActorParamComponent]) extends ActorPara
         val (pActor,pArray)=t
         pActor forward OptUpdate(pArray)
       }
+      reply('ok)
     case OptUpdate(x:Array[Double]) =>
       val to = paramArray.map{i=>new Array[Double](i.size)}
       setParam(x,to)
       pList.elements.zip(to.elements).foreach{t=>
         val (pActor,pArray)=t
-        pActor forward OptUpdate(pArray)
+        pActor !? OptUpdate(pArray)
       }
+      reply('ok)
     case RequestOpt =>
       reply(flatten(getParam2D))
     case Lower =>
