@@ -74,6 +74,7 @@ trait SimpleActorModelComponent extends ActorModelComponent{
         }
         else {sender ! ans}
       case m:MatReq=>
+      debug{this + " got MatReq " + m.b.id}
         val ans = matReq(m)
         if (rec1.isDefined){rec1.get forward ans}
         else {sender ! ans}
@@ -474,20 +475,21 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
   case class ExpReq(b:Branch[_],pi:Vector)
   case object Exit
 
-  class CacheActor(rec1:Option[Actor],lengthTo:Double,e:MatrixExponential) extends Actor{
+  class CacheActor(rec1:Option[Actor],lengthTo:Double,e:MatrixExponential) extends Actor with Logging{
     def act{
       val ans = e.exp(lengthTo)
       loop{
         react{
           case ExpReq(n,pi)=>
+            debug{" got expreq " + n.id + " " + lengthTo}
             val m = MatReq(n,Some(ans),Some(pi))
             if (rec1.isDefined){rec1.get forward m}
             else { sender ! m }
           case Exit=>
+            debug{" exiting " + lengthTo}
             exit
           case a:Any=>
             println("WEIRD MSG " + a)         
-
           }
         }
       }
@@ -498,7 +500,6 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
     if (rec1.isDefined){rec1.get.start}
     super.start
   }
-  var eigen:MatrixExponential=null 
 
   def act{
     main(None,Map[Double,CacheActor]())
@@ -509,6 +510,7 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
           sender ! q
           main(eigen,cache)
         case MatReq(n,Some(m),Some(pi)) => 
+          debug{this + " got MatReq " + n.id}
           val myEigen = if (eigen.isEmpty){
             val ans = new MatExpNormal(m,pi,None)
             ans
@@ -626,7 +628,7 @@ case class JoinedParamWrapper(pList:List[ActorParamComponent]) extends ActorPara
       setParam(x,to)
       pList.elements.zip(to.elements).foreach{t=>
         val (pActor,pArray)=t
-        pActor forward OptUpdate(pArray)
+        pActor !? OptUpdate(pArray)
       }
       reply('ok)
     case OptUpdate(x:Array[Double]) =>
@@ -1015,7 +1017,7 @@ trait OptPSetter {
 
 class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val paramMap:Map[ParamName,ActorParamComponent]) extends Logging{
 
-  val tree = t.splitAln(1)
+  val tree = t.splitAln(6)
   tree.foreach{_.startTree}
   t.startTree // needs branches to be started
   val params = paramMap.keys.toList
