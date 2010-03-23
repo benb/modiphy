@@ -4,12 +4,11 @@ import org.modiphy.tree._
 import org.modiphy.tree.DataParse.Tree
 import org.modiphy.sequence._
 import scala.collection.immutable.{Map,IntMap}
-import scala.actors.Actor
-import scala.actors.Actor._
-import scala.actors.OutputChannel
 import tlf.Logging
+import net.liftweb.actor._
+import scala.actors.Actor
 
-abstract class ActorModelComponent extends Actor with Logging{
+abstract class ActorModelComponent extends LiftActor with Logging{
 }
 
 case class SwitchingRate(n:Int) extends BranchMessage
@@ -19,37 +18,34 @@ sealed trait BranchMessage{
 
 trait SimpleActorModelComponent extends ActorModelComponent{
   def params:List[ActorParamComponent]
-  def rec1:Option[Actor]
+  def rec1:Option[LiftActor]
   lazy val numParams = params.length
   lazy val paramNames=params.map{_.name}
   lazy val pActorMap=paramNames.zip(params).foldLeft(Map[ParamName,ActorParamComponent]()){_+_}
-  var pMap:Map[ParamName,ParamChanged[_]]=null
-  override def start={
-    params.foreach{p=>
-      p addActor this
-    }
-    pMap = params.map{p=>
+  
+  params.foreach{p=>
+    p addActor this
+  }
+
+  val pMap:Map[ParamName,ParamChanged[_]]=params.map{p=>
     var x = (p !? (4000,RequestParam))
     while (x.isEmpty){
        x = (p !? (4000,RequestParam))
     }
     x.get
     }.map{_.asInstanceOf[ParamChanged[_]]}.map{p=>(p.name,p)}.foldLeft(Map[ParamName,ParamChanged[_]]()){_+_}
-    pMap.map{_._2}.foreach{updateParam}
-    if (rec1.isDefined){rec1.get.start}
-    super.start
-  }
-  def act{
-    loop{
-      react(myHandler.orElse { 
+
+  pMap.map{_._2}.foreach{updateParam}
+
+  protected def messageHandler = {
+      myHandler.orElse { 
           case a:Any => 
             if (rec1.isDefined){
-              rec1.get forward a
+              forwardMessageTo(a,rec1.get)
             }else {
-              println(self + " received unexpected message" + a)
-            }}
-          )
-    }
+              println(this + " received unexpected message" + a)
+            }
+          }
   }
 
  def matReq(m:MatReq):MatReq
@@ -63,21 +59,23 @@ trait SimpleActorModelComponent extends ActorModelComponent{
    called when a downstream component has a parameter changed
  */
  def unclean:Unit
- def myHandler = handlers
-  lazy val handlers = {
-
-    val mainHandler:PartialFunction[Any,Unit]={
+ def myHandler = {
+    def mainHandler:PartialFunction[Any,Unit]={
       case m:QMatReq=>
         val ans = matReq(m.toMatReq).toQMatReq
         if (rec1.isDefined){
-          rec1.get forward ans
+          forwardMessageTo(ans,rec1.get)
         }
-        else {sender ! ans}
+        else {reply(ans)}
       case m:MatReq=>
+      println(this + " got MatReq " + m.b.id + "\n" + rec1)
       debug{this + " got MatReq " + m.b.id}
         val ans = matReq(m)
-        if (rec1.isDefined){rec1.get forward ans}
-        else {sender ! ans}
+        if (rec1.isDefined){
+          println("Forwarding to " + rec1)
+          forwardMessageTo(ans,rec1.get) 
+        }
+        else {reply(ans)}
       case Unclean(a)=>
         unclean
         if (rec1.isDefined){rec1.get !? Unclean(a)}
@@ -98,8 +96,6 @@ trait SimpleActorModelComponent extends ActorModelComponent{
   
 
 }
-case class Params(list:List[ActorParamComponent])
-object GetParams extends Params(Nil)
 class MatBuilder(m:Option[Map[Node[_],Matrix]])
 case class MatReq(b:Branch[_],m:Option[Matrix],pi:Option[Vector]){
   def toQMatReq=QMatReq(b,m,pi)
@@ -110,7 +106,7 @@ case class QMatReq(b:Branch[_],m:Option[Matrix],pi:Option[Vector]){// extends Ma
 object NewMatReq{
   def apply(b:Branch[_])=MatReq(b,None,None)
 }
-case class Unclean(sender:Actor)
+case class Unclean(sender:LiftActor)
 case object RequestOpt
 object RequestParam 
 sealed trait ParamName
@@ -165,37 +161,52 @@ object Upper
 */
 case class OptUpdate(d:Array[Double])
 
-class BasicActorModel(piParam:ActorPiComponent,sParam:ActorSComponent,rec:Actor) extends ActorModelComponent with SimpleActorModelComponent{
-  val params = piParam :: sParam :: Nil
-  val piName = piParam.name
-  val sName = sParam.name
+class BasicActorModel(piParam:ActorPiComponent,sParam:ActorSComponent,rec:LiftActor) extends ActorModelComponent with SimpleActorModelComponent{
+  def params = piParam :: sParam :: Nil
+  lazy val piName = piParam.name
+  lazy val sName = sParam.name
   val rec1 = Some(rec)
   var pi:Vector = null
   var sMat:Matrix = null
   var mat:Option[Matrix]=None
   def updateParam(p:ParamChanged[_]){
+    println(piParam)
+    println(piParam.name)
+    println(piName)
+    println(sName)
     p match {
       case ParamChanged(`piName`,v:Vector)=>
         pi = v
+        println(this + " pi " + pi)
         unclean
       case ParamChanged(`sName`,m:Matrix) =>
         sMat = m
+        println(this + " sMat " + sMat)
+        println(this + " pi " + pi)
         unclean
+      case p=>
+        println(this + " Got unexpected ParamChanged " + p)
     }
   }
   def unclean{mat=None}
   def matReq(m:MatReq)={
+    println(this + " basic matreq")
     val myMat = if (mat.isDefined){
       mat.get
     }else {
+      println(this + " computing matreq")
+      println(sMat)
+      println(pi)
       mat = Some(sMat.sToQ(pi))
-        mat.get
-      }
+      println("done computing matreq")
+      mat.get
+    }
+    println("returning matreq")
     MatReq(m.b,Some(myMat),Some(pi))
   }
 }
-class NormaliserActorModel(rec:Actor) extends SimpleActorModelComponent{
-  val params = Nil
+class NormaliserActorModel(rec:LiftActor) extends SimpleActorModelComponent{
+  def params = Nil
   val rec1 = Some(rec)
   var mat:Option[Matrix]=None
   def updateParam(p:ParamChanged[_]){
@@ -211,7 +222,7 @@ class NormaliserActorModel(rec:Actor) extends SimpleActorModelComponent{
   }
 }
    
-class THMMActorModel(sigmaParam:ActorFullSComponent,numClasses:Int,rec:Actor) extends SimpleActorModelComponent{
+class THMMActorModel(sigmaParam:ActorFullSComponent,numClasses:Int,rec:LiftActor) extends SimpleActorModelComponent{
   val sigmaName = sigmaParam.name
   val params = sigmaParam :: Nil
   val rec1 = Some(rec)
@@ -262,7 +273,7 @@ class THMMActorModel(sigmaParam:ActorFullSComponent,numClasses:Int,rec:Actor) ex
     }
   }
   override def myHandler = {
-    val h:PartialFunction[Any,Unit]={
+    def h:PartialFunction[Any,Unit]={
       case SwitchingRate(n) =>
         reply(switchingRate)
     }
@@ -274,7 +285,7 @@ class THMMActorModel(sigmaParam:ActorFullSComponent,numClasses:Int,rec:Actor) ex
 
 
 
-class InvarActorModel(priorParam:ActorProbComponent,piParam:ActorPiComponent,numClasses:Int,rec:Actor) extends SimpleActorModelComponent{
+class InvarActorModel(priorParam:ActorProbComponent,piParam:ActorPiComponent,numClasses:Int,rec:LiftActor) extends SimpleActorModelComponent{
   val priorName=priorParam.name
   val piName = piParam.name
   val params = priorParam :: piParam :: Nil
@@ -337,7 +348,7 @@ class InvarActorModel(priorParam:ActorProbComponent,piParam:ActorPiComponent,num
     }
   }
 
-class GammaActorModel(shape:ActorGammaComponent,numClasses:Int,rec:Actor) extends SimpleActorModelComponent{
+class GammaActorModel(shape:ActorGammaComponent,numClasses:Int,rec:LiftActor) extends SimpleActorModelComponent{
   val rec1 = Some(rec)
   val shapeName = shape.name
   val params = shape :: Nil
@@ -394,125 +405,77 @@ class GammaActorModel(shape:ActorGammaComponent,numClasses:Int,rec:Actor) extend
   }
 }
 
-class ForkActor[A <: BioEnum](tree:Tree[A],rec1Map:Map[Int,Actor]) extends ActorModelComponent{
+class ForkActor[A <: BioEnum](tree:Tree[A],rec1Map:Map[Int,LiftActor]) extends ActorModelComponent{
   val rec = rec1Map.values.toList.removeDuplicates
   val numRec = rec.length
-  override def start={
-    rec1Map.values.foreach{v=>
-      v.start
-    }
-    super.start
-  }
 
-  def act{
-    loop{
-      react{
-        case Params(l)=>
-          rec.foreach{v=>
-            v ! Params(l)             
-          }
-          getListReplies(sender,numRec,Nil)
+  def messageHandlerMain:PartialFunction[Any,Unit] = {
         case Unclean(a:ActorParamComponent) =>
           rec.map{
-           _ !! Unclean(self)
-          }.toList.foreach{_()}
+           _ !< Unclean(this)
+          }.toList.foreach{_.get}
           reply(Unclean(a))
         case QMatReq(b,m,p)=>
           if (rec1Map contains b.id){
-            rec1Map(b.id) forward QMatReq(b,m,p)
+            forwardMessageTo(QMatReq(b,m,p),rec1Map(b.id))
           }else {
             warning{"Map does not contain " + b.id + " " + b}
-            sender ! QMatReq(b,m,p) 
+            reply(QMatReq(b,m,p))
           }
         case MatReq(b,m,p)=>
           if(rec1Map contains b.id){
-            rec1Map(b.id) forward MatReq(b,m,p)
+            forwardMessageTo(MatReq(b,m,p),rec1Map(b.id))
           }else {
             warning{"Map does not contain " + b.id + " " + b}
-            sender ! MatReq(b,m,p) 
+            reply(MatReq(b,m,p))
           }
         case m:BranchMessage=>
           if (rec1Map contains m.n){
-            rec1Map(m.n) forward m
+            forwardMessageTo(m,rec1Map(m.n))
           }else {
-            println(self + " received unexpected message " + m)
+            println(this + " received unexpected message " + m)
           }
         case a:Any=> 
-          println(self + " received unexpected message " + a)
-      }
-    }
+          println(this + " received unexpected message " + a)
   }
-
-  def getListReplies(output:OutputChannel[Any],toDo:Int,l:List[ActorParamComponent]){
-    if (toDo==0){
-      output ! Params(l) 
-      act
-    }
-    react{
-      case Params(l2) => 
-        getListReplies(output,toDo-1,l2++l)
-    }
-  }
-/*
-  def getCleanReplies(output:Actor,toDo:Int,me:Actor){
-    if (toDo==0){
-      output ! Unclean(output)
-      act
-    }
-    react{
-      case Unclean(`me`) => 
-        getCleanReplies(output,toDo-1,me)
-    }
-  }
-  */
+  def messageHandler = messageHandlerMain
 
 }
 
 
-class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:ActorTreeComponent[A],rec1:Option[Actor],myBranches:List[Branch[A]]) extends ActorModelComponent{
-  def this(tree:Tree[A],branchLengthParams:ActorTreeComponent[A],rec1:Option[Actor])=this(tree,branchLengthParams,rec1,tree.descendentBranches)
+class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:ActorTreeComponent[A],rec1:Option[LiftActor],myBranches:List[Branch[A]]) extends ActorModelComponent{
+  def this(tree:Tree[A],branchLengthParams:ActorTreeComponent[A],rec1:Option[LiftActor])=this(tree,branchLengthParams,rec1,tree.descendentBranches)
   val blName = branchLengthParams.name
   case class ExpReq(b:Branch[_],pi:Vector)
   case object Exit
+  branchLengthParams addActor this
 
-  class CacheActor(rec1:Option[Actor],lengthTo:Double,e:MatrixExponential) extends Actor with Logging{
-    def act{
-      val ans = e.exp(lengthTo)
-      loop{
-        react{
+  class CacheActor(rec1:Option[LiftActor],lengthTo:Double,e:MatrixExponential) extends LiftActor with Logging{
+    var ans:Option[Matrix] = None 
+    protected def messageHandler={
           case ExpReq(n,pi)=>
+            if (ans.isEmpty){ans = Some(e.exp(lengthTo))}
             debug{" got expreq " + n.id + " " + lengthTo}
-            val m = MatReq(n,Some(ans),Some(pi))
-            if (rec1.isDefined){rec1.get forward m}
-            else { sender ! m }
-          case Exit=>
-            debug{" exiting " + lengthTo}
-            exit
+            val m = MatReq(n,ans,Some(pi))
+            if (rec1.isDefined){forwardMessageTo(m,rec1.get)}
+            else { 
+              reply(m) 
+            }
           case a:Any=>
             println("WEIRD MSG " + a)         
           }
-        }
-      }
     }
 
-  override def start={
-    branchLengthParams addActor this
-    if (rec1.isDefined){rec1.get.start}
-    super.start
-  }
-
-  def act{
-    main(None,Map[Double,CacheActor]())
-  }
-  def main(eigen:Option[MatrixExponential],cache:Map[Double,CacheActor]){
-      react{
+  var eigen:Option[MatrixExponential]=None
+  var cache=Map[Double,CacheActor]()
+  def messageHandler={
         case q:QMatReq =>
-          sender ! q
-          main(eigen,cache)
+          reply(q)
         case MatReq(n,Some(m),Some(pi)) => 
           debug{this + " got MatReq " + n.id}
           val myEigen = if (eigen.isEmpty){
             val ans = new MatExpNormal(m,pi,None)
+            eigen=Some(ans)
             ans
           }else {
             eigen.get
@@ -523,18 +486,17 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
             (cache,actor)
           }else {
             val actor =new CacheActor(rec1,branchLength,myEigen)
-            actor.start
             (cache + ((branchLength,actor)),actor)
           }
-          actor forward ExpReq(n,pi)
-          main(Some(myEigen),newCache)
+          forwardMessageTo(ExpReq(n,pi),actor)
+          cache=newCache
         case Unclean(a)=>
           val updateTree = myBranches.map{_ !! UpdateMat}
           updateTree.foreach{_()}
           if (rec1.isDefined){rec1.get !? Unclean(a)}
-          cache.values.foreach{_ ! Exit}
           reply(Unclean(a))
-          main(None,Map[Double,CacheActor]())
+          eigen=None
+          cache=Map[Double,CacheActor]()
         case ParamChanged(`blName`,a:Array[Double])=>
           if (rec1.isDefined){rec1.get !? Unclean(branchLengthParams)}
           val arraySet = a.foldLeft(Set[Double]()){_+_}
@@ -542,61 +504,52 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
           removables.foreach{_._2 ! Exit}
           val newCache = cache -- removables.elements.map{_._1}
           reply(Unclean(branchLengthParams))
-          main(eigen,newCache)
+          cache=newCache
         case a:Any=>
           println(this + " received unexpected param " + a)
-      }
   }
 }
 
-trait ActorParamComponent extends Actor{
+trait ActorParamComponent extends LiftActor{
   def name:ParamName
-  var modelComp:List[Actor]=Nil
-  def addActor(l:Actor){
+  var modelComp:List[LiftActor]=Nil
+  def addActor(l:LiftActor){
     modelComp = l::modelComp
   }
 }
 
 
 case class SingleParamWrapper(p:ActorParamComponent) extends ActorParamComponent{
-  start
   val name = SingleParam(p.name)
-  def act{
+  var param:Array[Double]={
     val mainParam = (p !? RequestOpt).asInstanceOf[Array[Double]]
-    main(Array.make(mainParam.length,mainParam(0)))
+    Array.make(mainParam.length,mainParam(0))
   }
   def lower = (p !? Lower).asInstanceOf[Array[Double]](0)
   def upper = (p !? Upper).asInstanceOf[Array[Double]](0)
-  def main(param:Array[Double]){
-    react{
+  def messageHandler ={
     case RequestParam=>
       reply(ParamChanged(name,param(0)))
-      main(param)
     case ParamUpdate(x:Array[Double])=>
       val newParam = Array.make(param.length,x(0))
       p !? OptUpdate(newParam)
       reply('ok)
-      main(newParam)
+      param=newParam
     case OptUpdate(x:Array[Double]) =>
       val newParam = Array.make(param.length,x(0))
       p !? OptUpdate(newParam)
       reply('ok)
-      main(newParam)
+      param=newParam
     case RequestOpt =>
       reply(Array(param(0)))
-      main(param)
     case Lower =>
       reply(Array(lower))
-      main(param)
     case Upper =>
       reply(Array(upper))
-      main(param)
-    }
   }
 }
 
 case class JoinedParamWrapper(pList:List[ActorParamComponent]) extends ActorParamComponent{
-  start
   val name = JoinedParam(pList.map{_.name})
   val paramArray=getParam2D.toArray
   val numParams =paramArray.map{_.size}
@@ -618,9 +571,7 @@ case class JoinedParamWrapper(pList:List[ActorParamComponent]) extends ActorPara
     }
   lazy val lower = pList.map{p=>(p !? Lower).asInstanceOf[Array[Double]].toList}.flatten[Double].toArray
   lazy val upper = pList.map{p=>(p !? Upper).asInstanceOf[Array[Double]].toList}.flatten[Double].toArray
-  def act{
-    loop{
-    react{
+  def messageHandler={
     case RequestParam=>
       reply(ParamChanged(name,flatten(getParam2D)))
     case ParamUpdate(x:Array[Double])=>
@@ -645,7 +596,6 @@ case class JoinedParamWrapper(pList:List[ActorParamComponent]) extends ActorPara
       reply(lower)
     case Upper =>
       reply(upper)
-    }}
   }
 }
 /*
@@ -688,7 +638,7 @@ abstract class AbstractActorParam[A] extends ActorParamComponent with Logging{
         }
     }
   }*/
-  private val myHandler:PartialFunction[Any,Unit] = {
+  private def myHandler:PartialFunction[Any,Unit] = {
         case RequestParam=>
          reply(ParamChanged(name,myParam))
         case ParamUpdate(x:Array[Double])=> 
@@ -720,12 +670,8 @@ abstract class AbstractActorParam[A] extends ActorParamComponent with Logging{
   def handler:PartialFunction[Any,Unit]= {
      myHandler 
   }
+  protected def messageHandler=handler
 
-  def act{
-    loop{
-      react(handler)
-    }
-  }
 }
 class ActorPiComponent(pi:Vector,val name:ParamName) extends AbstractActorParam[Vector]{
   class PiParam(pi:Vector){
@@ -776,7 +722,7 @@ class ActorSComponent(s:Matrix,val name:ParamName) extends AbstractActorParam[Ma
   def myParam = s
   def lower = 0.0
   def upper = 200
-  private val myHandler:PartialFunction[Any,Unit]={
+  def myHandler:PartialFunction[Any,Unit]={
       case ParamUpdate(m:Matrix)=>
         setRaw(linearSMatFull(m).toArray)
         modelComp.foreach{c=>
@@ -800,7 +746,7 @@ class ActorFullSComponent(s:Matrix,val name:ParamName) extends AbstractActorPara
   def lower = 0.0D
   def upper = 200
   def myParam = s
-  private val myHandler:PartialFunction[Any,Unit]={
+  private def myHandler:PartialFunction[Any,Unit]={
       case RequestParam=>
           reply(ParamChanged(name,myParam))
       case ParamUpdate(m:Matrix)=>
@@ -847,7 +793,7 @@ class ActorDoubleComponent(param:Double,val name:ParamName,val lower:Double,val 
   val internal = new DoubleParam
   def myParam = internal.getParams(0)
 
-  private val myHandler:PartialFunction[Any,Unit]={
+  private def myHandler:PartialFunction[Any,Unit]={
     case ParamUpdate(x:Double)=>
       internal.myP=x
       modelComp.foreach{c=>
@@ -964,12 +910,12 @@ object BranchSpecificThmmModel{
       pList = sigma :: pList
       val ans = new THMMActorModel(sigma,numClasses, new BasicSingleExpActorModel(tree,branchLength,None))
       (a,ans)
-    }.foldLeft[Map[Int,Actor]](IntMap[Actor]()){_+_}
+    }.foldLeft[Map[Int,LiftActor]](IntMap[LiftActor]()){_+_}
 
     val pMap = pList.map{p => (p.name,p)}.foldLeft(Map[ParamName,ActorParamComponent]()){_+_}
 
       
-    val modelMap = (map.keys).map{id=> (id,modelMapTmp(map(id)))}.foldLeft[Map[Int,Actor]](IntMap[Actor]()){_+_}
+    val modelMap = (map.keys).map{id=> (id,modelMapTmp(map(id)))}.foldLeft[Map[Int,LiftActor]](IntMap[LiftActor]()){_+_}
     val components = new BasicActorModel(pi,s,
       new GammaActorModel(alpha,numClasses-1,
         new InvarActorModel(invarPrior,pi,numClasses,
@@ -1016,13 +962,12 @@ trait OptPSetter {
 
 
 class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val paramMap:Map[ParamName,ActorParamComponent]) extends Logging{
+  import scala.actors.Actor._
 
   val tree = t.splitAln(6)
   tree.foreach{_.startTree}
   t.startTree // needs branches to be started
   val params = paramMap.keys.toList
-  paramMap.values.foreach{_.start}
-  components.start
 
 
   def rawReq(a:Any)={

@@ -6,6 +6,7 @@ import org.modiphy.math.EnhancedMatrix._
 import ModelData._
 import scala.actors.Actor
 import scala.actors.Actor._
+import net.liftweb.actor._
 
 
 class ActorModelSuite extends FunSuite {
@@ -13,26 +14,18 @@ class ActorModelSuite extends FunSuite {
 
   test ("Actor Model should give correct matrix exp"){
     case class Test(b:Branch[_])
-    class ActorTest extends Actor{
+    class ActorTest extends LiftActor{
       tree.startTree
       val actorPi = new ActorPiComponent(WAG.pi,Pi(0))
       val actorS = new ActorSComponent(WAG.S,S(0))
       val branchLengthComp =  new ActorTreeComponent(tree,BranchLengths(0))
       val part1 = new BasicActorModel(actorPi,actorS,new NormaliserActorModel(new BasicSingleExpActorModel(tree,branchLengthComp,None)))
-      actorPi.start
-      actorS.start
-      part1.start
-      def act{
-        loop{
-          react{
-            case Test(branch) => part1 forward NewMatReq(branch)
-            }
-          }
-        }
+      def messageHandler={
+         case Test(branch) => forwardMessageTo(NewMatReq(branch),part1)
       }
+    }
 
       val actor = new ActorTest
-      actor.start
       val ans = (actor !? Test(tree.bList.head.myBranch)).asInstanceOf[MatReq]
       val mat1 = ans.m.get
       val me = new MatExpYang(WAG.S.sToQ(WAG.pi),WAG.pi,Some(1.0))
