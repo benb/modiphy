@@ -39,7 +39,7 @@ object AA extends SiteClassAA(1)
 
 class BioSeq[A](seq:Seq[A]) extends Seq[A]{
   def length = seq.length
-  def elements = seq.elements
+  def iterator = seq.iterator
   def apply(i:Int)=seq(i)
 }
 
@@ -223,7 +223,7 @@ class Alignment[A<:BioEnum](m:Map[String,String],val alphabet:A){
 
   def getFPi={
     val f = getF
-    Vector(alphabet.matElements.map{f.getOrElse(_,0.0)}).normalize(1.0D)
+    Matrix1D(alphabet.matElements.map{f.getOrElse(_,0.0)}).normalize(1.0D)
   }
 
   def toFasta={

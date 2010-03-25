@@ -34,7 +34,7 @@ class ModelSuite extends FunSuite {
 
   test("TufA Gamma Model"){
     val (tree,aln)=DataParse(tufaTree,tufaAln.lines,new org.modiphy.sequence.SiteClassAA(4))
-    val pi = Vector(0.066487,0.050798,0.021011,0.069415,0.001862,0.033511,0.095479,0.089628,0.012500,0.061436,0.093617,0.053457,0.032979,0.038830,0.051064,0.027926,0.067287,0.000266,0.025532,0.106915)
+    val pi = Matrix1D(0.066487,0.050798,0.021011,0.069415,0.001862,0.033511,0.095479,0.089628,0.012500,0.061436,0.093617,0.053457,0.032979,0.038830,0.051064,0.027926,0.067287,0.000266,0.025532,0.106915)
 
     //val gammaModel = ModelFact.gamma(pi,WAG.S,0.496466,tree)
     val gammaModel = GammaModel(tree)//
@@ -58,7 +58,7 @@ class ModelSuite extends FunSuite {
     val model2B = InvarGammaModel(tree5)
     model2B(InvarPrior(0))=0.0D
     model2B(Pi(0))=plusF
-    //val model2B = ModelFact.invarThmm(Vector(plusF),WAG.S,0.5,Matrix(5,5),tree5)
+    //val model2B = ModelFact.invarThmm(Matrix1D(plusF),WAG.S,0.5,Matrix(5,5),tree5)
    // model2B.getParam("First Prior").head.setParams(Array(0))
     model2B.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
   }
@@ -127,7 +127,7 @@ class ModelSuite extends FunSuite {
     sigma(2,4)=2.415327
     sigma(3,4)=2.415327
 
-    val pi = Vector(Array(0.024191,0.002492,0.002932,0.002492,0.001906,0.002492,0.006304,0.023018,0.002346,0.026683,0.034307,0.008943,0.007037,0.014808,0.005278,0.018326,0.013928,0.007477,0.007917,0.020379)).normalize(1)
+    val pi = Matrix1D(Array(0.024191,0.002492,0.002932,0.002492,0.001906,0.002492,0.006304,0.023018,0.002346,0.026683,0.034307,0.008943,0.007037,0.014808,0.005278,0.018326,0.013928,0.007477,0.007917,0.020379)).normalize(1)
     println("PI " + pi)
     thmmsi(Pi(0))=pi
     thmmsi(Sigma(0))=sigma
@@ -144,7 +144,7 @@ class ModelSuite extends FunSuite {
     println("OK " + c); c+=1
     model2.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
     println("OK " + c); c+=1
-  //  val model2B = ModelFact.invarThmmBS(Vector(plusF),WAG.S,0.5,Matrix(5,5),tree5)
+  //  val model2B = ModelFact.invarThmmBS(Matrix1D(plusF),WAG.S,0.5,Matrix(5,5),tree5)
     val typ = org.modiphy.sequence.SiteClassAA(5)
     println("OK " + c); c+=1
     val (tree5a,aln5a) = DataParse(treeStr,alnStr.lines,typ)

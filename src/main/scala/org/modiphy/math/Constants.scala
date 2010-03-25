@@ -1,6 +1,6 @@
 package org.modiphy.math
 import math._
-import math.EnhancedMatrix._
+import org.modiphy.math.EnhancedMatrix._
 
 object ReplacementMatrix{
 def makeSMatTop(array:Array[Double],size:Int) = {
@@ -38,12 +38,12 @@ def makeSMatBottom(array:Array[Double],size:Int) = {
 
 }
 abstract class ReplacementMatrix{
-  def pi:Vector
+  def pi:Matrix1D
   def S:Matrix
 }
 
 object WAG extends ReplacementMatrix{
-  def pi = Vector(0.0866279,0.043972,0.0390894,0.0570451,0.0193078,0.0367281,0.0580589,0.0832518,0.0244313,0.048466,0.086209,0.0620286,0.0195027,0.0384319,0.0457631,0.0695179,0.0610127,0.0143859,0.0352742,0.0708956).normalize
+  def pi = Matrix1D(0.0866279,0.043972,0.0390894,0.0570451,0.0193078,0.0367281,0.0580589,0.0832518,0.0244313,0.048466,0.086209,0.0620286,0.0195027,0.0384319,0.0457631,0.0695179,0.0610127,0.0143859,0.0352742,0.0708956).normalize
   def S = ReplacementMatrix.makeSMatBottom(Array(
   0.551571,
   0.509848,0.635346,

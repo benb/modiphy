@@ -14,8 +14,8 @@ case object UpdateMat
 case class LikelihoodCalcDir[A <: BioEnum](model:ActorModelComponent,b:DirBranch[A])
 case class LikelihoodCalc(model:ActorModelComponent)
 case class LogLikelihood(d:Double)
-case class LogLikelihoodCalc(model:ActorModelComponent,pi:Vector)
-case class CalculatedPartialLikelihoods(pl:List[Vector])
+case class LogLikelihoodCalc(model:ActorModelComponent,pi:Matrix1D)
+case class CalculatedPartialLikelihoods(pl:List[Matrix1D])
 /**
   Used internally for parsing trees
 */
@@ -52,7 +52,7 @@ class TreeGen[A <: BioEnum]{
 */
 object DataParse{
   type Tree[A <: BioEnum]=INode[A]
-  import sequence.Alignment
+  import org.modiphy.sequence.Alignment
 
   private def cleanTree(t:String)=t.split("\\s+").mkString("").split("\n").mkString("")
 
@@ -86,7 +86,7 @@ class DirBranch[A <: BioEnum](val down:Node[A],var dist:Double,val up:Node[A],va
     main(None)
   }
   //partial likelihoods go up the tree - so down -> to
-  def main(pl:Option[List[Vector]]){
+  def main(pl:Option[List[Matrix1D]]){
 //    if (myBranch.id==0){println("node " + id + " " + pl.isDefined)}
     react{
       case BranchLength=>
@@ -128,7 +128,7 @@ class DirBranch[A <: BioEnum](val down:Node[A],var dist:Double,val up:Node[A],va
         getAns2(replyTo,mat,pi)
     }
   }
-  def getAns2(replyTo:OutputChannel[Any],mat:Matrix,pi:Vector){
+  def getAns2(replyTo:OutputChannel[Any],mat:Matrix,pi:Matrix1D){
     debug{id + " waiting on CPL"}
     react{
       case CalculatedPartialLikelihoods(pl)=>
@@ -188,8 +188,7 @@ class Branch[A <: BioEnum](val a:Node[A],val b:Node[A],var dist:Double,val id:In
       }
     }
   }
-}
-
+} 
 
 abstract class Node[A <: BioEnum] extends Actor with Logging{
   def dirToString(dir:DirBranch[A]):String
@@ -276,7 +275,7 @@ class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignmen
   def act{
     main
   }
-  type Cache=Map[Option[DirBranch[A]],List[Vector]] 
+  type Cache=Map[Option[DirBranch[A]],List[Matrix1D]] 
   def main{
     react{
       case LogLikelihoodCalc(model,pi) =>
@@ -299,7 +298,7 @@ class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignmen
       }
     }
     
-    def logLikelihood(plList:List[List[Vector]],toDo:Int,replyTo:OutputChannel[Any],pi:Vector){
+    def logLikelihood(plList:List[List[Matrix1D]],toDo:Int,replyTo:OutputChannel[Any],pi:Matrix1D){
       if (toDo==0){
         val ans = BasicLikelihoodCalc.combinePartialLikelihoods(plList)
         val ans2 = BasicLikelihoodCalc.logLikelihood(ans,pi,aln)
@@ -313,7 +312,7 @@ class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignmen
       }
     }
 
-    def partialLikelihoods(branch:DirBranch[_],plList:List[List[Vector]],toDo:Int,replyTo:OutputChannel[Any]){
+    def partialLikelihoods(branch:DirBranch[_],plList:List[List[Matrix1D]],toDo:Int,replyTo:OutputChannel[Any]){
       debug{id + " waiting on " + toDo + " PL"}
       if (toDo==0){
         val ans = BasicLikelihoodCalc.combinePartialLikelihoods(plList)
@@ -344,9 +343,9 @@ class Leaf[A <: BioEnum](val id:Int,aln:Alignment[A],val name:String,val initial
   val sequence:List[alphabet.Value]=aln.getPatterns(name).asInstanceOf[List[alphabet.Value]]
   val alphabet = aln.alphabet
 
-  lazy val likelihoods:List[Vector]={
+  lazy val likelihoods:List[Matrix1D]={
     sequence.map{a:alphabet.Value=>
-      val vec = Vector(alphabet.matLength)
+      val vec = Matrix1D(alphabet.matLength)
         alphabet.getNums(a).foreach{i=>
         vec(i)=1.0D}
         vec

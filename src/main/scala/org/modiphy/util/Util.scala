@@ -19,12 +19,9 @@ object PList{
 }
 
 class CacheMap[A,B](defaultSize:Int) extends scala.collection.mutable.Map[A,B]{
-  val map = new org.apache.commons.collections.LRUMap(defaultSize)
-  def update(a:A,b:B){
-    map.put(a,b)
-  }
+  val myMap = new org.apache.commons.collections.LRUMap(defaultSize)
   def get(a:A)={
-    val b = map.get(a)
+    val b = myMap.get(a)
     if (b==null){
       None
     }else{
@@ -32,16 +29,21 @@ class CacheMap[A,B](defaultSize:Int) extends scala.collection.mutable.Map[A,B]{
     }
   }
   def -=(a:A)={
-    map remove a
+    myMap.remove(a)
+    this
   }
-  def size:Int = map.size
-  def elements={new JclIterator(map.iterator).map{_.asInstanceOf[A]}.map{a=>(a,get(a).get)}}
+  def iterator={new JclIterator(myMap.iterator).map{_.asInstanceOf[A]}.map{a=>(a,get(a).get)}}
+  def +=(kv:(A,B))={
+    myMap.put(kv._1,kv._2)
+    this
+  }
 }
 import scala.ref.SoftReference
 class SoftCacheMap[A,B <: AnyRef](defaultSize:Int) extends scala.collection.mutable.Map[A,B]{
   val map = new CacheMap[A,SoftReference[B]](defaultSize)
-  def update(a:A,b:B){
-    map(a)=new SoftReference[B](b)
+  def +=(kv:(A,B)) = {
+    map(kv._1)=new SoftReference[B](kv._2)
+    this
   }
   def get(a:A)={
     val b = map.get(a)
@@ -51,9 +53,8 @@ class SoftCacheMap[A,B <: AnyRef](defaultSize:Int) extends scala.collection.muta
       None
     }
   }
-  def -=(a:A)=map -= a
-  def size = map.size
-  def elements=map.elements.map{t=>(t._1,t._2.get)}.filter{_._2.isDefined}.map{t=>(t._1,t._2.get)}
+  def -=(a:A)={map -= a; this}
+  def iterator=map.elements.map{t=>(t._1,t._2.get)}.filter{_._2.isDefined}.map{t=>(t._1,t._2.get)}
 }
 
 class JclIterator[A](i:java.util.Iterator[A]) extends Iterator[A]{

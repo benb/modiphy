@@ -5,57 +5,28 @@ import cern.colt.function.DoubleFunction
 import cern.colt.matrix.linalg.{Algebra,EigenvalueDecomposition}
 import org.modiphy.util._
 
+
+case class Foo(d:Double)
+
 object EnhancedMatrix{
   type Matrix=DoubleMatrix2D
-  type Vector=DoubleMatrix1D
+  type Matrix1D=DoubleMatrix1D
   implicit def enhanceMatrix(m:Matrix)=new EnhancedMatrix(m)
-  implicit def enhanceVector(m:Vector)=new EnhancedVector(m)
+  implicit def enhanceMatrix1D(m:Matrix1D)=new EnhancedMatrix1D(m)
   implicit def enhanceArray(m:Array[Double])=new EnhancedArray(m)
   implicit def enhanceList(m:List[Double])=new EnhancedList(m)
   private lazy val algebra = new Algebra
 
   class EnhancedList(l:List[Double]){
-    def toVector=Vector(l)
+    def toMatrix1D=Matrix1D(l)
   }
   class EnhancedArray(a:Array[Double]){
-    def toVector=Vector(a)
+    def toMatrix1D=Matrix1D(a)
   }
 
 }
 
 import EnhancedMatrix._
-object Vector{
-  def apply(i:Int):Vector=cern.colt.matrix.DoubleFactory1D.dense.make(i)
-  def apply(a:Double*):Vector=Vector(a.toArray)
-  def apply(a:Array[Double]):Vector=cern.colt.matrix.DoubleFactory1D.dense.make(a)
-  def apply(l:List[Double]):Vector=Vector(l.toArray)
-}
-object Matrix{
-  def apply(i:Int,j:Int)=dense.make(i,j)
-}
-
-trait MatrixExponential{
-  def pi:Vector
-  def u:Matrix
-  def v:Matrix
-  def q:Matrix
-  lazy val qNorm = u * d * v
-  def rawD:Matrix
-  def scale:Option[Double]
-  lazy val d = {
-    if (scale.isDefined){
-      def normFact = - dense.diagonal(q).zDotProduct(pi) / scale.get
-      def normFunc = new DoubleFunction(){def apply(v:Double)=v/normFact}
-      rawD.copy.assign(normFunc)
-    }else {
-      rawD
-    }
-  }
-  def exp(t:Double)={
-    (u * d.expVals(t)) * v
-  }
-}
-
 
 //Doesn't play well with other actors 
 //(react from channel belonging to other actor error)
@@ -66,14 +37,16 @@ trait CachedMatrixExponential extends MatrixExponential{
   import scala.actors.OutputChannel
   import scala.actors.Actor._
   case class CacheReq(t:Double)
+  def realExp(t:Double) = super.exp(t)
   case class Calc(o:OutputChannel[Any],r:CacheReq)
   case class Answer(t:Double,m:Matrix)
-  def realExp(t:Double) = super.exp(t)
+  case object ExitNow
   class CacheActor extends Actor{
     val cache = new SoftCacheMap[Double,Matrix](500)
     def act{
         loop{
           react{
+            case ExitNow => Actor.exit
             case Answer(t,m)=>
             println("GOT ANSWER")
               cache+((t,m)) 
@@ -105,9 +78,45 @@ trait CachedMatrixExponential extends MatrixExponential{
     println("SENDING")
     (actor !? CacheReq(t)).asInstanceOf[Answer].m
   }
-  def exit { actor.exit }
+  def exit { actor ! ExitNow }
 }
-class MatExpNormal(val q:Matrix,val pi:Vector,val scale:Option[Double]) extends MatrixExponential{
+
+
+
+object Matrix1D{
+  def apply(i:Int):Matrix1D=cern.colt.matrix.DoubleFactory1D.dense.make(i)
+  def apply(a:Double*):Matrix1D=Matrix1D(a.toArray)
+  def apply(a:Array[Double]):Matrix1D=cern.colt.matrix.DoubleFactory1D.dense.make(a)
+  def apply(l:List[Double]):Matrix1D=Matrix1D(l.toArray)
+}
+object Matrix{
+  def apply(i:Int,j:Int)=dense.make(i,j)
+}
+
+trait MatrixExponential{
+  def pi:Matrix1D
+  def u:Matrix
+  def v:Matrix
+  def q:Matrix
+  lazy val qNorm = u * d * v
+  def rawD:Matrix
+  def scale:Option[Double]
+  lazy val d = {
+    if (scale.isDefined){
+      def normFact = - dense.diagonal(q).zDotProduct(pi) / scale.get
+      def normFunc = new DoubleFunction(){def apply(v:Double)=v/normFact}
+      rawD.copy.assign(normFunc)
+    }else {
+      rawD
+    }
+  }
+  def exp(t:Double)={
+    (u * d.expVals(t)) * v
+  }
+}
+
+
+class MatExpNormal(val q:Matrix,val pi:Matrix1D,val scale:Option[Double]) extends MatrixExponential{
   val eigen = new EigenvalueDecomposition(q)  
   val algebra = new Algebra
   val u = eigen.getV
@@ -122,14 +131,14 @@ class MatExpScale(m:MatrixExponential,val s:Double) extends MatrixExponential{
   def rawD = m.rawD
   val scale = Some(s)
 }
-class BasicMatExpScale(val u:Matrix,val rawD:Matrix,val v:Matrix,val pi:Vector, s:Double) extends MatrixExponential{
-  def this(u:Matrix,rawD:Vector,v:Matrix,pi:Vector,scale:Double)= this(u,sparse.diagonal(rawD),v,pi,scale)
+class BasicMatExpScale(val u:Matrix,val rawD:Matrix,val v:Matrix,val pi:Matrix1D, s:Double) extends MatrixExponential{
+  def this(u:Matrix,rawD:Matrix1D,v:Matrix,pi:Matrix1D,scale:Double)= this(u,sparse.diagonal(rawD),v,pi,scale)
   val scale = Some(s)
   def q = u * rawD * v
 }
 
 
-class MatExpYang(val q:Matrix,val pi:Vector,val scale:Option[Double]) extends MatrixExponential{
+class MatExpYang(val q:Matrix,val pi:Matrix1D,val scale:Option[Double]) extends MatrixExponential{
   import cern.colt.matrix.DoubleFactory2D.sparse
 
     val funcRoot = new DoubleFunction(){def apply(v:Double)=Math.sqrt(v)}
@@ -199,12 +208,12 @@ class EnhancedMatrix(d:DoubleMatrix2D){
     }
     q
   }
-  def normalize(v:Vector):Matrix=normalize(v,1.0D)
-  def normalize(v:Vector,overall:Double):Matrix={
+  def normalize(v:Matrix1D):Matrix=normalize(v,1.0D)
+  def normalize(v:Matrix1D,overall:Double):Matrix={
     val sum = rate(v)
     d.copy.assign(new DoubleFunction(){def apply(d:Double)= overall * d/sum})
   }
-  def rate(v:Vector):Double={
+  def rate(v:Matrix1D):Double={
     -dense.diagonal(d).zDotProduct(v)
   }
 
@@ -255,7 +264,7 @@ class EnhancedMatrix(d:DoubleMatrix2D){
   }
 
 }
-class EnhancedVector(d:DoubleMatrix1D){
+class EnhancedMatrix1D(d:DoubleMatrix1D){
   type ID={def id:Int}
   def toList = (0 to d.size -1).map{i=>d.get(i)}.toList
   def elements=d.toArray.elements
@@ -265,10 +274,10 @@ class EnhancedVector(d:DoubleMatrix1D){
   def update(i:ID,v:Double):Unit=update(i.id,v)
   def *(n:Double)=d.copy.assign(new DoubleFunction(){def apply(v:Double)=v * n}) 
   def /(n:Double)={*(1/n)} 
-  def normalize(a:Double):Vector={
+  def normalize(a:Double):Matrix1D={
     val sum = d.zSum
     d.copy.assign(new DoubleFunction(){def apply(o:Double)=a*o/sum})
   }
 
-  def normalize:Vector=normalize(1.0D)
+  def normalize:Matrix1D=normalize(1.0D)
 }

@@ -13,20 +13,20 @@ class LikelihoodCalc[A <: BioEnum](tree:Node[A],model:Matrix,alphabet:A){
 
 object BasicLikelihoodCalc{
 
-  def partialLikelihoodCalc(end:List[Vector],matrix:Matrix)={
+  def partialLikelihoodCalc(end:List[Matrix1D],matrix:Matrix)={
     val width = matrix.rows
-    end.map{siteVector=>
-        val ret = Vector(width)
+    end.map{siteMatrix1D=>
+        val ret = Matrix1D(width)
 
         for (i<-0 until width){
-          ret(i)=siteVector.zDotProduct(matrix.viewRow(i))
+          ret(i)=siteMatrix1D.zDotProduct(matrix.viewRow(i))
         }
         ret
       }
   }
 
   val func = new cern.colt.function.DoubleDoubleFunction{def apply(x:Double,y:Double)=x*y}
-  def combinePartialLikelihoods(intermediates:List[List[Vector]])={
+  def combinePartialLikelihoods(intermediates:List[List[Matrix1D]])={
     val ans = intermediates.head.map{_.copy}
     intermediates.tail.foreach{list2=>
       ans.zip(list2).foreach{t=> 
@@ -37,7 +37,7 @@ object BasicLikelihoodCalc{
     ans
 
   }
-  def likelihoods(pl:List[Vector],pi:Vector)={
+  def likelihoods(pl:List[Matrix1D],pi:Matrix1D)={
     pl.map{vec=>
     val vec2=vec.copy
      pi.elements.zipWithIndex.map{t=>
@@ -47,7 +47,7 @@ object BasicLikelihoodCalc{
    }
  }
 
-  def logLikelihood[A <: BioEnum](pl:List[Vector],pi:Vector,aln:Alignment[A])={
+  def logLikelihood[A <: BioEnum](pl:List[Matrix1D],pi:Matrix1D,aln:Alignment[A])={
     likelihoods(pl,pi).zip(aln.pCount).foldLeft(0.0D){(i,j)=>i+Math.log(j._1)*j._2}
   }
 }
