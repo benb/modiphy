@@ -165,7 +165,7 @@ class Alignment[A<:BioEnum](m:Map[String,String],val alphabet:A){
   }
 
   def split(i:Int):List[Alignment[A]]={
-    val size = patterns._1.values.next.length
+    val size = patterns._1.values.head.length
     for (j <- 0 until (size - (size % i)) by (size/i)) yield {
       val t = if (j < (size - (size % i)) - (size/i)){
         sub(j,(size/i))

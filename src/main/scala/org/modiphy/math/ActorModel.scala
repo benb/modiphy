@@ -472,7 +472,7 @@ class ForkActor[A <: BioEnum](tree:Tree[A],rec1Map:Map[Int,Actor]) extends Actor
 class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:ActorTreeComponent[A],rec1:Option[Actor],myBranches:List[Branch[A]]) extends ActorModelComponent{
   def this(tree:Tree[A],branchLengthParams:ActorTreeComponent[A],rec1:Option[Actor])=this(tree,branchLengthParams,rec1,tree.descendentBranches)
   val blName = branchLengthParams.name
-  case class ExpReq(b:Branch[A],pi:Matrix1D)
+  case class ExpReq(b:Branch[BioEnum],pi:Matrix1D)
   case object Exit
 
   class CacheActor(rec1:Option[Actor],lengthTo:Double,e:MatrixExponential) extends Actor with Logging{
@@ -509,7 +509,7 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
         case q:QMatReq[A] =>
           sender ! q
           main(eigen,cache)
-        case MatReq(n:Branch[A],Some(m),Some(pi)) => 
+        case MatReq(n:Branch[BioEnum],Some(m),Some(pi)) => 
           debug{this + " got MatReq " + n.id}
           val myEigen = if (eigen.isEmpty){
             val ans = new MatExpNormal(m,pi,None)

@@ -200,7 +200,7 @@ abstract class Node[A <: BioEnum] extends Actor with Logging{
  def descendentBranches(dir:DirBranch[A]):List[Branch[A]]
 }
 
-class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignment[A]) extends Node[A]{
+class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignment[A],var label:String="") extends Node[A]{
 
  var started=false 
  override def start={
@@ -230,10 +230,10 @@ class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignmen
  
  def alphabet = aln.alphabet
  override def toString={
-   "(" + branchEnds.reverse.mkString(",") + ");" //reverse to match original tree ordering
+   "(" + branchEnds.reverse.mkString(",") + label +  ");" //reverse to match original tree ordering
  }
  def dirToString(branch:DirBranch[A])={
-   "(" + branchX(branch).reverse.mkString(",") + ")"
+   "(" + branchX(branch).reverse.mkString(",") + label +  ")"
  }
  def copy=DataParse(this.toString,aln)._1
  def copy[B <: BioEnum](newAln:Alignment[B])=DataParse(this.toString,newAln)._1
@@ -327,14 +327,14 @@ class INode[A <: BioEnum](val id:Int,val initialLengthTo:Double,val aln:Alignmen
     }
 
 }
-class Leaf[A <: BioEnum](val id:Int,aln:Alignment[A],val name:String,val initialLengthTo:Double) extends Node[A]{
+class Leaf[A <: BioEnum](val id:Int,aln:Alignment[A],val name:String,val initialLengthTo:Double,var label:String ="") extends Node[A]{
   override def start={
     super.start
   }
   def descendentBranches(n:DirBranch[A])=Nil
   
-  override def toString=name
-  def dirToString(d:DirBranch[A])=name
+  override def toString=name + " " + label
+  def dirToString(d:DirBranch[A])=name + " " + label
   var branchEnd:Option[DirBranch[A]]=None
   def bList=branchEnd.toList
   def addBranch(d:DirBranch[A]){
