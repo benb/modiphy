@@ -12,23 +12,30 @@ import scala.util.parsing.combinator._
 /**
   Used internally for parsing trees
 */
+
 class TreeParser[A <: BioEnum](aln:Alignment[A]) extends JavaTokenParsers{
   val treegen = new TreeGen[A]
   import treegen._
   def root: Parser[INode[A]] = "("~node~rep(","~>node)~");" ^^ {
-    case "("~node1~nodeList~");" => getINode(node1::nodeList,aln,0.0)
+    case "("~node1~nodeList~");" => getINode(node1::nodeList,aln,0.0,None)
   }
-  def node: Parser[Node[A]] = leaf | "("~node~rep(","~>node)~"):"~floatingPointNumber ^^ {
-    case "("~node1~nodeList~"):"~length => getINode(node1::nodeList,aln,length.toDouble)
-  } 
+  def node: Parser[Node[A]] = leaf | "("~node~rep(","~>node)~"):"~branchLength ^^ {
+    case "("~node1~nodeList~"):"~length => getINode(node1::nodeList,aln,length._1,length._2)
+  }
   def seqName: Parser[String] = regex(new scala.util.matching.Regex("[a-zA-Z0-9_.+-]+"))
-  def leaf: Parser[Leaf[A]] = seqName~":"~floatingPointNumber ^^ {case name~":"~length => getLeaf(name,aln,length.toDouble)}
+  def leaf: Parser[Leaf[A]] = seqName~":"~branchLength ^^ {case name~":"~branchLength => getLeaf(name,aln,branchLength._1,branchLength._2)}
+  def branchLength:Parser[(Double,Option[Int])] = {floatingPointNumber~"#"~wholeNumber ^^{
+     case length~"#"~id => (length.toDouble,Some(id.toInt))
+  } | floatingPointNumber  ^^ {
+     case length => (length.toDouble,None)
+  }
+  }
 }
 
 class TreeGen[A <: BioEnum]{
   var nodeCount:Int= -1
-  def getINode(children:List[Node[A]],aln:Alignment[A], lengthTo:Double)={nodeCount += 1;new INode[A](children,aln,lengthTo,nodeCount)}
-  def getLeaf(name:String,aln:Alignment[A], lengthTo:Double)={nodeCount += 1;new Leaf[A](name,aln,lengthTo,nodeCount)}
+  def getINode(children:List[Node[A]],aln:Alignment[A], lengthTo:Double, label:Option[Int]):INode[A]={nodeCount += 1;new INode[A](children,aln,lengthTo,nodeCount,label)}
+  def getLeaf(name:String,aln:Alignment[A], lengthTo:Double,label:Option[Int]):Leaf[A]={nodeCount += 1;new Leaf[A](name,aln,lengthTo,nodeCount,label)}
 }
 
 /**
@@ -71,6 +78,7 @@ import scala.actors.Actor
 import scala.actors.Actor._
 
 trait Node[A <: BioEnum] extends Actor with Logging{
+  val label:Option[Int]
   val me = this
   def isLeaf=false
   val id:Int
@@ -130,7 +138,7 @@ trait RootNode[A <: BioEnum] extends INode[A]{
   override val isRoot=true
   override def toString="("+children.mkString(",")+");"
 
-  override def factory[B <: BioEnum](c:List[Node[B]],aln:Alignment[B],len:Double):Tree[B]=new INode[B](c,aln,len,id) with RootNode[B]
+  override def factory[B <: BioEnum](c:List[Node[B]],aln:Alignment[B],len:Double):Tree[B]=new INode[B](c,aln,len,id,label) with RootNode[B]
 
   override def getBranchLengths={
     children.map{c=>c.getBranchLengths}.flatten[Double]
@@ -238,7 +246,7 @@ class PartialLikelihoodCalc extends Actor{
 }
 
 abstract class MatExpActor extends Actor
-class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val lengthTo:Double,val id:Int) extends Node[A]{ 
+class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val lengthTo:Double,val id:Int,val label:Option[Int]) extends Node[A]{ 
   val plCalc = new PartialLikelihoodCalc
   plCalc.start
 
@@ -293,7 +301,7 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
 
   val name=""
 
-  def factory[B<:BioEnum](c:List[Node[B]],aln:Alignment[B],len:Double)=if (isRoot){new INode[B](c,aln,len,id) with RootNode[B]}else {new INode[B](c,aln,len,id)}
+  def factory[B<:BioEnum](c:List[Node[B]],aln:Alignment[B],len:Double)=if (isRoot){new INode[B](c,aln,len,id,label) with RootNode[B]}else {new INode[B](c,aln,len,id,label)}
 
   def numChildren = children.size
   def childElements:Iterator[Node[A]] = children.elements
@@ -339,7 +347,7 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
     "("+children.mkString(",")+"):"+lengthTo
   }
 
-  def setRoot=new INode[A](children,aln,0.0D,id) with RootNode[A]
+  def setRoot=new INode[A](children,aln,0.0D,id,label) with RootNode[A]
 
   def setBranchLengths(l:List[Double])={
     var listPtr=l.tail
@@ -366,7 +374,7 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
   }
 }
 
-class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Double, val id:Int) extends Node[A]{
+class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Double, val id:Int, val label:Option[Int]) extends Node[A]{
 
   override def isLeaf=true
   def children:List[Node[A]]=Nil
@@ -385,26 +393,26 @@ class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Doubl
   def descendentNodes=List()
   def setBranchLengths(l:List[Double])={
   //   println("Node " + this + " setting branch length " + l.head)
-     new Leaf[A](name,aln,l.head,id)
+     new Leaf[A](name,aln,l.head,id,label)
  }
   def setBranchLengths(m:Map[Int,Double])={
-    new Leaf[A](name,aln,m(id),id)
+    new Leaf[A](name,aln,m(id),id,label)
   }
   def child(i:Int)=None
   def descendents=List(name)
-  def resize(bl:Double) = new Leaf[A](name,aln,bl,id)
+  def resize(bl:Double) = new Leaf[A](name,aln,bl,id,label)
   def numChildren=0
   def removeUseless=this
-  def setAlign[B<:BioEnum](a2:Alignment[B]):Node[B]=new Leaf[B](name,a2,lengthTo,id)
+  def setAlign[B<:BioEnum](a2:Alignment[B]):Node[B]=new Leaf[B](name,a2,lengthTo,id,label)
   def restrictTo(allowed:Set[String])=this
   override def toString=name + ":" + lengthTo
   def getBranchLengths=List(lengthTo)
-  def factory[B <: BioEnum](n:String,a:Alignment[B],len:Double)=new Leaf[B](n,a,len,id)
+  def factory[B <: BioEnum](n:String,a:Alignment[B],len:Double)=new Leaf[B](n,a,len,id,label)
   def branchTo=name
 
   def splitAln(i:Int)={
     val alnSplit = aln.split(i)
-    val ans = alnSplit.map{a => new Leaf(name,a,lengthTo,id)}
+    val ans = alnSplit.map{a => new Leaf(name,a,lengthTo,id,label)}
     //println(ans.length)
     assert(ans.length==i)
     ans
