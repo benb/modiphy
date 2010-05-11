@@ -86,6 +86,7 @@ trait Node[A <: BioEnum] extends Actor with Logging{
   val aln:Alignment[A]
   val alphabet:A=aln.alphabet
   
+  def toLabelledString=toString + {if (label.isDefined){"#" + label.get}else {""}}
   def lengthTo:Double
   def child(i:Int):Option[Node[A]]
   def children:List[Node[A]]
@@ -137,6 +138,8 @@ trait RootNode[A <: BioEnum] extends INode[A]{
 
   override val isRoot=true
   override def toString="("+children.mkString(",")+");"
+  override def toLabelledString="("+children.map{_.toLabelledString}.mkString(",")+");"
+
 
   override def factory[B <: BioEnum](c:List[Node[B]],aln:Alignment[B],len:Double):Tree[B]=new INode[B](c,aln,len,id,label) with RootNode[B]
 

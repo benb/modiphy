@@ -765,7 +765,7 @@ class ActorFullSComponent(s:Matrix,val name:ParamName) extends AbstractActorPara
   class FullSMatParam(s:Matrix) extends SMatUtil{
     var cache:Option[Array[Double]]=None
     def getParams={ if (cache.isEmpty){cache = Some(linearSMatFull(s).toArray)}; cache.get}
-    def setParams(a:Array[Double]) = setSMat(a,s)
+    def setParams(a:Array[Double]) = {setSMat(a,s);cache=None}
   }
   val internal = new FullSMatParam(s)
   def lower = 0.0D
@@ -890,13 +890,13 @@ def apply[A <: BioEnum](tree:Tree[A])={
 }
 
 object BranchSpecificThmmModel{
-  def apply[A <: BioEnum](tree:Tree[A]):ActorModel={
+  def apply[A <: BioEnum](tree:Tree[A]):ActorModel[A]={
     val nodeMap=tree.descendentNodes.foldLeft[Map[Int,Int]](IntMap[Int]()){(m,n)=>
         m + ((n.id,n.id))
     }
     apply(tree,nodeMap)
   }
-  def apply[A <: BioEnum](tree:Tree[A],map:Map[Int,Int]):ActorModel={
+  def apply[A <: BioEnum](tree:Tree[A],map:Map[Int,Int]):ActorModel[A]={
     val numClasses = tree.alphabet.numClasses
     val pi = new ActorPiComponent(WAG.pi,Pi(0))
     val s = new ActorSComponent(WAG.S,S(0))
@@ -928,7 +928,7 @@ object BranchSpecificThmmModel{
 
    
   }
-  def apply[A <: BioEnum](tree:Tree[A],l:List[Int]):ActorModel={
+  def apply[A <: BioEnum](tree:Tree[A],l:List[Int]):ActorModel[A]={
     apply(tree,(tree::tree.descendentNodes).map{n => (n.id,if (l contains n.id){1}else{0})}.foldLeft(Map[Int,Int]()){_+_})
   }
 }
@@ -961,7 +961,7 @@ trait OptPSetter {
 
 
 
-class ActorModel(t:Tree[_],components:ActorModelComponent,val paramMap:Map[ParamName,ActorParamComponent]) extends Logging{
+class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val paramMap:Map[ParamName,ActorParamComponent]) extends Logging{
 
   val tree = t.splitAln(6)
   tree.foreach{_.start}
@@ -1040,7 +1040,7 @@ class ActorModel(t:Tree[_],components:ActorModelComponent,val paramMap:Map[Param
     ans
   }
   
-  def setParamsFrom(other:ActorModel){
+  def setParamsFrom(other:ActorModel[A]){
     other.paramMap.foreach{t=> val (k,v)=t
       if (paramMap.contains(k) && !k.isInstanceOf[BranchLengths]){
       debug{"Setting " + k}
@@ -1049,13 +1049,13 @@ class ActorModel(t:Tree[_],components:ActorModelComponent,val paramMap:Map[Param
     }
   }
 
-  def from(other:ActorModel)={
+  def from(other:ActorModel[A])={
     this << other
     apply(BranchLengths(0)) << other(BranchLengths(0))
     this
   }
 
-  def <<(other:ActorModel){setParamsFrom(other)}
+  def <<(other:ActorModel[A]){setParamsFrom(other)}
 
   val paramLengthMap = paramMap.keys.map{t=>(t,optGet(t).length)}.foldLeft(Map[ParamName,Int]()){(m,p)=>m+((p._1,p._2))}
 

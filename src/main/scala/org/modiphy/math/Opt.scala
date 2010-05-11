@@ -17,7 +17,7 @@ abstract class Gradient extends MultivariateVectorialFunction{
   def apply(point:Array[Double]):Array[Double]
   def value(point:Array[Double])=apply(point)
 }
-class FuncWrapper(model:ActorModel,p:OptPSetter) extends MultivariateFunction with MultivariateRealFunction with Logging{
+class FuncWrapper(model:ActorModel[_],p:OptPSetter) extends MultivariateFunction with MultivariateRealFunction with Logging{
   def setBest=apply(best)
   var best:Array[Double]=p.latestArgs
   var bestLnL = -1E100
@@ -72,10 +72,10 @@ class FuncWrapper(model:ActorModel,p:OptPSetter) extends MultivariateFunction wi
 object ModelOptimiser extends Logging{
 
   
-  def optimise[A <: BioEnum](optFactory: => MultivariateMinimum,p:ParamName,model:ActorModel):Double={
+  def optimise[A <: BioEnum](optFactory: => MultivariateMinimum,p:ParamName,model:ActorModel[_]):Double={
     optimise(optFactory,p::Nil,model)
   }
-  def optimise[A <: BioEnum](optFactory: => MultivariateMinimum,pList:List[ParamName],model:ActorModel):Double={
+  def optimise[A <: BioEnum](optFactory: => MultivariateMinimum,pList:List[ParamName],model:ActorModel[_]):Double={
       val startParams = model.optSetter(pList)
       val func = new FuncWrapper(model,startParams)
       if (func.length==1){
@@ -85,7 +85,7 @@ object ModelOptimiser extends Logging{
       }
       func.setBest 
   }
-  def optimiseSequential[A <: BioEnum](optFactory: => MultivariateMinimum,pListList:List[List[ParamName]],model:ActorModel):Double={
+  def optimiseSequential[A <: BioEnum](optFactory: => MultivariateMinimum,pListList:List[List[ParamName]],model:ActorModel[_]):Double={
      var start = model.logLikelihood
      var end = start
      do {
