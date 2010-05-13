@@ -86,7 +86,7 @@ trait Node[A <: BioEnum] extends Actor with Logging{
   val aln:Alignment[A]
   val alphabet:A=aln.alphabet
   
-  def toLabelledString=toString + {if (label.isDefined){"#" + label.get}else {""}}
+  def toLabelledString:String
   def lengthTo:Double
   def child(i:Int):Option[Node[A]]
   def children:List[Node[A]]
@@ -259,6 +259,8 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
   val plCalc = new PartialLikelihoodCalc
   plCalc.start
 
+  def toLabelledString="("+children.map{_.toLabelledString}.mkString(",")+"):" + lengthTo + {if (label.isDefined){"#" + label.get}else {""}}
+
 
   def act{
     react {
@@ -391,6 +393,7 @@ class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Doubl
   override def isLeaf=true
   def children:List[Node[A]]=Nil
 
+  def toLabelledString = toString + {if (label.isDefined){"#" + label.get}else {""}}
   val sequence:List[alphabet.Value]=aln.getPatterns(name).asInstanceOf[List[alphabet.Value]]
   lazy val likelihoods:List[Vector]={
     sequence.map{a:alphabet.Value=>
