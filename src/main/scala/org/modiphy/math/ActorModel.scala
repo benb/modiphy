@@ -957,6 +957,25 @@ trait OptPSetter {
   def apply(d:Array[Double])
   def currentArgs:Array[Double]
   def latestArgs:Array[Double]
+  def randomise{
+
+    val random = new org.apache.commons.math.random.MersenneTwister
+
+    apply(
+      lower.zip(upper).map{t=>
+        random.nextDouble * (t._2-t._1) + t._2
+      }.toArray
+    )
+  }
+  def randomise(lowerX:Double,upperX:Double){
+    val random = new org.apache.commons.math.random.MersenneTwister
+    apply(
+      lower.zip(upper).map{t=> ((t._1 max lowerX),(t._2 min upperX))}.map{t=>
+        random.nextDouble * (t._2-t._1) + t._2
+      }.toArray
+    )
+
+  }
 }
 
 
