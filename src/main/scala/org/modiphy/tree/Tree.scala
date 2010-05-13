@@ -144,9 +144,14 @@ trait RootNode[A <: BioEnum] extends INode[A]{
   override def factory[B <: BioEnum](c:List[Node[B]],aln:Alignment[B],len:Double):Tree[B]=new INode[B](c,aln,len,id,label) with RootNode[B]
 
   override def getBranchLengths={
-    children.map{c=>c.getBranchLengths}.flatten[Double]
+    descendentNodes.map{_.lengthTo}
   }
   override def setBranchLengths(l:List[Double]):Tree[A]={
+    val nMap = descendentNodes.zip(l).foldLeft(Map[Int,Double]()){(m,t)=>
+      m + ((t._1.id,t._2))
+    }
+    setBranchLengths(nMap)
+    /*
     var listPtr = l
     val newchildren = children.map{c=>
       val c2 = c.setBranchLengths(listPtr)
@@ -154,6 +159,7 @@ trait RootNode[A <: BioEnum] extends INode[A]{
       c2
     }
     factory(newchildren,aln,l.head)
+    */
   }
   override def setBranchLengths(m:Map[Int,Double]):Tree[A]={
     val newChildren = children.map{c=>c.setBranchLengths(m)}
@@ -352,18 +358,21 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
 
   def setRoot=new INode[A](children,aln,0.0D,id,label) with RootNode[A]
 
-  def setBranchLengths(l:List[Double])={
-    var listPtr=l.tail
-    val newchildren = children.map{c=>val c2 = c.setBranchLengths(listPtr); listPtr = listPtr.drop(c.descendentNodes.size + 1);c2}
-    factory(newchildren,aln,l.head)
+  override def setBranchLengths(l:List[Double])={
+    val nMap = descendentNodes.zip(l).foldLeft(Map[Int,Double]()){(m,t)=>
+      m + ((t._1.id,t._2))
+    }
+    setBranchLengths(nMap)
   }
+ 
   def setBranchLengths(m:Map[Int,Double])={
     val newChildren = children.map{c=>c.setBranchLengths(m)}
     factory(newChildren,aln,m(id))
   }
 
   def getBranchLengths={
-    lengthTo :: children.map{c=>c.getBranchLengths}.flatten[Double]
+    //lengthTo :: children.map{c=>c.getBranchLengths}.flatten[Double]
+    lengthTo :: descendentNodes.map{_.lengthTo}
   }
 
   def branchTo=descendents.mkString(",")

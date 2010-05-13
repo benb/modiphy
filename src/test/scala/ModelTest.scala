@@ -165,18 +165,22 @@ class ModelSuite extends FunSuite {
     val typ = new org.modiphy.sequence.SiteClassAA(5)
     val (tree5a,aln5a) = DataParse(treeStr,alnStr.lines,typ)
     var i= -1
-    val model2C=BranchSpecificThmmModel(tree5a,(tree5a::tree5a.descendentNodes).foldLeft(Map[Int,Int]()){(m,n)=>i=i+1;m+((n.id,i))})
+    val model2C=BranchSpecificThmmModel(tree5a,(tree5a.descendentNodes).foldLeft(Map[Int,Int]()){(m,n)=>i=i+1;m+((n.id,i))})
     model2C(InvarPrior(0))=0.0
     model2C(Pi(0))=plusF
     model2C.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
 
     val model2D = InvarThmmModel(tree5a) from model2C
+    println(model2C)
+    println(model2D)
+    println("T1 " + model2C.currentTree)
+    println("T2 " + model2D.currentTree)
     model2D.logLikelihood should be (-5810.399586 plusOrMinus 0.001)
 
     //trying to set BS params using JoinedParam
     model2D(InvarPrior)=0.1
     model2D(SingleParam(Sigma))=0.1
-    val sigmaList = (tree5a::tree5a.descendentNodes).map{n=>Sigma(n.id)}
+    val sigmaList = (tree5a.descendentNodes).map{n=>Sigma(n.id)}
     val array = model2C.optGet(JoinedParam(sigmaList))
     model2C(InvarPrior)=0.1
     model2C(JoinedParam(sigmaList))=Array.make(array.length,0.1)

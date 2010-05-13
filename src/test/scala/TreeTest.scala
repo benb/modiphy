@@ -48,4 +48,12 @@ GFITQVIGPVVDIEF
      tree.children.map{_.label.get}.sort{_ < _} should be (List(0,1,26))
      tree.children.sort{_.label.get > _.label.get}.head.children.map{_.label.get}.sort{_ < _} should be (List(27,28))
    }
+  test("Branch Lengths"){
+     val t2 = tree.setBranchLengths(tree.getBranchLengths)
+     println(tree.getBranchLengths)
+     println(t2.getBranchLengths)
+     t2.getBranchLengths should be (tree.getBranchLengths)
+     t2.toString should be (tree.toString)
+   }
+
  }

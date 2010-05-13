@@ -788,7 +788,7 @@ class ActorFullSComponent(s:Matrix,val name:ParamName) extends AbstractActorPara
 }
 
 
-class ActorTreeComponent[B <: BioEnum](tree:Tree[B],name:ParamName) extends ActorArrayComponent((tree.descendentNodes.map(_.lengthTo).toArray),name,0.0,100.0)
+class ActorTreeComponent[B <: BioEnum](tree:Tree[B],name:ParamName) extends ActorArrayComponent(tree.getBranchLengths.toArray,name,0.0,100.0)
 class ActorDoubleComponent(param:Double,val name:ParamName,val lower:Double,val upper:Double) extends AbstractActorParam[Double]{
   class DoubleParam{
     var myP:Double=param
