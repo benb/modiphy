@@ -16,11 +16,12 @@ object BasicLikelihoodCalc{
 
   def partialLikelihoodCalc(end:List[Vector],matrix:Matrix)={
     val width = matrix.rows
+    val rows = (0 until width).map{i=> matrix viewRow i}.toArray
     end.map{siteVector=>
         val ret = Vector(width)
 
         for (i<-0 until width){
-          ret(i)=siteVector.zDotProduct(matrix.viewRow(i))
+          ret(i)=siteVector.zDotProduct(rows(i))
         }
         ret
       }
