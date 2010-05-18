@@ -2,6 +2,7 @@ package org.modiphy.math
 import EnhancedMatrix._
 import org.modiphy.tree._
 import org.modiphy.sequence._
+import cern.colt.matrix.DoubleMatrix1D
 
 class LikelihoodCalc[A <: BioEnum](tree:Node[A],model:Matrix,alphabet:A){
   def count = alphabet.filter{i=>alphabet.isReal(i)}.foldLeft(0){(i,j)=>i+1}
@@ -16,12 +17,13 @@ object BasicLikelihoodCalc{
 
   def partialLikelihoodCalc(end:List[Vector],matrix:Matrix)={
     val width = matrix.rows
-    val rows = (0 until width).map{i=> matrix viewRow i}.toArray
+    val rows = new Array[DoubleMatrix1D](width)
+    (0 until width).foreach{i=> rows(i)=matrix viewRow i}
     end.map{siteVector=>
         val ret = Vector(width)
 
         for (i<-0 until width){
-          ret(i)=siteVector.zDotProduct(rows(i))
+          ret set (i,siteVector.zDotProduct(rows(i)))
         }
         ret
       }
