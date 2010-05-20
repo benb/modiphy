@@ -542,6 +542,7 @@ case class SingleParamWrapper(p:ActorParamComponent) extends ActorParamComponent
   }
   def lower = (p !? Lower).asInstanceOf[Array[Double]](0)
   def upper = (p !? Upper).asInstanceOf[Array[Double]](0)
+
   def main(param:Array[Double]){
     react{
     case RequestParam=>
@@ -629,6 +630,9 @@ case class JoinedParamWrapper(p:List[ActorParamComponent]) extends ActorParamCom
  
 }*/
 
+case class ReadSerial(x:Seq[Double])
+case object WriteSerial
+
 abstract class AbstractActorParam[A] extends ActorParamComponent with Logging{
   type Param = {
     def getParams:Array[Double]
@@ -637,8 +641,11 @@ abstract class AbstractActorParam[A] extends ActorParamComponent with Logging{
   def internal:Param
   def myParam:A
   override def toString={
-    name.toString + " " + internal.getParams.toList
+    name.toString + " = " + internal.getParams.toList.mkString(",")
   }
+
+  def readSerial(x:Seq[Double])=internal setParams x.toArray
+  def writeSerial:Seq[Double]=internal.getParams
 
   def lower:Double
   def upper:Double
@@ -687,6 +694,11 @@ abstract class AbstractActorParam[A] extends ActorParamComponent with Logging{
           reply(lowerArray)
         case Upper=>
           reply(upperArray)
+        case ReadSerial(s) =>
+          readSerial(s)
+          reply('ok)
+        case WriteSerial =>
+          reply(writeSerial)
   }
   def handler:PartialFunction[Any,Unit]= {
      myHandler 
@@ -735,7 +747,9 @@ class ActorPiComponent(pi:Vector,val name:ParamName) extends AbstractActorParam[
   override def setRaw(p:Array[Double]){
     internal setPi p
   }
-  override def toString=name.toString + " " + internal.view
+  override def toString=name.toString + " = " + internal.view.toArray.mkString(",")
+  override def writeSerial = internal.view.toList
+  override def readSerial(x:Seq[Double])=internal.setPi(x.toArray)
 }
 class ActorSComponent(s:Matrix,val name:ParamName) extends AbstractActorParam[Matrix] with SMatUtil{
   class SMatParam(s:Matrix) extends SMatUtil{
@@ -759,8 +773,8 @@ class ActorSComponent(s:Matrix,val name:ParamName) extends AbstractActorParam[Ma
   override def handler={
     myHandler orElse (super.handler)
   }
-
 }
+
 class ActorFullSComponent(s:Matrix,val name:ParamName) extends AbstractActorParam[Matrix] with SMatUtil{
   class FullSMatParam(s:Matrix) extends SMatUtil{
     var cache:Option[Array[Double]]=None
@@ -936,6 +950,14 @@ class BadParameterException(s:String) extends Exception(s)
 
 trait PSetter[A]{
   def internal:ActorParamComponent
+  def update(x:Seq[Double]){
+    x.elements.zipWithIndex.foreach{t=>
+      update(t._2,t._1)
+    }
+  }
+
+  def readSerial(x:Seq[Double]){internal !? ReadSerial(x)}
+  def writeSerial = {internal !? WriteSerial}.asInstanceOf[Seq[Double]]
   def update(i:Int,x:Double) { throw new BadParameterException("Can't accept 1D parameter location")}
   def update(i:Int,j:Int,x:Double) { throw new BadParameterException("Can't accept 2D parameter location")}
   def apply(i:Int):Double = throw new BadParameterException("Can't accept 1D parameter location")
@@ -954,27 +976,32 @@ trait OptPSetter {
   def lower:Array[Double]
   def upper:Array[Double]
   def numArguments:Int
+  def length = numArguments
   def apply(d:Array[Double])
   def currentArgs:Array[Double]
   def latestArgs:Array[Double]
+  lazy val random = new org.apache.commons.math.random.MersenneTwister
   def randomise{
-
-    val random = new org.apache.commons.math.random.MersenneTwister
-
     apply(
       lower.zip(upper).map{t=>
-        random.nextDouble * (t._2-t._1) + t._2
+        random.nextDouble * (t._2-t._1) + t._1
       }.toArray
     )
   }
   def randomise(lowerX:Double,upperX:Double){
-    val random = new org.apache.commons.math.random.MersenneTwister
     apply(
       lower.zip(upper).map{t=> ((t._1 max lowerX),(t._2 min upperX))}.map{t=>
-        random.nextDouble * (t._2-t._1) + t._2
+        random.nextDouble * (t._2-t._1) + t._1
       }.toArray
     )
+  }
 
+  def shuffle{
+    val prevArgs = currentArgs
+    val newArgs = prevArgs.map{i=>
+      prevArgs(random nextInt currentArgs.length)
+    }
+    apply(newArgs)
   }
 }
 
@@ -1071,6 +1098,22 @@ class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val para
   def from(other:ActorModel[A])={
     this << other
     apply(BranchLengths(0)) << other(BranchLengths(0))
+    this
+  }
+
+
+  def from(other:String)={
+    val pLookup = paramMap.map{t=>(t._1.toString,t._1)}.foldLeft(Map[String,ParamName]()){_+_}
+    other.lines.foreach{s=>
+      val p = s.split("=").map{_.trim}
+      println(p.toList)
+      val name=pLookup.get(p(0))
+      if (name.isDefined){
+        apply(name.get) readSerial p(1).split(",").map(_.toDouble)
+      }else {
+        warning{"Ignoring apparent Parameter " + p(0)}
+      }
+    }
     this
   }
 
@@ -1234,6 +1277,10 @@ class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val para
         val ans = getP
         ans
       }
+      override def update(i:Int,x:Double)={
+        assert(i==0)
+        update(x)
+      }
       def toList = getP :: Nil
       def name = p.name
       def paramString = getP.toString
@@ -1282,7 +1329,7 @@ class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val para
   if (ans.isNaN){-1E100}else{ans}
 }
 
-  def paramString=paramMap.map{t=> t._2.toString}.mkString("\n")
+  def paramString=paramMap.map{t=> t._2.name + " = " + (t._2 !? WriteSerial).asInstanceOf[Seq[Double]].mkString(",")}.mkString("\n")
 
   override def toString = paramString + "\nlog-likelihood: " + logLikelihood
 

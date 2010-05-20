@@ -25,23 +25,33 @@ class FuncWrapper(model:ActorModel[_],p:OptPSetter) extends MultivariateFunction
   val length = latestArgs.length
   val lower = (0 until length).map{i=>p.lower(i)}.toArray
   val upper = (0 until length).map{i=>p.upper(i)}.toArray
+  var logT = System.currentTimeMillis()
+  var logT1 = logT
   def getUpperBound(i:Int)=upper(i)
   def getLowerBound(i:Int)=lower(i)
   //def this(model:ActorModel,p:OptPSetter)=this(model,p,{s:String=>})
   def apply(point:Array[Double])={
+    val t1 = System.currentTimeMillis
+    info{"out " + (t1 - logT1)}
     p(point)
     val ans = model.logLikelihood
+    val t2 = System.currentTimeMillis
     if (ans > bestLnL){
       finest{"NEW BEST" + point + " " + ans}
       best = point.toArray
       bestLnL = ans
     }
     if (count % 100==0){
-      info{count + " f: " + p + " " + ans}
+      val newT = System.currentTimeMillis()
+      info{count + "t: " + (newT - logT) + " f: " + p + " " + ans}
+      info{"tSingle: " + (t2 - t1)}
+      logT = newT
     }else {
       extra{count + " f: " + p + " " + ans}
     }
     count=count+1
+    logT1 = System.currentTimeMillis
+    info{"in " +  (logT1 - t1)}
     ans
   }
   def evaluate(point:Array[Double])= -apply(point)
