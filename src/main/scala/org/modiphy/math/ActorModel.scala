@@ -569,11 +569,21 @@ case class SingleParamWrapper(p:ActorParamComponent) extends ActorParamComponent
   }
 }
 
-case class JoinedParamWrapper(pList:List[ActorParamComponent]) extends ActorParamComponent{
-  start
+
+object JoinedParamWrapper{
+  def apply(pList:List[ActorParamComponent])={
+    val ans = new JoinedParamWrapper(pList)
+    ans.start
+    ans
+  }
+}
+class JoinedParamWrapper private(pList:List[ActorParamComponent]) extends ActorParamComponent{
+  override def start ={
+    super.start
+  }
   val name = JoinedParam(pList.map{_.name})
-  val paramArray=getParam2D.toArray
-  val numParams =paramArray.map{_.size}
+  lazy val paramArray=getParam2D.toArray
+  lazy val numParams =paramArray.map{_.size}
     def getParam2D= pList.map{p=>(p !? RequestOpt).asInstanceOf[Array[Double]]}
     def flatten(a:Array[Array[Double]]):Array[Double]={
       flatten(a.toList)
@@ -1079,8 +1089,12 @@ class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val para
     val ans = p match {
       case SingleParam(p2)=>SingleParamWrapper(getParam(p2))
       case JoinedParam(p2)=>JoinedParamWrapper(p2.map{getParam})
-      case m:AllSingle => JoinedParamWrapper( paramMap.filter{m matches _._1}.map{t=>SingleParamWrapper(t._2)}.toList)
-      case m:ParamMatcher => JoinedParamWrapper( paramMap.filter{m matches _._1}.map{_._2}.toList)
+      case m:AllSingle => {
+       JoinedParamWrapper( paramMap.filter{m matches _._1}.map{t=>SingleParamWrapper(t._2)}.toList)
+     }
+      case m:ParamMatcher => {
+        JoinedParamWrapper( paramMap.filter{m matches _._1}.map{_._2}.toList)
+      }
       case p  => paramMap(p)
     }
     ans
@@ -1106,7 +1120,6 @@ class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val para
     val pLookup = paramMap.map{t=>(t._1.toString,t._1)}.foldLeft(Map[String,ParamName]()){_+_}
     other.lines.foreach{s=>
       val p = s.split("=").map{_.trim}
-      println(p.toList)
       val name=pLookup.get(p(0))
       if (name.isDefined){
         apply(name.get) readSerial p(1).split(",").map(_.toDouble)
@@ -1152,10 +1165,10 @@ class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val para
   def optSetter(p:ParamName):OptPSetter={
     new OptPSetter{
       val param = getParam(p) 
-      val lower = (param !? Lower).asInstanceOf[Array[Double]]
-      val upper = (param !? Upper).asInstanceOf[Array[Double]]
-      val numArguments=lower.length
-      val currentArgs=(param !? RequestOpt).asInstanceOf[Array[Double]]
+      lazy val lower = (param !? Lower).asInstanceOf[Array[Double]]
+      lazy val upper = (param !? Upper).asInstanceOf[Array[Double]]
+      lazy val numArguments=lower.length
+      lazy val currentArgs=(param !? RequestOpt).asInstanceOf[Array[Double]]
       def latestArgs={
         val latestArgs=(param !? RequestOpt).asInstanceOf[Array[Double]]
         Array.copy(latestArgs,0,currentArgs,0,currentArgs.length)

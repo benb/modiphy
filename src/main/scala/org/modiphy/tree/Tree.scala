@@ -51,7 +51,7 @@ object DataParse{
    Produce a parsed Tree and alignment from a newick file and a fasta file
   */
   def apply[A <: BioEnum](tree:String,alignment:Iterator[String],alphabet:A):(Tree[A],Alignment[A])={
-    val aln = new Fasta(alignment)
+    val aln = GenAlnParser(alignment)
     val seqMap = aln.foldLeft(Map[String,String]()){_+_}
     apply(tree,new Alignment(seqMap,alphabet))
   }

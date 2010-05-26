@@ -63,6 +63,31 @@ class EnhancedIterator[A](i:BufferedIterator[A]){
   }
 }
 
+class PamlAlignment(source:Iterator[String]) extends Iterator[(String,String)]{
+  source.next // skip first line
+  def next = {
+    val l = source.next.split("\\s+")
+    (l(0),l(1))
+  }
+  def hasNext = source.hasNext
+}
+class UnsupportedAlignmentFormatException(s:String) extends Exception
+
+object GenAlnParser{
+  def apply(source:Iterator[String]):Iterator[(String,String)]={
+    val iter = source.buffered
+    if (iter.head.trim matches "[0-9]+\\s+[0-9]+"){//paml first line
+      new PamlAlignment(iter)
+    }else if(iter.head matches ">.*") {//fasta
+      new Fasta(iter)
+    }else {
+      throw new UnsupportedAlignmentFormatException("Can't read alignment with header:\n" + iter.head)
+    }
+
+  }
+}
+
+
 class Fasta(source:Iterator[String]) extends Iterator[(String,String)]{
   import EnhancedIterator._
   val iter=source.map{i=>i.trim}.buffered

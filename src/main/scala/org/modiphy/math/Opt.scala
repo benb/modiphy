@@ -32,7 +32,7 @@ class FuncWrapper(model:ActorModel[_],p:OptPSetter) extends MultivariateFunction
   //def this(model:ActorModel,p:OptPSetter)=this(model,p,{s:String=>})
   def apply(point:Array[Double])={
     val t1 = System.currentTimeMillis
-    info{"out " + (t1 - logT1)}
+    finest{"out " + (t1 - logT1)}
     p(point)
     val ans = model.logLikelihood
     val t2 = System.currentTimeMillis
@@ -51,7 +51,7 @@ class FuncWrapper(model:ActorModel[_],p:OptPSetter) extends MultivariateFunction
     }
     count=count+1
     logT1 = System.currentTimeMillis
-    info{"in " +  (logT1 - t1)}
+    finest{"in " +  (logT1 - t1)}
     ans
   }
   def evaluate(point:Array[Double])= -apply(point)
