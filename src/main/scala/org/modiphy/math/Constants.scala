@@ -1,6 +1,6 @@
 package org.modiphy.math
-import math._
-import math.EnhancedMatrix._
+import org.modiphy.math._
+import org.modiphy.math.EnhancedMatrix._
 
 object ReplacementMatrix{
 def makeSMatTop(array:Array[Double],size:Int) = {

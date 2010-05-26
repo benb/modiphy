@@ -9,13 +9,7 @@ import scala.actors.Actor._
 import scala.actors.OutputChannel
 import tlf.Logging
 
-abstract class ActorModelComponent extends Actor with Logging{
-}
-
-case class SwitchingRate(n:Int) extends NodeMessage
-sealed trait NodeMessage{
-  def n:Int
-}
+abstract class ActorModelComponent extends Actor with Logging
 
 trait SimpleActorModelComponent extends ActorModelComponent{
   def params:List[ActorParamComponent]
@@ -25,34 +19,37 @@ trait SimpleActorModelComponent extends ActorModelComponent{
   lazy val pActorMap=paramNames.zip(params).foldLeft(Map[ParamName,ActorParamComponent]()){_+_}
   var pMap:Map[ParamName,ParamChanged[_]]=null
   override def start={
+    debug{"Setup start" + this}
     params.foreach{p=>
       p addActor this
     }
     pMap = params.map{p=>
     var x = (p !? (4000,RequestParam))
     while (x.isEmpty){
+       debug{"LOOP"}
        x = (p !? (4000,RequestParam))
     }
     x.get
     }.map{_.asInstanceOf[ParamChanged[_]]}.map{p=>(p.name,p)}.foldLeft(Map[ParamName,ParamChanged[_]]()){_+_}
     pMap.map{_._2}.foreach{updateParam}
     if (rec1.isDefined){rec1.get.start}
+    debug{"Setup " + this}
     super.start
   }
   def act{
     loop{
-      react(myHandler.orElse { 
+      react{myHandler.orElse { 
           case a:Any => 
             if (rec1.isDefined){
               rec1.get forward a
             }else {
               println(self + " received unexpected message" + a)
             }}
-          )
+          }
     }
   }
 
- def matReq(m:MatReq):MatReq
+ def matReq[A <: BioEnum](m:MatReq[A]):MatReq[A]
  def updateParam(p:ParamChanged[_])
 
  def sendUnclean(p:ParamName)={
@@ -67,13 +64,13 @@ trait SimpleActorModelComponent extends ActorModelComponent{
   lazy val handlers = {
 
     val mainHandler:PartialFunction[Any,Unit]={
-      case m:QMatReq=>
+      case m:QMatReq[BioEnum]=>
         val ans = matReq(m.toMatReq).toQMatReq
         if (rec1.isDefined){
           rec1.get forward ans
         }
         else {sender ! ans}
-      case m:MatReq=>
+      case m:MatReq[BioEnum]=>
         val ans = matReq(m)
         if (rec1.isDefined){rec1.get forward ans}
         else {sender ! ans}
@@ -97,18 +94,18 @@ trait SimpleActorModelComponent extends ActorModelComponent{
   
 
 }
+
+sealed trait NMessage{
+  def n:Int
+}
+
+case class SwitchingRate(val n:Int) extends NMessage
+
+
+
 case class Params(list:List[ActorParamComponent])
 object GetParams extends Params(Nil)
 class MatBuilder(m:Option[Map[Node[_],Matrix]])
-case class MatReq(n:Node[_],m:Option[Matrix],pi:Option[Vector]){
-  def toQMatReq=QMatReq(n,m,pi)
-}
-case class QMatReq(n:Node[_],m:Option[Matrix],pi:Option[Vector]){// extends MatReq(n2,m2,pi2) //used for skipping exponentiation
-  def toMatReq=MatReq(n,m,pi)
-}
-object NewMatReq{
-  def apply(n:Node[_])=MatReq(n,None,None)
-}
 case class Unclean(sender:Actor)
 case object RequestOpt
 object RequestParam 
@@ -124,6 +121,7 @@ case class InvarPrior(i:Int) extends ConcreteParamName
 case class Sigma(i:Int) extends ConcreteParamName
 case class SingleParam(p:ParamName) extends ParamName
 case class JoinedParam(p:List[ParamName]) extends ParamName
+
 
 trait ParamMatcher extends ParamName{
   def matches(p2:ParamName):Boolean
@@ -183,7 +181,7 @@ class BasicActorModel(piParam:ActorPiComponent,sParam:ActorSComponent,rec:Actor)
     }
   }
   def unclean{mat=None}
-  def matReq(m:MatReq)={
+  def matReq[A <: BioEnum](m:MatReq[A])={
     val myMat = if (mat.isDefined){
       mat.get
     }else {
@@ -200,7 +198,7 @@ class NormaliserActorModel(rec:Actor) extends SimpleActorModelComponent{
   def updateParam(p:ParamChanged[_]){
   }
   def unclean{mat=None}
-  def matReq(m:MatReq)={
+  def matReq[A <: BioEnum](m:MatReq[A])={
     if (mat.isDefined){
       MatReq(m.n,mat,m.pi)
     }else {
@@ -245,7 +243,7 @@ class THMMActorModel(sigmaParam:ActorFullSComponent,numClasses:Int,rec:Actor) ex
       (qStart,switching)
   }
 
-  def matReq(m:MatReq)={
+  def matReq[A <: BioEnum](m:MatReq[A])={
     m match {
       case MatReq(n,Some(m),Some(pi))=>
         if (mat.isDefined){mat}
@@ -255,7 +253,7 @@ class THMMActorModel(sigmaParam:ActorFullSComponent,numClasses:Int,rec:Actor) ex
           switchingRate=Some(switch)
         }
         MatReq(n,mat,Some(pi))
-      case m:MatReq=>
+      case m:MatReq[_]=>
         problem(m + " is not defined")
         m
     }
@@ -313,7 +311,7 @@ class InvarActorModel(priorParam:ActorProbComponent,piParam:ActorPiComponent,num
     newPi
   }
 
-   def matReq(m:MatReq)={
+   def matReq[A <: BioEnum](m:MatReq[A])={
      m match{
       case MatReq(n,Some(m),Some(p))=>
         val myPi = if (processedPi.isDefined){
@@ -329,7 +327,7 @@ class InvarActorModel(priorParam:ActorProbComponent,piParam:ActorPiComponent,num
           mat.get
         }
         MatReq(n,mat,processedPi)
-      case m:MatReq =>
+      case m:MatReq[_] =>
         problem(m + " not completely defined")
         m
       }
@@ -356,7 +354,7 @@ class GammaActorModel(shape:ActorGammaComponent,numClasses:Int,rec:Actor) extend
     myMat
   }
 
-  def matReq(m:MatReq)=m match{
+  def matReq[A <: BioEnum](m:MatReq[A])=m match{
     case MatReq(n,Some(m),Some(p)) =>
       if (mat.isEmpty){
         mat = Some(applyMat(m,alpha,p))
@@ -365,7 +363,7 @@ class GammaActorModel(shape:ActorGammaComponent,numClasses:Int,rec:Actor) extend
         processedPi = Some(applyPi(p))
       }
       MatReq(n,mat,processedPi)
-    case m:MatReq=>
+    case m:MatReq[A]=>
       problem("Unfilled " + m)
       m
   }
@@ -430,7 +428,7 @@ class ForkActor[A <: BioEnum](tree:Tree[A],rec1Map:Map[Int,Actor]) extends Actor
             if (! n.isRoot){warning{"Map does not contain " + n.id + " " + n}}
             sender ! MatReq(n,m,p) 
           }
-        case m:NodeMessage=>
+        case m:NMessage=>
           if (rec1Map contains m.n){
             rec1Map(m.n) forward m
           }else {
@@ -482,9 +480,9 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
     main(None,nodes.foldLeft(Map[Int,Double]()){(m,n)=>m+((n.id,n.lengthTo))})
   }
   def main(eigen:Option[MatrixExponential],lengths:Map[Int,Double]){
-    case class ExpReq(n:Node[_],e:MatrixExponential,lengthTo:Double,pi:Vector)
+    case class ExpReq[A <: BioEnum](n:Node[A],e:MatrixExponential,lengthTo:Double,pi:Vector)
       react{
-        case q:QMatReq =>
+        case q:QMatReq[_] =>
           sender ! q
           main(eigen,lengths)
         case MatReq(n,Some(m),Some(pi)) => 
@@ -572,9 +570,9 @@ case class SingleParamWrapper(p:ActorParamComponent) extends ActorParamComponent
 
 object JoinedParamWrapper{
   def apply(pList:List[ActorParamComponent])={
-    val ans = new JoinedParamWrapper(pList)
-    ans.start
-    ans
+    val x = new JoinedParamWrapper(pList)
+    x.start
+    x
   }
 }
 class JoinedParamWrapper private(pList:List[ActorParamComponent]) extends ActorParamComponent{
@@ -644,6 +642,13 @@ case class ReadSerial(x:Seq[Double])
 case object WriteSerial
 
 abstract class AbstractActorParam[A] extends ActorParamComponent with Logging{
+  override def !?(msg:Any)={
+    debug{this + " !? "+ msg}
+    val ans = super.!?(msg)
+    debug{this + " finished" }
+    ans 
+  }
+
   type Param = {
     def getParams:Array[Double]
     def setParams(a:Array[Double]):Unit
@@ -687,10 +692,14 @@ abstract class AbstractActorParam[A] extends ActorParamComponent with Logging{
           reply('ok)
         //  waitOn(modelComp.length,sender)
         case ParamUpdate(v:Vector)=>
+          debug{"ParamUpdate 1"}
           setRaw(v.toArray)
+          debug{"ParamUpdate 2"}
           modelComp.foreach{c=>
+            debug{"ParamUpdate c"}
             c !? ParamChanged(name,myParam)
           }
+          debug{"ParamUpdate 3"}
           reply('ok)
         case OptUpdate(x)=>
           internal setParams x
@@ -716,11 +725,17 @@ abstract class AbstractActorParam[A] extends ActorParamComponent with Logging{
 
   def act{
     loop{
-      react(handler)
+      react{handler}
     }
   }
 }
 class ActorPiComponent(pi:Vector,val name:ParamName) extends AbstractActorParam[Vector]{
+
+  override def handler:PartialFunction[Any,Unit]={
+    super.handler
+  }
+
+
   class PiParam(pi:Vector){
 
     var medianIndex=0
@@ -938,7 +953,6 @@ object BranchSpecificThmmModel{
 
     val pMap = pList.map{p => (p.name,p)}.foldLeft(Map[ParamName,ActorParamComponent]()){_+_}
 
-      
     val modelMap = (map.keys).map{id=> (id,modelMapTmp(map(id)))}.foldLeft[Map[Int,Actor]](IntMap[Actor]()){_+_}
     val components = new BasicActorModel(pi,s,
       new GammaActorModel(alpha,numClasses-1,
@@ -948,7 +962,7 @@ object BranchSpecificThmmModel{
           //modelMap(1))))
 
 
-     new ActorModel(tree,components,pMap)
+    new ActorModel(tree,components,pMap)
 
    
   }
@@ -1103,8 +1117,10 @@ class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val para
   def setParamsFrom(other:ActorModel[A]){
     other.paramMap.foreach{t=> val (k,v)=t
       if (paramMap.contains(k) && !k.isInstanceOf[BranchLengths]){
-      debug{"Setting " + k}
-          this(k)=(v !? RequestParam).asInstanceOf[ParamChanged[_]]
+        debug{"Setting " + k + " " + v}
+        val p = (v !? RequestParam).asInstanceOf[ParamChanged[_]]
+        debug{"Param " + p}
+        this(k)=p
       }
     }
   }
@@ -1207,7 +1223,7 @@ class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val para
         for (i<- 0 until numSub){
           val len = lenIter.next
           val s =  subIter.next
-          s(d.slice(pointer,pointer + len).force)
+          s(d.slice(pointer,pointer + len).toArray)
           pointer = pointer + len
         }
       }
@@ -1374,7 +1390,7 @@ class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val para
 
   def switchingRate(nodeID:Int)={
     val myTree=tree(0)
-    val ans = rawReq(QMatReq(myTree(nodeID),None,None)).asInstanceOf[QMatReq]
+    val ans = rawReq(QMatReq(myTree(nodeID),None,None)).asInstanceOf[QMatReq[_]]
     val qMat = ans.m.get
     val pi = ans.pi.get
     Math.max(qMat.rate(pi),1.0)-1.0
@@ -1393,4 +1409,15 @@ class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val para
   }
   
 }
+case class MatReq[A <: BioEnum](n:Node[A],m:Option[Matrix],pi:Option[Vector]){
+  def toQMatReq=QMatReq(n,m,pi)
+}
+case class QMatReq[A <: BioEnum](n:Node[A],m:Option[Matrix],pi:Option[Vector]){// extends MatReq(n2,m2,pi2) //used for skipping exponentiation
+  def toMatReq=MatReq(n,m,pi)
+}
+object NewMatReq{
+  def apply[A <: BioEnum](n:Node[A])=MatReq(n,None,None)
+}
+
+
 

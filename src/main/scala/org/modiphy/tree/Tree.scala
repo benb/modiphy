@@ -43,7 +43,7 @@ class TreeGen[A <: BioEnum]{
 */
 object DataParse{
   type Tree[A <: BioEnum]=Node[A] with RootNode[A]
-  import sequence.Alignment
+  import org.modiphy.sequence.Alignment
 
   private def cleanTree(t:String)=t.split("\\s+").mkString("").split("\n").mkString("")
 
@@ -121,8 +121,8 @@ trait Node[A <: BioEnum] extends Actor with Logging{
 object ReadTree{
   def fromFiles[A <: BioEnum](tree:String,aln:String,alphabet:A):Tree[A]={
     DataParse(
-      scala.io.Source.fromFile(tree).getLines.map{_.trim}.mkString(""),
-      scala.io.Source.fromFile(aln).getLines,
+      scala.io.Source.fromPath(tree).getLines().map{_.trim}.mkString(""),
+      scala.io.Source.fromPath(aln).getLines(),
       alphabet
     )._1
   }
@@ -169,7 +169,7 @@ trait RootNode[A <: BioEnum] extends INode[A]{
   override def removeUseless:INode[A] with RootNode[A]=super.removeUseless.iNode.get.setRoot
   override def restrictTo(allowed:Set[String]):INode[A] with RootNode[A]=super.restrictTo(allowed).iNode.get.setRoot
   override val cromulent = children.foldLeft(true){(a,b) => a && b.cromulent}
-  override def splitAln(i:Int)=super.splitAln(i).map{_.asInstanceOf[INode[A]].setRoot}
+  override def splitAln(i:Int):List[RootNode[A]]=super.splitAln(i).map{_.asInstanceOf[INode[A]].setRoot}
 
   def fPi = aln.getFPi
 
@@ -188,19 +188,20 @@ trait RootNode[A <: BioEnum] extends INode[A]{
     if (done < numChildren+1){
       //println("0")
     react{
-      case PartialLikelihoods(pl2,eMat)=>{
+      case PartialLikelihoods(pl2,eMat)=>
         //println("1")
         plCalc ! PartialLikelihoods(pl2,eMat)
         act2(pl,done,requester,pi)
-      }
-      case CalculatedPartialLikelihoods(pl2)=>{
+      case CalculatedPartialLikelihoods(pl2)=>
         //println("2")
         act2(pl2::pl,done+1,requester,pi)
-      }
-      case MatReq(`me`,_,p) =>{
+      case MatReq(m,a,p)=>
         //println("3")
-        act2(pl,done+1,requester,p)
-      }
+        if (m==me){
+          act2(pl,done+1,requester,p)
+        }else {
+          println(this + " received unexpected message: " +  MatReq(m,a,p))
+        }
       case a:Any => 
         println(this + " received unexpected message: " + a)
     }
@@ -277,15 +278,17 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
     //println("DONE " + done)
     if (done < numChildren+1){
     react{
-      case MatReq(`me`,mat,pi) =>{
+      case MatReq(m,mat,pi) =>
         //println("CASE 1")
-        qMat(pl,done+1,requester,matExp,mat)
-      }
-      case PartialLikelihoods(pl2,eMat)=>{
+        if (m==me){
+          qMat(pl,done+1,requester,matExp,mat)
+        }else {
+          println(this + " received unexpected message: " + MatReq(m,mat,pi))
+        }
+      case PartialLikelihoods(pl2,eMat)=>
         //println("CASE 2")
         plCalc ! PartialLikelihoods(pl2,eMat)
         qMat(pl,done,requester,matExp,myEMat)
-      }
       case CalculatedPartialLikelihoods(pl2)=>
         //println("CASE 3")
         qMat(pl2::pl,done+1,requester,matExp,myEMat)
@@ -446,9 +449,13 @@ class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Doubl
   def qMat(requester:OutputChannel[Any],matExp:ActorModelComponent){
     //println("LeafNode Got2")
     react{
-      case MatReq(`me`,eMat,pi) =>
-        requester ! PartialLikelihoods(likelihoods,eMat.get)
-        act
+      case MatReq(m,eMat,pi) =>
+        if (m==me){
+          requester ! PartialLikelihoods(likelihoods,eMat.get)
+          act
+        }else{
+          println(this + " received unexpected message: " + MatReq(m,eMat,pi))
+        }
       case a:Any => 
         println(this + " received unexpected message: " + a)
     }
