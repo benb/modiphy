@@ -71,7 +71,7 @@ class PamlAlignment(source:Iterator[String]) extends Iterator[(String,String)]{
   }
   def hasNext = source.hasNext
 }
-class UnsupportedAlignmentFormatException(s:String) extends Exception
+class UnsupportedAlignmentFormatException(s:String) extends Exception(s)
 
 object GenAlnParser{
   def apply(source:Iterator[String]):Iterator[(String,String)]={
