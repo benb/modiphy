@@ -9,7 +9,12 @@ import scala.actors.Actor._
 import scala.actors.OutputChannel
 import tlf.Logging
 
-abstract class ActorModelComponent extends Actor with Logging
+object ParamScheduler extends scala.actors.scheduler.ForkJoinScheduler(10,400,true,false)
+
+trait ParamActor extends Actor{
+  override def scheduler = ParamScheduler
+}
+abstract class ActorModelComponent extends ParamActor with Logging
 
 trait SimpleActorModelComponent extends ActorModelComponent{
   def params:List[ActorParamComponent]
@@ -522,7 +527,7 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
   }
 }
 
-trait ActorParamComponent extends Actor{
+trait ActorParamComponent extends ParamActor{
   def name:ParamName
   var modelComp:List[Actor]=Nil
   def addActor(l:Actor){
