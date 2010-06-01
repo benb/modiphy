@@ -86,12 +86,15 @@ object ModelOptimiser extends Logging{
     optimise(optFactory,p::Nil,model)
   }
   def optimise[A <: BioEnum](optFactory: => MultivariateMinimum,pList:List[ParamName],model:ActorModel[_]):Double={
-      val startParams = model.optSetter(pList)
+    optimise(optFactory,pList,model,1E-4,1E-3)
+  }
+  def optimise[A <: BioEnum](optFactory: => MultivariateMinimum,pList:List[ParamName],model:ActorModel[_],tolfx:Double,tolx:Double):Double={
+    val startParams = model.optSetter(pList)
       val func = new FuncWrapper(model,startParams)
       if (func.length==1){
         getNelderMead.optimize(func,MAXIMIZE,func.latestArgs)
       }else {
-        optFactory.optimize(func,func.latestArgs,1E-4,1E-3)
+        optFactory.optimize(func,func.latestArgs,tolfx,tolx)
       }
       func.setBest 
   }

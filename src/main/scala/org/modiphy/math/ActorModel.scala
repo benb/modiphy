@@ -1370,11 +1370,15 @@ class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val para
   def optimise(params:ParamName*):Double={
     optimise(params.toList)
   }
+  def optimise(params:List[ParamName],tolfx:Double,tolx:Double):Double={
+    import ModelOptimiser._
+    ModelOptimiser.optimise(getConjugateDirection,params,this,tolfx,tolx)
+  }
+  def optimiseQuick(params:List[ParamName]):Double=optimise(params,1E-1,1E-1)
   def optimise(params:List[ParamName]):Double={
     import ModelOptimiser._
     ModelOptimiser.optimise(getConjugateDirection,params,this)
   }
-  import scala.reflect.Manifest
   def optimise(params:List[List[ParamName]])(implicit m:Manifest[List[List[ParamName]]]):Double={
     var end = logLikelihood
     var start = end
@@ -1386,8 +1390,33 @@ class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val para
       end = logLikelihood
     } while (end - start > 0.001)
     end
-   
   }
+  def optimiseCustom(params:List[List[ParamName]],tolfx:Double,tolx:Double)(implicit m:Manifest[List[List[ParamName]]]):Double={
+  var end = logLikelihood
+    var start = end
+    do {
+      start=end
+      params.foreach{pset=>
+        optimise(pset,tolfx,tolx) 
+      }
+      end = logLikelihood
+    } while (end - start > 0.001)
+    end
+  }
+  def optimiseQuick(params:List[List[ParamName]])(implicit m:Manifest[List[List[ParamName]]]):Double={
+    var end = logLikelihood
+    var start = end
+    do {
+      start=end
+      params.foreach{pset=>
+        optimiseQuick(pset) 
+      }
+      end = logLikelihood
+    } while (end - start > 0.001)
+    end
+  }
+
+
 //  def switchingRate(nodeID:Int)={
 //    logLikelihood //make sure parameters are set
 //    (components !? SwitchingRate(nodeID)).asInstanceOf[Option[Double]].get
