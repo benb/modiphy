@@ -3,6 +3,7 @@ import org.scalatest.matchers.ShouldMatchers._
 import org.modiphy.math._
 import org.modiphy.tree._
 import org.modiphy.math.EnhancedMatrix._
+import org.modiphy.sequence._
 import ModelData._
 import scala.actors.Actor
 import scala.actors.Actor._
@@ -12,7 +13,7 @@ class ActorModelSuite extends FunSuite {
   val (tree,data)=DataParse(treeStr,alnStr.lines,new org.modiphy.sequence.SiteClassAA(1))
 
   test ("Actor Model should give correct matrix exp"){
-    case class Test(n:Node[_])
+    case class Test[A <: BioEnum](n:Node[A])
     class ActorTest extends Actor{
       val actorPi = new ActorPiComponent(WAG.pi,Pi(0))
       val actorS = new ActorSComponent(WAG.S,S(0))
@@ -32,7 +33,7 @@ class ActorModelSuite extends FunSuite {
 
       val actor = new ActorTest
       actor.start
-      val ans = (actor !? Test(tree.children(0))).asInstanceOf[MatReq]
+      val ans = (actor !? Test(tree.children(0))).asInstanceOf[MatReq[_]]
       val mat1 = ans.m.get
       val me = new MatExpYang(WAG.S.sToQ(WAG.pi),WAG.pi,Some(1.0))
       val mat2 = me.exp(tree.children(0).lengthTo)
@@ -41,7 +42,7 @@ class ActorModelSuite extends FunSuite {
         t._1 should be (t._2 plusOrMinus 1E-7) //could be MatExpNormal or other impl that might not give exactly the same answer
       }
 
-       val mat3 = (actor !? Test(tree.children(0).children(1))).asInstanceOf[MatReq].m.get
+       val mat3 = (actor !? Test(tree.children(0).children(1))).asInstanceOf[MatReq[_]].m.get
            mat3.elements.zip(me.exp(tree.children(0).children(1).lengthTo).elements).foreach{t=>
            t._1 should be (t._2 plusOrMinus 1E-7)
          }

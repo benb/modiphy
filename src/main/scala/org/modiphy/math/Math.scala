@@ -69,6 +69,7 @@ trait CachedMatrixExponential extends MatrixExponential{
   case class Calc(o:OutputChannel[Any],r:CacheReq)
   case class Answer(t:Double,m:Matrix)
   def realExp(t:Double) = super.exp(t)
+  case object Exit
   class CacheActor extends Actor{
     val cache = new SoftCacheMap[Double,Matrix](500)
     def act{
@@ -94,6 +95,7 @@ trait CachedMatrixExponential extends MatrixExponential{
                   exit
                 }
               } ! Calc(sender,CacheReq(t))
+            case Exit => exit
           }
         }
     }
@@ -105,7 +107,7 @@ trait CachedMatrixExponential extends MatrixExponential{
     println("SENDING")
     (actor !? CacheReq(t)).asInstanceOf[Answer].m
   }
-  def exit { actor.exit }
+  def exit { actor ! Exit }
 }
 class MatExpNormal(val q:Matrix,val pi:Vector,val scale:Option[Double]) extends MatrixExponential{
   val eigen = new EigenvalueDecomposition(q)  

@@ -1,6 +1,7 @@
 package org.modiphy.sequence
 import org.modiphy.math._
 import org.modiphy.math.EnhancedMatrix._
+import org.modiphy.math.Vector
 
 abstract class BioEnum(names:String*) extends Enumeration(names: _*){
   def isReal(a:Value)=true
@@ -39,7 +40,7 @@ object AA extends SiteClassAA(1)
 
 class BioSeq[A](seq:Seq[A]) extends Seq[A]{
   def length = seq.length
-  def elements = seq.elements
+  def iterator = seq.iterator
   def apply(i:Int)=seq(i)
 }
 
@@ -149,7 +150,7 @@ class MafAln(source:BufferedIterator[String]){
 
 class Alignment[A<:BioEnum](m:Map[String,String],val alphabet:A){
   type Letter=alphabet.Value
-  import scala.collection.immutable._
+  import scala.collection.immutable.{Map,TreeMap}
   val map = m.foldLeft(TreeMap[String,String]()){_+_} // use TreeMap to keep sorted
 
 
@@ -190,7 +191,7 @@ class Alignment[A<:BioEnum](m:Map[String,String],val alphabet:A){
   }
 
   def split(i:Int):List[Alignment[A]]={
-    val size = patterns._1.values.next.length
+    val size = patterns._1.values.iterator.next.length
     for (j <- 0 until (size - (size % i)) by (size/i)) yield {
       val t = if (j < (size - (size % i)) - (size/i)){
         sub(j,(size/i))
