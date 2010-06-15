@@ -37,8 +37,8 @@ class FuncWrapper(model:ActorModel[_],p:OptPSetter) extends MultivariateFunction
     val ans = model.logLikelihood
     val t2 = System.currentTimeMillis
     if (ans > bestLnL){
-      finest{"NEW BEST" + point + " " + ans}
-      best = point.toArray
+      best = point.clone
+      finest{"NEW BEST" + best + " " + ans}
       bestLnL = ans
     }
     if (count % 100==0){

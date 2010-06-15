@@ -1,6 +1,8 @@
 import sbt._
+import java.io.File
 
-class ModiphyProject(info: ProjectInfo) extends DefaultProject(info)
+
+class ModiphyProject(info: ProjectInfo) extends ProguardProject(info)
 {
   override def compileOptions = super.compileOptions ++ Seq(Unchecked)
 

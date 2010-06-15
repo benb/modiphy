@@ -102,6 +102,7 @@ trait Node[A <: BioEnum] extends Actor with Logging{
   def setBranchLengths(m:Map[Int,Double]):Node[A]
   def getBranchLengths:List[Double]
   def branchTo:String
+  def addLabels:Node[A]
 
   def nodes=this::descendentNodes
 
@@ -131,6 +132,7 @@ object ReadTree{
 
 
 trait RootNode[A <: BioEnum] extends INode[A]{
+  override def addLabels = factory(children.map{_.addLabels},aln,lengthTo,Some(id))
   val children:List[Node[A]]
   import scala.collection.immutable.IntMap
   val nodeMap=(this::descendentNodes).foldLeft[Map[Int,Node[A]]](IntMap[Node[A]]()){(m,n)=> m + ((n.id,n))}
@@ -142,6 +144,7 @@ trait RootNode[A <: BioEnum] extends INode[A]{
 
 
   override def factory[B <: BioEnum](c:List[Node[B]],aln:Alignment[B],len:Double):Tree[B]=new INode[B](c,aln,len,id,label) with RootNode[B]
+  override def factory[B <: BioEnum](c:List[Node[B]],aln:Alignment[B],len:Double,lab:Option[Int]):Tree[B]=new INode[B](c,aln,len,id,lab) with RootNode[B]
 
   override def getBranchLengths={
     descendentNodes.map{_.lengthTo}
@@ -260,6 +263,7 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
   val plCalc = new PartialLikelihoodCalc
   plCalc.start
 
+  def addLabels = factory(children.map{_.addLabels},aln,lengthTo,Some(id))
   def toLabelledString="("+children.map{_.toLabelledString}.mkString(",")+"):" + lengthTo + {if (label.isDefined){"#" + label.get}else {""}}
 
 
@@ -316,6 +320,8 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
   val name=""
 
   def factory[B<:BioEnum](c:List[Node[B]],aln:Alignment[B],len:Double)=if (isRoot){new INode[B](c,aln,len,id,label) with RootNode[B]}else {new INode[B](c,aln,len,id,label)}
+  def factory[B<:BioEnum](c:List[Node[B]],aln:Alignment[B],len:Double,lab:Option[Int])=if (isRoot){new INode[B](c,aln,len,id,lab) with RootNode[B]}else {new INode[B](c,aln,len,id,lab)}
+
 
   def numChildren = children.size
   def childElements:Iterator[Node[A]] = children.elements
@@ -395,6 +401,7 @@ class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Doubl
 
   override def isLeaf=true
   def children:List[Node[A]]=Nil
+  def addLabels = factory(name,aln,lengthTo,Some(id))
 
   def toLabelledString = toString + {if (label.isDefined){"#" + label.get}else {""}}
   val sequence:List[alphabet.Value]=aln.getPatterns(name).asInstanceOf[List[alphabet.Value]]
@@ -426,6 +433,7 @@ class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Doubl
   override def toString=name + ":" + lengthTo
   def getBranchLengths=List(lengthTo)
   def factory[B <: BioEnum](n:String,a:Alignment[B],len:Double)=new Leaf[B](n,a,len,id,label)
+  def factory[B <: BioEnum](n:String,a:Alignment[B],len:Double,lab:Option[Int])=new Leaf[B](n,a,len,id,lab)
   def branchTo=name
 
   def splitAln(i:Int)={

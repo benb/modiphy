@@ -131,6 +131,7 @@ case class JoinedParam(p:List[ParamName]) extends ParamName
 trait ParamMatcher extends ParamName{
   def matches(p2:ParamName):Boolean
 }
+
 case class All(p:ConcreteParamName) extends ParamMatcher{
   def matches(p2:ParamName)={
     p2!=null && (p2.getClass==p.getClass) 
@@ -720,6 +721,9 @@ abstract class AbstractActorParam[A] extends ActorParamComponent with Logging{
           reply(upperArray)
         case ReadSerial(s) =>
           readSerial(s)
+          modelComp.foreach{c=>
+            c !? ParamChanged(name,myParam)
+          }
           reply('ok)
         case WriteSerial =>
           reply(writeSerial)
@@ -858,7 +862,7 @@ class ActorDoubleComponent(param:Double,val name:ParamName,val lower:Double,val 
 class ActorArrayComponent(param:Array[Double],val name:ParamName,val lower:Double, val upper:Double) extends AbstractActorParam[Array[Double]]{
   class ArrayParam{
     var myP=param
-    def getParams = myP.toArray
+    def getParams = myP.clone
     def setParams(a:Array[Double]){Array.copy(a,0,myP,0,Math.min(a.length,myP.length))}
   }
   val internal = new ArrayParam
@@ -1143,7 +1147,7 @@ class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val para
       val p = s.split("=").map{_.trim}
       val name=pLookup.get(p(0))
       if (name.isDefined){
-        apply(name.get) readSerial p(1).split(",").map(_.toDouble)
+        apply(name.get)  readSerial p(1).split(",").map(_.toDouble)
       }else {
         warning{"Ignoring apparent Parameter " + p(0)}
       }
@@ -1228,7 +1232,7 @@ class ActorModel[A <: BioEnum](t:Tree[A],components:ActorModelComponent,val para
         for (i<- 0 until numSub){
           val len = lenIter.next
           val s =  subIter.next
-          s(d.slice(pointer,pointer + len).toArray)
+          s(d.slice(pointer,pointer + len))
           pointer = pointer + len
         }
       }
