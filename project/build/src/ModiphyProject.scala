@@ -8,7 +8,7 @@ class ModiphyProject(info: ProjectInfo) extends ProguardProject(info)
 
   val scalaToolsSnapshots = "Scala-Tools Maven2 Snapshots Repository" at "http://scala-tools.org/repo-snapshots"
 
-  val scalatest = "org.scalatest" % "scalatest" % "1.2-for-scala-2.8.0.RC2-SNAPSHOT"
+  val scalatest = "org.scalatest" % "scalatest" % "1.2-for-scala-2.8.0.RC5-SNAPSHOT"
   val logspace = "Logspace maven repo" at "http://www.logspace.co.uk/maven/"
   val tlf = "uk.co.logspace.tlf" %% "tlf" % "1.2.0"
   val colt = "coltjar" % "colt" % "1.2.0" from "http://repo1.maven.org/maven2/colt/colt/1.2.0/colt-1.2.0.jar"

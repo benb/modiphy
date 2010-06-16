@@ -122,8 +122,8 @@ trait Node[A <: BioEnum] extends Actor with Logging{
 object ReadTree{
   def fromFiles[A <: BioEnum](tree:String,aln:String,alphabet:A):Tree[A]={
     DataParse(
-      scala.io.Source.fromPath(tree).getLines().map{_.trim}.mkString(""),
-      scala.io.Source.fromPath(aln).getLines(),
+      scala.io.Source.fromFile(tree).getLines().map{_.trim}.mkString(""),
+      scala.io.Source.fromFile(aln).getLines(),
       alphabet
     )._1
   }
