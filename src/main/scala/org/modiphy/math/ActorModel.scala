@@ -498,8 +498,16 @@ class BasicSingleExpActorModel[A <: BioEnum](tree:Tree[A],branchLengthParams:Act
             main(eigen,lengths)
           }
           val myEigen = if (eigen.isEmpty){
-            val ans = new MatExpNormal(m,pi,None)
-            ans
+            case object Get
+            val actorX = new Actor{
+              def act{
+                react{
+                  case Get => reply(new MatExpNormal(m,pi,None)) // send this calculation out onto a normal actor so Param doesn't do too much computation if user has lowered thread count
+                }
+              }
+            }
+            actorX.start
+            (actorX !? Get).asInstanceOf[MatExpNormal]//match { case a:MatExpNormal => a}
           }else {
             eigen.get
           }
