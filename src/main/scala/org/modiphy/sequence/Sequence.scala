@@ -148,6 +148,17 @@ class MafAln(source:BufferedIterator[String]){
 
 }
 
+
+abstract class AbsAlignment[A<:BioEnum]{
+  import scala.collection.immutable.{Map,TreeMap}
+  val alphabet:A
+  type Letter = alphabet.Value
+  def get(a:String):List[Letter] 
+  def patterns:(TreeMap[String,List[Letter]],List[Int])
+  def split(i:Int):List[Alignment[A]]
+}
+
+
 class Alignment[A<:BioEnum](m:Map[String,String],val alphabet:A){
   type Letter=alphabet.Value
   import scala.collection.immutable.{Map,TreeMap}
