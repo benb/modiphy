@@ -12,7 +12,7 @@ class AlignmentSuite extends FunSuite {
    test("Split"){
        val split = aln.split(10)
        split.length should be (10)
-       split.zip(aln.split(10)).foreach{t=> t._1.map should equal (t._2.map)}
+       split.zip(aln.split(10)).foreach{t=> t._1.toFasta should equal (t._2.toFasta)}
 
        println(split.map{_.length})
        split.foldLeft(0){_+_.length} should be (aln.length)
