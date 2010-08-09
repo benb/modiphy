@@ -357,6 +357,7 @@ class GammaActorModel(shape:ActorGammaComponent,numClasses:Int,rec:Actor) extend
     (0 until numClasses).foreach{i=>
       myMat.viewPart(i * numAlpha,i * numAlpha,numAlpha,numAlpha).assign(m) * r(i)
     }
+    println(myMat)
     myMat
   }
 
@@ -892,9 +893,10 @@ object SimpleModel{
   }
 }
 object GammaModel{
-  def apply[A <: BioEnum](tree:Tree[A])={
-    val pi = new ActorPiComponent(WAG.pi,Pi(0))
-    val s = new ActorSComponent(WAG.S,S(0))
+  def apply[A <: BioEnum](tree:Tree[A]):ActorModel[A]=apply(tree,WAG.pi,WAG.S)
+  def apply[A <: BioEnum](tree:Tree[A],piVect:Vector,sMat:Matrix):ActorModel[A]={
+    val pi = new ActorPiComponent(piVect,Pi(0))
+    val s = new ActorSComponent(sMat,S(0))
     val branchLength = new ActorTreeComponent(tree,BranchLengths(0))
     val alpha = new ActorGammaComponent(0.5D,Alpha(0))
     val components = new BasicActorModel(pi,s, 
@@ -904,7 +906,9 @@ object GammaModel{
     val pList = List(pi,s,branchLength,alpha)
     val pMap = pList.map{p => (p.name,p)}.foldLeft(Map[ParamName,ActorParamComponent]()){_+_}
     new ActorModel(tree,components,pMap)
+
   }
+
 }
 object InvarGammaModel{
   def apply[A <: BioEnum](tree:Tree[A])={
