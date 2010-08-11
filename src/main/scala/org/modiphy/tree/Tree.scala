@@ -50,21 +50,21 @@ object DataParse{
   /**
    Produce a parsed Tree and alignment from a newick file and a fasta file
   */
-  def apply[A <: BioEnum](tree:String,alignment:Iterator[String],alphabet:A):(Tree[A],Alignment[A])={
+  def apply[A <: BioEnum](tree:String,alignment:Iterator[String],alphabet:A):(Tree[A],SimpleAlignment[A])={
     val aln = GenAlnParser(alignment)
     val seqMap = aln.foldLeft(Map[String,String]()){_+_}
-    apply(tree,new Alignment(seqMap,alphabet))
+    apply(tree,SimpleAlignment(seqMap,alphabet))
   }
 
   
-  def apply[A <: BioEnum](tree:String,aln:Alignment[A]):(Tree[A],Alignment[A])={
+  def apply[A <: BioEnum](tree:String,aln:SimpleAlignment[A]):(Tree[A],SimpleAlignment[A])={
     val root = new TreeParser[A](aln){def parseAll=parse(root,cleanTree(tree))}.parseAll.get.iNode.get.setRoot
     (root,aln)
   }
 
-  def dropNodes[A <: BioEnum](tree:String,aln:Alignment[A]):(Tree[A],Alignment[A])={
+  def dropNodes[A <: BioEnum](tree:String,aln:SimpleAlignment[A]):(Tree[A],SimpleAlignment[A])={
     val t1:Tree[A] = apply(tree,aln)._1
-    val t2 = t1.restrictTo(aln.map.keySet).iNode.get.setRoot
+    val t2 = t1.restrictTo(aln.sequenceNames.toSet).iNode.get.setRoot
     //println(t2)
     (t2.setAlign(aln).iNode.get.setRoot,aln)
   }
@@ -108,7 +108,7 @@ trait Node[A <: BioEnum] extends Actor with Logging{
 
   def iNode:Option[INode[A]]=None
 
-  def cromulent:Boolean= lengthTo > -Math.EPS_DOUBLE && children.foldLeft(true){(a,b)=>a && b.cromulent}
+  def cromulent:Boolean= lengthTo > -scala.Double.Epsilon && children.foldLeft(true){(a,b)=>a && b.cromulent}
 
   def splitAln(i:Int):List[Node[A]]
 
@@ -227,7 +227,7 @@ trait RootNode[A <: BioEnum] extends INode[A]{
       ans
     }
    // println("parallel likelihoods " + likelihoods)
-    val lnL = likelihoods.zip(aln.pCount).foldLeft(0.0D){(i,j)=>i+Math.log(j._1)*j._2}
+    val lnL = likelihoods.zip(aln.pCount).foldLeft(0.0D){(i,j)=>i+math.log(j._1)*j._2}
     //println("LnL = " + lnL)
     //println("ROOT SENDING LOG LIKELIHOOD " + requester)
     requester ! LogLikelihood(lnL)
@@ -324,7 +324,7 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
 
 
   def numChildren = children.size
-  def childElements:Iterator[Node[A]] = children.elements
+  def childElements:Iterator[Node[A]] = children.iterator
   def child(i:Int)=if (i < children.length){Some(children(i))}else{None}
   def length(i:Int):Double=children(i).lengthTo
   def length(n:Node[A]):Double=children.find{node=>node==n}.get.lengthTo
@@ -404,7 +404,7 @@ class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Doubl
   def addLabels = factory(name,aln,lengthTo,Some(id))
 
   def toLabelledString = toString + {if (label.isDefined){"#" + label.get}else {""}}
-  val sequence:List[alphabet.Value]=aln.getPatterns(name).asInstanceOf[List[alphabet.Value]]
+  val sequence:Seq[alphabet.Value]=aln.getPatterns(name).asInstanceOf[Seq[alphabet.Value]]
   lazy val likelihoods:List[Vector]={
     sequence.map{a:alphabet.Value=>
     

@@ -69,13 +69,13 @@ trait SimpleActorModelComponent extends ActorModelComponent{
   lazy val handlers = {
 
     val mainHandler:PartialFunction[Any,Unit]={
-      case m:QMatReq[BioEnum]=>
+      case m:QMatReq[_]=>
         val ans = matReq(m.toMatReq).toQMatReq
         if (rec1.isDefined){
           rec1.get forward ans
         }
         else {sender ! ans}
-      case m:MatReq[BioEnum]=>
+      case m:MatReq[_]=>
         val ans = matReq(m)
         if (rec1.isDefined){rec1.get forward ans}
         else {sender ! ans}

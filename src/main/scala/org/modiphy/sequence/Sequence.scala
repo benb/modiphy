@@ -3,11 +3,22 @@ import org.modiphy.math._
 import org.modiphy.math.EnhancedMatrix._
 import org.modiphy.math.Vector
 
+object FlippedIterator{
+  def apply[A](l:Iterable[Iterator[A]])(implicit m:Manifest[Iterable[Iterator[A]]])=new FlippedIterator(l)
+  implicit def MakeIterator[A](l:Iterable[Iterable[A]])=l.map{_.iterator}
+//  def apply[A](l:Iterable[Iterable[A]])(implicit m:Manifest[Iterable[Iterable[A]]])=new FlippedIterator(l.map{_.iterator})
+}
+class FlippedIterator[A](l:Iterable[Iterator[A]]) extends Iterator[Iterable[A]]{
+  def next = l.map{_.next}
+  def hasNext = l.foldLeft(true){(a,b)=>a && b.hasNext}
+}
+
+import FlippedIterator.MakeIterator
 abstract class BioEnum(names:String*) extends Enumeration(names: _*){
   def isReal(a:Value)=true
   def getNums(a:Value):List[Int]
   val matLength:Int
-  def parseString(s:String):BioSeq[Value]
+  def parseString(s:String):IndexedSeq[Value]
   def matElements:List[Value]
   val numClasses=1
   val numAlpha=matElements.length
@@ -15,12 +26,13 @@ abstract class BioEnum(names:String*) extends Enumeration(names: _*){
 }
 
 case class SiteClassDNA(override val numClasses:Int) extends BioEnum("A","G","C","T","N","-"){
+  import scala.collection.immutable.{Vector,VectorBuilder}
   type Base = Value
   val A,G,C,T,N,GAP=Value
   override val matLength=numClasses*4
   override def isReal(a:Base)=((a!=N) && (a!=GAP))
   def getNums(a:Base)=if (isReal(a)){(a.id to (matLength-1) by numAlpha).toList}else{(0 to matLength-1).toList}
-  def parseString(s:String)=new BioSeq(s.toList.map{i=> valueOf(i.toString).getOrElse(N)})
+  def parseString(s:String)=s.map{i=> valueOf(i.toString).getOrElse(N)}.foldLeft(new VectorBuilder[Base]){_ += _}.result
   def matElements=List(A,G,C,T)
   val unknown=N
 }
@@ -32,20 +44,15 @@ case class SiteClassAA(override val numClasses:Int) extends BioEnum("A","R","N",
   override val matLength=numClasses*20
   override def isReal(a:AminoAcid)=((a!=X) && (a!=GAP))
   def getNums(a:AminoAcid)=if (isReal(a)){(a.id to (matLength-1) by numAlpha).toList}else{(0 to matLength-1).toList}
-  def parseString(s:String)=new BioSeq(s.toList.map{i=> valueOf(i.toString).getOrElse(N)})
+  def parseString(s:String)=s.map{i=> valueOf(i.toString).getOrElse(X)}.toIndexedSeq
   def matElements=List(A,R,N,D,C,Q,E,G,H,I,L,K,M,F,P,S,T,W,Y,V)
   val unknown=X
 }
 object AA extends SiteClassAA(1)
 
-class BioSeq[A](seq:Seq[A]) extends Seq[A]{
-  def length = seq.length
-  def iterator = seq.iterator
-  def apply(i:Int)=seq(i)
-}
 
 object BioSeq{
-  def string2DNA(s:String)=new BioSeq(s.toList.map{i=> DNA valueOf i.toString getOrElse(DNA.N)})
+  def string2DNA(s:String)=s.toList.map{i=> DNA valueOf i.toString getOrElse(DNA.N)}.toIndexedSeq
 }
 
 object EnhancedIterator{
@@ -98,7 +105,7 @@ class Fasta(source:Iterator[String]) extends Iterator[(String,String)]{
       (name,seq)
     }
     def hasNext = iter.hasNext
-    def toAlignment[A <: BioEnum](alphabet:A)={new Alignment(this.foldLeft(Map[String,String]()){_+_},alphabet)}
+    def toAlignment[A <: BioEnum](alphabet:A)={SimpleAlignment(this.foldLeft(Map[String,String]()){_+_},alphabet)}
   }
 
 class Maf(source:Iterator[String]) extends Iterator[MafAln]{
@@ -148,85 +155,35 @@ class MafAln(source:BufferedIterator[String]){
 
 }
 
-class Alignment[A<:BioEnum](m:Map[String,String],val alphabet:A){
-  type Letter=alphabet.Value
+
+abstract class Alignment[A<:BioEnum]{
   import scala.collection.immutable.{Map,TreeMap}
-  val map = m.foldLeft(TreeMap[String,String]()){_+_} // use TreeMap to keep sorted
-
-
-  val stateMap=map.map{t=>(t._1,t._2.split("").drop(1).map{alphabet.valueOf(_).getOrElse(alphabet.unknown)}.toList)}.foldLeft(Map[String,List[Letter]]()){_+_}
-  private def columns:List[List[String]] = new FlippedIterator(map.values.map{s=>s.split("").drop(1).elements}.toList).toList
-  val alphaList:List[List[Letter]] = columns.map(_.map{alphabet.valueOf(_).getOrElse(alphabet.unknown)}) //mapped to alphabet values
-  
-  def get(a:String):List[Letter]=stateMap.get(a).getOrElse(Nil)
-  def colPatterns=alphaList.foldLeft(Map[List[Letter],Int]()){(m,l)=>
-    m(l)=m.getOrElse(l,0)+1  
-  }.toList
-
-  val patterns={
-    val l=colPatterns
-    val i=new FlippedIterator(l.map{_._1.elements}).toList
-    (
-      map.keySet.toList.zip(i).foldLeft(TreeMap[String,List[Letter]]()){(m,t)=>m+((t._1,t._2.toList))}, 
-      l.map{_._2}
-    )
-  }
-  val pCount={
-    //println("PATTERNS") 
-    //println(patterns._1)
-    //println(patterns._2)
-    patterns._2
-  }
-
-  def length = patterns._2.foldLeft(0){_+_}
-  /**
-   return (List[patternCount],Map(Name,Patterns)) taking npatterns after dropping skip
-  */
-  def sub(skip:Int,nPatterns:Int)={
-    (patterns._2.drop(skip).take(nPatterns),
-      patterns._1.map{t=> val(name,patterns)=t
-        (name,patterns.drop(skip).take(nPatterns))
-      }.foldLeft(Map[String,List[Letter]]()){_+_}
-    )
-  }
-
-  def split(i:Int):List[Alignment[A]]={
-    val size = patterns._1.values.iterator.next.length
-    for (j <- 0 until (size - (size % i)) by (size/i)) yield {
-      val t = if (j < (size - (size % i)) - (size/i)){
-        sub(j,(size/i))
-      }else {
-        sub(j,(size/i)+(size%i))
-      }
-        val subMap = t._2.map{tx => 
-          (tx._1, tx._2.zip(t._1).map{ty=> ty._1.toString * ty._2}.mkString(""))
-        }.foldLeft(Map[String,String]()){_+_}
-      new Alignment(subMap,alphabet)
-    }
-  }.toList
-
+  val alphabet:A
+  type Letter = alphabet.Value
+  def patterns:(Map[String,Seq[Letter]],List[Int])
+  def split(i:Int):List[Alignment[A]]
+  def pCount=patterns._2
   def getPatterns(a:String)=patterns._1(a)
+  
+  def length = patterns._2.foldLeft(0){_+_}
 
-
-  def apply(a:String)=map(a)
   def getF={
 
-    val letterCounts:List[Map[Letter,Int]] = map.values.map{
-      alphabet.parseString(_).foldLeft(Map[Letter,Int]()){
-        (m,l)=>m(l)=m.getOrElse(l,0)+1
-      }
-    }.toList//map each sequence to a map of counts of each letter
+    val letterCounts:List[Map[Letter,Int]] = patterns._1.values.map{list=> list.zip(patterns._2).foldLeft(Map[Letter,Int]()){(m,t)=>
+      val (letter,count)=t
+      m.updated(letter,m.getOrElse(letter,0)+count)
+    }}.toList//map each sequence to a map of counts of each letter
 
     val pMap = letterCounts.map{m=>
       val propMap = Map[Letter,Double]()
         val total = m.values.foldLeft(0){_+_}
         m.foldLeft(propMap){(m2,t)=> 
-          m2(t._1)=t._2.toDouble/total 
+          m2.updated(t._1,t._2.toDouble/total)
         }
     }
-    val num = map.size
+    val num = patterns._1.size
     val ans = pMap.foldLeft(Map[Letter,Double]()){(m,m2)=>
-      m2.foldLeft(m){(m3,t)=>m3(t._1)=m3.getOrElse(t._1,0.0D)+t._2/num}
+      m2.foldLeft(m){(m3,t)=>m3.updated(t._1,m3.getOrElse(t._1,0.0D)+t._2/num)}
     }
     ans
 
@@ -247,18 +204,109 @@ class Alignment[A<:BioEnum](m:Map[String,String],val alphabet:A){
     */
     }
 
+  def sequenceNames = patterns._1.keys
+
   def getFPi={
     val f = getF
     Vector(alphabet.matElements.map{f.getOrElse(_,0.0)}).normalize(1.0D)
   }
+}
 
-  def toFasta={
-    map.foldLeft(""){(s,t)=>s + ">"+t._1+"\n"+t._2+"\n"}
+abstract class SimpleAlignment[A<:BioEnum](alphabet:A) extends SplitAlignment[A](alphabet){
+  val pointers:List[Int]
+  def get(seqName:String)={
+    val vec = sitePatterns(seqName)
+    pointers.map{vec}
   }
-    
+  def toFasta={
+    sequenceNames.map{s=> (s,get(s).mkString)}.foldLeft(""){(s,t)=>s + ">"+t._1+"\n"+t._2+"\n"}
+  }
+  override def canEqual(other:Any)=other.isInstanceOf[SimpleAlignment[A]]
+  override def equals(other:Any)={
+    other match {
+      case that:SimpleAlignment[A]=> (that canEqual this) && (that.pointers == this.pointers) && super.equals(that)
+      case _ => false
+    }
+  }
+ 
 }
 
-class FlippedIterator[A](l:List[Iterator[A]]) extends Iterator[List[A]]{
-  def next = l.map{_.next}
-  def hasNext = l.foldLeft(true){(a,b)=>a && b.hasNext}
+abstract class SplitAlignment[A<:BioEnum](val alphabet:A) extends Alignment[A]{
+  val sitePatterns:Map[String,scala.IndexedSeq[alphabet.Value]]
+  val counts:List[Int]
+
+  def canEqual(other:Any)=other.isInstanceOf[SplitAlignment[A]]
+  override lazy val hashCode = 41 + alphabet.hashCode + sitePatterns.hashCode + counts.hashCode
+  override def equals(other:Any)={
+    other match {
+      case that:SplitAlignment[A]=> (that canEqual this) && (that.sitePatterns==this.sitePatterns) && (that.counts == this.counts)
+      case _ => false
+    }
+  }
+  
+
+
+  def patterns=(sitePatterns,counts)
+  def split(i:Int):List[Alignment[A]]={
+    val originalLength = sitePatterns.values.head.length
+    val size = (originalLength/i) + {if (originalLength%i>0) {1} else {0}}
+    val p = sitePatterns.map{t=> (t._1,t._2.grouped(size))}.map{t=>(t._1,t._2.zip(counts.grouped(size)))}.map{ t=>//produce Iterator[(String,Iterable[List[Vector[Letter]],List[List[Int]]])]
+      t._2.map{i=>(t._1,i)} // produce Seq[(String,(Vector[Letter],List[Int]))]
+    }
+    val x = p.map{_.toList}.toList
+    val pIter = FlippedIterator(x)
+    pIter.map{slice:Iterable[(String,(IndexedSeq[alphabet.Value],List[Int]))]=>
+      new SplitAlignment(alphabet){
+        val sitePatterns:Map[String,scala.IndexedSeq[this.alphabet.Value]] = slice.foldLeft(Map[String,scala.IndexedSeq[this.alphabet.Value]]()){(m,t)=>
+          m updated (t._1,t._2._1.asInstanceOf[IndexedSeq[this.alphabet.Value]])
+        }      
+        val counts = slice.head._2._2
+      }
+    }.toList
+  }
 }
+
+object SimpleAlignment{
+  // using this pattern:
+  // http://www.scala-lang.org/node/6353
+  trait pack[A<:BioEnum] {val alphabet:A;val patterns:Map[String,scala.IndexedSeq[alphabet.Value]]}
+  trait raw[A<:BioEnum] {val alphabet:A;val alignment:Map[String,scala.IndexedSeq[alphabet.Value]]}
+
+  def apply[A<:BioEnum](p:pack[A],countList:List[Int],pointerList:List[Int]):SimpleAlignment[A]={
+    import p._
+    new SimpleAlignment[A](alphabet){
+      val counts = countList
+      val pointers = pointerList
+      val sitePatterns = patterns.asInstanceOf[Map[String,scala.IndexedSeq[alphabet.Value]]]
+    }
+  }
+
+  def apply[A<:BioEnum](p:raw[A]):SimpleAlignment[A] = {
+    import p._
+    val patterns = FlippedIterator(alignment.values).foldLeft(Map[List[alphabet.Value],Int]()){(m,s)=> val l = s.toList; m.updated(l,m.getOrElse(l,0)+1)}
+    val mySitePatterns = alignment.keys.iterator.zip(FlippedIterator(patterns.keys.toList)).foldLeft(Map[String,scala.Vector[alphabet.Value]]()){(m,t)=>
+      m.updated(t._1,new scala.collection.immutable.VectorBuilder().++=(t._2).result)
+    }
+    val hash = patterns.keys.zipWithIndex.foldLeft(Map[List[alphabet.Value],Int]()){_+_}
+    val myCounts = patterns.values.toList
+    val myPointers = FlippedIterator(alignment.values).map{a=>hash(a.toList)}.toList
+    new SimpleAlignment[A](alphabet){
+      val counts = myCounts
+      val pointers = myPointers
+      val sitePatterns = mySitePatterns.asInstanceOf[Map[String,scala.Vector[alphabet.Value]]]
+    }
+  }
+  def apply[A <: BioEnum](aln:Map[String,String],alpha:A):SimpleAlignment[A]={
+    apply(new raw[A]{
+        val alphabet=alpha
+        val alignment = aln.map{t=>(t._1,alphabet.parseString(t._2))}.foldLeft[Map[String,IndexedSeq[alphabet.Value]]](Map[String,scala.IndexedSeq[alphabet.Value]]()){_+_}
+      }
+    )
+  }
+
+  /*
+  TODO
+  def apply(m:Map[String,String],alphabet:A):SimpleAlignment[A]={
+  }*/
+}
+
