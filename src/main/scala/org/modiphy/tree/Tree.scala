@@ -55,6 +55,13 @@ object DataParse{
     val seqMap = aln.foldLeft(Map[String,String]()){_+_}
     apply(tree,SimpleAlignment(seqMap,alphabet))
   }
+  def fromFiles[A<:BioEnum](treeFile:String,alnFile:String,alphabet:A):(Tree[A],SimpleAlignment[A])={
+    apply(
+      scala.io.Source.fromFile(treeFile).getLines().map{_.trim}.mkString(""),
+      scala.io.Source.fromFile(alnFile).getLines(),
+      alphabet
+    )
+  }
 
   
   def apply[A <: BioEnum](tree:String,aln:SimpleAlignment[A]):(Tree[A],SimpleAlignment[A])={
@@ -121,11 +128,7 @@ trait Node[A <: BioEnum] extends Actor with Logging{
 
 object ReadTree{
   def fromFiles[A <: BioEnum](tree:String,aln:String,alphabet:A):Tree[A]={
-    DataParse(
-      scala.io.Source.fromFile(tree).getLines().map{_.trim}.mkString(""),
-      scala.io.Source.fromFile(aln).getLines(),
-      alphabet
-    )._1
+    DataParse.fromFiles( tree,aln,alphabet)._1
   }
 }
 
