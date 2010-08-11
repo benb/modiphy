@@ -50,19 +50,19 @@ object DataParse{
   /**
    Produce a parsed Tree and alignment from a newick file and a fasta file
   */
-  def apply[A <: BioEnum](tree:String,alignment:Iterator[String],alphabet:A):(Tree[A],Alignment[A])={
+  def apply[A <: BioEnum](tree:String,alignment:Iterator[String],alphabet:A):(Tree[A],SimpleAlignment[A])={
     val aln = GenAlnParser(alignment)
     val seqMap = aln.foldLeft(Map[String,String]()){_+_}
     apply(tree,SimpleAlignment(seqMap,alphabet))
   }
 
   
-  def apply[A <: BioEnum](tree:String,aln:Alignment[A]):(Tree[A],Alignment[A])={
+  def apply[A <: BioEnum](tree:String,aln:SimpleAlignment[A]):(Tree[A],SimpleAlignment[A])={
     val root = new TreeParser[A](aln){def parseAll=parse(root,cleanTree(tree))}.parseAll.get.iNode.get.setRoot
     (root,aln)
   }
 
-  def dropNodes[A <: BioEnum](tree:String,aln:Alignment[A]):(Tree[A],Alignment[A])={
+  def dropNodes[A <: BioEnum](tree:String,aln:SimpleAlignment[A]):(Tree[A],SimpleAlignment[A])={
     val t1:Tree[A] = apply(tree,aln)._1
     val t2 = t1.restrictTo(aln.sequenceNames.toSet).iNode.get.setRoot
     //println(t2)
