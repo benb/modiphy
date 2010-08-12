@@ -13,17 +13,17 @@ import scala.util.parsing.combinator._
   Used internally for parsing trees
 */
 
-class TreeParser[A <: BioEnum](aln:Alignment[A]) extends JavaTokenParsers{
-  val treegen = new TreeGen[A]
+class TreeParser(aln:Alignment) extends JavaTokenParsers{
+  val treegen = new TreeGen
   import treegen._
-  def root: Parser[INode[A]] = "("~node~rep(","~>node)~");" ^^ {
+  def root: Parser[INode] = "("~node~rep(","~>node)~");" ^^ {
     case "("~node1~nodeList~");" => getINode(node1::nodeList,aln,0.0,None)
   }
-  def node: Parser[Node[A]] = leaf | "("~node~rep(","~>node)~"):"~branchLength ^^ {
+  def node: Parser[Node] = leaf | "("~node~rep(","~>node)~"):"~branchLength ^^ {
     case "("~node1~nodeList~"):"~length => getINode(node1::nodeList,aln,length._1,length._2)
   }
   def seqName: Parser[String] = regex(new scala.util.matching.Regex("[a-zA-Z0-9_.+-]+"))
-  def leaf: Parser[Leaf[A]] = seqName~":"~branchLength ^^ {case name~":"~branchLength => getLeaf(name,aln,branchLength._1,branchLength._2)}
+  def leaf: Parser[Leaf] = seqName~":"~branchLength ^^ {case name~":"~branchLength => getLeaf(name,aln,branchLength._1,branchLength._2)}
   def branchLength:Parser[(Double,Option[Int])] = {floatingPointNumber~"#"~wholeNumber ^^{
      case length~"#"~id => (length.toDouble,Some(id.toInt))
   } | floatingPointNumber  ^^ {
@@ -32,17 +32,17 @@ class TreeParser[A <: BioEnum](aln:Alignment[A]) extends JavaTokenParsers{
   }
 }
 
-class TreeGen[A <: BioEnum]{
+class TreeGen{
   var nodeCount:Int= -1
-  def getINode(children:List[Node[A]],aln:Alignment[A], lengthTo:Double, label:Option[Int]):INode[A]={nodeCount += 1;new INode[A](children,aln,lengthTo,nodeCount,label)}
-  def getLeaf(name:String,aln:Alignment[A], lengthTo:Double,label:Option[Int]):Leaf[A]={nodeCount += 1;new Leaf[A](name,aln,lengthTo,nodeCount,label)}
+  def getINode(children:List[Node],aln:Alignment, lengthTo:Double, label:Option[Int]):INode={nodeCount += 1;new INode(children,aln,lengthTo,nodeCount,label)}
+  def getLeaf(name:String,aln:Alignment, lengthTo:Double,label:Option[Int]):Leaf={nodeCount += 1;new Leaf(name,aln,lengthTo,nodeCount,label)}
 }
 
 /**
  Parses Newick format trees
 */
 object DataParse{
-  type Tree[A <: BioEnum]=Node[A] with RootNode[A]
+  type Tree=Node with RootNode
   import org.modiphy.sequence.Alignment
 
   private def cleanTree(t:String)=t.split("\\s+").mkString("").split("\n").mkString("")
@@ -50,12 +50,12 @@ object DataParse{
   /**
    Produce a parsed Tree and alignment from a newick file and a fasta file
   */
-  def apply[A <: BioEnum](tree:String,alignment:Iterator[String],alphabet:A):(Tree[A],SimpleAlignment[A])={
+  def apply[A <: BioEnum](tree:String,alignment:Iterator[String],alphabet:A):(Tree,SimpleAlignment)={
     val aln = GenAlnParser(alignment)
     val seqMap = aln.foldLeft(Map[String,String]()){_+_}
     apply(tree,SimpleAlignment(seqMap,alphabet))
   }
-  def fromFiles[A<:BioEnum](treeFile:String,alnFile:String,alphabet:A):(Tree[A],SimpleAlignment[A])={
+  def fromFiles[A <: BioEnum](treeFile:String,alnFile:String,alphabet:A):(Tree,SimpleAlignment)={
     apply(
       scala.io.Source.fromFile(treeFile).getLines().map{_.trim}.mkString(""),
       scala.io.Source.fromFile(alnFile).getLines(),
@@ -64,13 +64,13 @@ object DataParse{
   }
 
   
-  def apply[A <: BioEnum](tree:String,aln:SimpleAlignment[A]):(Tree[A],SimpleAlignment[A])={
-    val root = new TreeParser[A](aln){def parseAll=parse(root,cleanTree(tree))}.parseAll.get.iNode.get.setRoot
+  def apply(tree:String,aln:SimpleAlignment):(Tree,SimpleAlignment)={
+    val root = new TreeParser(aln){def parseAll=parse(root,cleanTree(tree))}.parseAll.get.iNode.get.setRoot
     (root,aln)
   }
 
-  def dropNodes[A <: BioEnum](tree:String,aln:SimpleAlignment[A]):(Tree[A],SimpleAlignment[A])={
-    val t1:Tree[A] = apply(tree,aln)._1
+  def dropNodes(tree:String,aln:SimpleAlignment):(Tree,SimpleAlignment)={
+    val t1:Tree = apply(tree,aln)._1
     val t2 = t1.restrictTo(aln.sequenceNames.toSet).iNode.get.setRoot
     //println(t2)
     (t2.setAlign(aln).iNode.get.setRoot,aln)
@@ -84,40 +84,40 @@ import DataParse._
 import scala.actors.Actor
 import scala.actors.Actor._
 
-trait Node[A <: BioEnum] extends Actor with Logging{
+trait Node extends Actor with Logging{
   val label:Option[Int]
   val me = this
   def isLeaf=false
   val id:Int
   val isRoot=false
-  val aln:Alignment[A]
-  val alphabet:A=aln.alphabet
+  val aln:Alignment
+  val alphabet=aln.alphabet
   
   def toLabelledString:String
   def lengthTo:Double
-  def child(i:Int):Option[Node[A]]
-  def children:List[Node[A]]
+  def child(i:Int):Option[Node]
+  def children:List[Node]
   def name:String
   def descendents:List[String]
   def numChildren:Int
-  def removeUseless:Node[A]
-  def resize(bl:Double):Node[A]
-  def setAlign[B <: BioEnum](a2:Alignment[B]):Node[B]
-  def restrictTo(allowed:Set[String]):Node[A]
-  def descendentNodes:List[Node[A]]
-  def setBranchLengths(l:List[Double]):Node[A]
-  def setBranchLengths(m:Map[Int,Double]):Node[A]
+  def removeUseless:Node
+  def resize(bl:Double):Node
+  def setAlign[B <: BioEnum](a2:Alignment):Node
+  def restrictTo(allowed:Set[String]):Node
+  def descendentNodes:List[Node]
+  def setBranchLengths(l:List[Double]):Node
+  def setBranchLengths(m:Map[Int,Double]):Node
   def getBranchLengths:List[Double]
   def branchTo:String
-  def addLabels:Node[A]
+  def addLabels:Node
 
   def nodes=this::descendentNodes
 
-  def iNode:Option[INode[A]]=None
+  def iNode:Option[INode]=None
 
   def cromulent:Boolean= lengthTo > -scala.Double.Epsilon && children.foldLeft(true){(a,b)=>a && b.cromulent}
 
-  def splitAln(i:Int):List[Node[A]]
+  def splitAln(i:Int):List[Node]
 
   override def start={
    children.foreach{_.start}
@@ -127,18 +127,18 @@ trait Node[A <: BioEnum] extends Actor with Logging{
 }
 
 object ReadTree{
-  def fromFiles[A <: BioEnum](tree:String,aln:String,alphabet:A):Tree[A]={
+  def fromFiles[A <: BioEnum](tree:String,aln:String,alphabet:A):Tree={
     DataParse.fromFiles( tree,aln,alphabet)._1
   }
 }
 
 
 
-trait RootNode[A <: BioEnum] extends INode[A]{
+trait RootNode extends INode{
   override def addLabels = factory(children.map{_.addLabels},aln,lengthTo,Some(id))
-  val children:List[Node[A]]
+  val children:List[Node]
   import scala.collection.immutable.IntMap
-  val nodeMap=(this::descendentNodes).foldLeft[Map[Int,Node[A]]](IntMap[Node[A]]()){(m,n)=> m + ((n.id,n))}
+  val nodeMap=(this::descendentNodes).foldLeft[Map[Int,Node]](IntMap[Node]()){(m,n)=> m + ((n.id,n))}
   def apply(i:Int)=nodeMap(i)
 
   override val isRoot=true
@@ -146,13 +146,13 @@ trait RootNode[A <: BioEnum] extends INode[A]{
   override def toLabelledString="("+children.map{_.toLabelledString}.mkString(",")+");"
 
 
-  override def factory[B <: BioEnum](c:List[Node[B]],aln:Alignment[B],len:Double):Tree[B]=new INode[B](c,aln,len,id,label) with RootNode[B]
-  override def factory[B <: BioEnum](c:List[Node[B]],aln:Alignment[B],len:Double,lab:Option[Int]):Tree[B]=new INode[B](c,aln,len,id,lab) with RootNode[B]
+  override def factory[B <: BioEnum](c:List[Node],aln:Alignment,len:Double):Tree=new INode(c,aln,len,id,label) with RootNode
+  override def factory[B <: BioEnum](c:List[Node],aln:Alignment,len:Double,lab:Option[Int]):Tree=new INode(c,aln,len,id,lab) with RootNode
 
   override def getBranchLengths={
     descendentNodes.map{_.lengthTo}
   }
-  override def setBranchLengths(l:List[Double]):Tree[A]={
+  override def setBranchLengths(l:List[Double]):Tree={
     val nMap = descendentNodes.zip(l).foldLeft(Map[Int,Double]()){(m,t)=>
       m + ((t._1.id,t._2))
     }
@@ -167,15 +167,15 @@ trait RootNode[A <: BioEnum] extends INode[A]{
     factory(newchildren,aln,l.head)
     */
   }
-  override def setBranchLengths(m:Map[Int,Double]):Tree[A]={
+  override def setBranchLengths(m:Map[Int,Double]):Tree={
     val newChildren = children.map{c=>c.setBranchLengths(m)}
     factory(newChildren,aln,0.0)
   }
 
-  override def removeUseless:INode[A] with RootNode[A]=super.removeUseless.iNode.get.setRoot
-  override def restrictTo(allowed:Set[String]):INode[A] with RootNode[A]=super.restrictTo(allowed).iNode.get.setRoot
+  override def removeUseless:INode with RootNode=super.removeUseless.iNode.get.setRoot
+  override def restrictTo(allowed:Set[String]):INode with RootNode=super.restrictTo(allowed).iNode.get.setRoot
   override val cromulent = children.foldLeft(true){(a,b) => a && b.cromulent}
-  override def splitAln(i:Int):List[RootNode[A]]=super.splitAln(i).map{_.asInstanceOf[INode[A]].setRoot}
+  override def splitAln(i:Int):List[RootNode]=super.splitAln(i).map{_.asInstanceOf[INode].setRoot}
 
   def fPi = aln.getFPi
 
@@ -183,7 +183,7 @@ trait RootNode[A <: BioEnum] extends INode[A]{
     react {
       case LogLikelihoodCalc(model,actor) =>
         children.foreach{c => c ! LikelihoodCalc(model)}
-        model ! NewMatReq(self.asInstanceOf[Node[A]]) 
+        model ! NewMatReq(self.asInstanceOf[Node]) 
         act2(Nil,0,actor,None)
       case a:Any =>
         println(this + " received unexpected message: " + a)
@@ -262,7 +262,7 @@ class PartialLikelihoodCalc extends Actor{
 }
 
 abstract class MatExpActor extends Actor
-class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val lengthTo:Double,val id:Int,val label:Option[Int]) extends Node[A]{ 
+class INode(val children:List[Node],val aln:Alignment,val lengthTo:Double,val id:Int,val label:Option[Int]) extends Node{ 
   val plCalc = new PartialLikelihoodCalc
   plCalc.start
 
@@ -275,7 +275,7 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
       case LikelihoodCalc(model) => 
         //println("INode got")
         children.foreach{c => c ! LikelihoodCalc(model)}
-        model ! NewMatReq(self.asInstanceOf[Node[A]])
+        model ! NewMatReq(self.asInstanceOf[Node])
         qMat(Nil,0,sender,model,None)
       case a:Any => 
         println(this + " WTF " + a)
@@ -322,23 +322,23 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
 
   val name=""
 
-  def factory[B<:BioEnum](c:List[Node[B]],aln:Alignment[B],len:Double)=if (isRoot){new INode[B](c,aln,len,id,label) with RootNode[B]}else {new INode[B](c,aln,len,id,label)}
-  def factory[B<:BioEnum](c:List[Node[B]],aln:Alignment[B],len:Double,lab:Option[Int])=if (isRoot){new INode[B](c,aln,len,id,lab) with RootNode[B]}else {new INode[B](c,aln,len,id,lab)}
+  def factory[B<:BioEnum](c:List[Node],aln:Alignment,len:Double)=if (isRoot){new INode(c,aln,len,id,label) with RootNode}else {new INode(c,aln,len,id,label)}
+  def factory[B<:BioEnum](c:List[Node],aln:Alignment,len:Double,lab:Option[Int])=if (isRoot){new INode(c,aln,len,id,lab) with RootNode}else {new INode(c,aln,len,id,lab)}
 
 
   def numChildren = children.size
-  def childElements:Iterator[Node[A]] = children.iterator
+  def childElements:Iterator[Node] = children.iterator
   def child(i:Int)=if (i < children.length){Some(children(i))}else{None}
   def length(i:Int):Double=children(i).lengthTo
-  def length(n:Node[A]):Double=children.find{node=>node==n}.get.lengthTo
+  def length(n:Node):Double=children.find{node=>node==n}.get.lengthTo
   def restrictTo(allowed:Set[String])={
     val newChildren=children.filter{child=>child.descendents.exists{name=>allowed contains name}}map{_.restrictTo(allowed)}
     //println(children.toString + " => " + newChildren.toString)
     factory(newChildren,aln,lengthTo).removeUseless
   }
   def descendents:List[String]=childElements.map{i=>i.descendents}.toList.flatten[String]
-  def descendentNodes = {children ++ children.map{c=>c.descendentNodes}.flatten[Node[A]]}
-  def removeUseless:Node[A]={
+  def descendentNodes = {children ++ children.map{c=>c.descendentNodes}.flatten[Node]}
+  def removeUseless:Node={
     val newChildren = children.map{child=>
       if (child.numChildren >1){
         child
@@ -356,21 +356,21 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
         //maybe need to remove if useless internal
       }
     }.map{_.removeUseless}
-    if (newChildren.length==1){// This check can't be made because of erasure: && newChildren(0).isInstanceOf[INode[A]]){
+    if (newChildren.length==1){// This check can't be made because of erasure: && newChildren(0).isInstanceOf[INode]){
         newChildren(0)
     }else{
       factory(newChildren,aln,lengthTo)
     }
   }
 
-  def setAlign[B<:BioEnum](a2:Alignment[B]):Node[B]=factory(children.map{i=>i.setAlign(a2)},a2,lengthTo)
+  def setAlign[B<:BioEnum](a2:Alignment):Node=factory(children.map{i=>i.setAlign(a2)},a2,lengthTo)
   def resize(bl:Double)=factory(children,aln,bl)
           
   override def toString={
     "("+children.mkString(",")+"):"+lengthTo
   }
 
-  def setRoot=new INode[A](children,aln,0.0D,id,label) with RootNode[A]
+  def setRoot=new INode(children,aln,0.0D,id,label) with RootNode
 
   override def setBranchLengths(l:List[Double])={
     val nMap = descendentNodes.zip(l).foldLeft(Map[Int,Double]()){(m,t)=>
@@ -392,7 +392,7 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
   def branchTo=descendents.mkString(",")
   def splitAln(i:Int)={
     val splitChildren = children.map{_.splitAln(i)}
-    def makeNode(chi:List[Node[A]],nextChi:List[List[Node[A]]]):List[Node[A]]= nextChi.head match{
+    def makeNode(chi:List[Node],nextChi:List[List[Node]]):List[Node]= nextChi.head match{
       case Nil => List(factory(chi,chi.head.aln,lengthTo))
       case _ => factory(chi,chi.head.aln,lengthTo)::makeNode(nextChi.map{_.head},nextChi.map{_.tail})
     }
@@ -400,16 +400,16 @@ class INode[A <: BioEnum](val children:List[Node[A]],val aln:Alignment[A],val le
   }
 }
 
-class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Double, val id:Int, val label:Option[Int]) extends Node[A]{
+class Leaf(val name:String,val aln:Alignment,val lengthTo:Double, val id:Int, val label:Option[Int]) extends Node{
 
   override def isLeaf=true
-  def children:List[Node[A]]=Nil
+  def children:List[Node]=Nil
   def addLabels = factory(name,aln,lengthTo,Some(id))
 
   def toLabelledString = toString + {if (label.isDefined){"#" + label.get}else {""}}
   val sequence:Seq[alphabet.Value]=aln.getPatterns(name).asInstanceOf[Seq[alphabet.Value]]
   lazy val likelihoods:List[Vector]={
-    sequence.map{a:alphabet.Value=>
+    sequence.map{a=>
     
       val vec = Vector(alphabet.matLength)
         alphabet.getNums(a).foreach{i=>
@@ -421,22 +421,22 @@ class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Doubl
   def descendentNodes=List()
   def setBranchLengths(l:List[Double])={
   //   println("Node " + this + " setting branch length " + l.head)
-     new Leaf[A](name,aln,l.head,id,label)
+     new Leaf(name,aln,l.head,id,label)
  }
   def setBranchLengths(m:Map[Int,Double])={
-    new Leaf[A](name,aln,m(id),id,label)
+    new Leaf(name,aln,m(id),id,label)
   }
   def child(i:Int)=None
   def descendents=List(name)
-  def resize(bl:Double) = new Leaf[A](name,aln,bl,id,label)
+  def resize(bl:Double) = new Leaf(name,aln,bl,id,label)
   def numChildren=0
   def removeUseless=this
-  def setAlign[B<:BioEnum](a2:Alignment[B]):Node[B]=new Leaf[B](name,a2,lengthTo,id,label)
+  def setAlign[B<:BioEnum](a2:Alignment):Node=new Leaf(name,a2,lengthTo,id,label)
   def restrictTo(allowed:Set[String])=this
   override def toString=name + ":" + lengthTo
   def getBranchLengths=List(lengthTo)
-  def factory[B <: BioEnum](n:String,a:Alignment[B],len:Double)=new Leaf[B](n,a,len,id,label)
-  def factory[B <: BioEnum](n:String,a:Alignment[B],len:Double,lab:Option[Int])=new Leaf[B](n,a,len,id,lab)
+  def factory[B <: BioEnum](n:String,a:Alignment,len:Double)=new Leaf(n,a,len,id,label)
+  def factory[B <: BioEnum](n:String,a:Alignment,len:Double,lab:Option[Int])=new Leaf(n,a,len,id,lab)
   def branchTo=name
 
   def splitAln(i:Int)={
@@ -450,7 +450,7 @@ class Leaf[A <: BioEnum](val name:String,val aln:Alignment[A],val lengthTo:Doubl
     react {
       case LikelihoodCalc(model) => 
         //println("LeafNode Got")
-        model ! NewMatReq(self.asInstanceOf[Node[A]])
+        model ! NewMatReq(self.asInstanceOf[Node])
         qMat(sender,model)
       case a:Any => 
         println(this + " received unexpected message: " + a)

@@ -4,7 +4,7 @@ import org.modiphy.tree._
 import org.modiphy.sequence._
 import cern.colt.matrix.DoubleMatrix1D
 
-class LikelihoodCalc[A <: BioEnum](tree:Node[A],model:Matrix,alphabet:A){
+class LikelihoodCalc(tree:Node,model:Matrix,alphabet:BioEnum){
   def count = alphabet.filter{i=>alphabet.isReal(i)}.foldLeft(0){(i,j)=>i+1}
 
   def likelihood(i:Int)={
