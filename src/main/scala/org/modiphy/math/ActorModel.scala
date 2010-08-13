@@ -1052,7 +1052,7 @@ trait OptPSetter {
 
 
 
-class ActorModel(t:Tree,components:ActorModelComponent,val paramMap:Map[ParamName,ActorParamComponent]) extends Logging{
+class ActorModel(t:Tree,components:ActorModelComponent,val paramMap:Map[ParamName,ActorParamComponent]) extends SimpleModel with Logging{
 
   val tree = t.splitAln(6)
   tree.foreach{_.start}
@@ -1199,59 +1199,6 @@ class ActorModel(t:Tree,components:ActorModelComponent,val paramMap:Map[ParamNam
     //but how often is this really going to be called?
     p.map{optGet(_).toList}.flatten[Double].toArray
   }
-  def optSetter(p:ParamName):OptPSetter={
-    new OptPSetter{
-      val param = getParam(p) 
-      lazy val lower = (param !? Lower).asInstanceOf[Array[Double]]
-      lazy val upper = (param !? Upper).asInstanceOf[Array[Double]]
-      lazy val numArguments=lower.length
-      lazy val currentArgs=(param !? RequestOpt).asInstanceOf[Array[Double]]
-      def latestArgs={
-        val latestArgs=(param !? RequestOpt).asInstanceOf[Array[Double]]
-        Array.copy(latestArgs,0,currentArgs,0,currentArgs.length)
-        latestArgs
-      }
-      def apply(d:Array[Double])={
-        if (d.zip(currentArgs).foldLeft(false){(bool,t)=> bool || t._1!=t._2}){
-          Array.copy(d,0,currentArgs,0,d.length)
-          param !? OptUpdate(d)
-        }
-      }
-      def paramString=latestArgs.mkString(" ")
-      override def toString = p + " : (" +paramString+")"
-    }
-  }
-  def optSetter(p:List[ParamName]):OptPSetter={
-    new OptPSetter{
-      val numSub=p.length
-      val sub = p.map{optSetter}
-      val lower = sub.map{_.lower.toList}.flatten[Double].toArray
-      val upper = sub.map{_.upper.toList}.flatten[Double].toArray
-      val subLengths = sub.map{_.numArguments}
-      val numArguments=subLengths.foldLeft(0){_+_}
-
-      val currentArgs = sub.map{_.currentArgs.toList}.flatten[Double].toArray
-      def latestArgs={
-        val latestArgs = sub.map{_.latestArgs.toList}.flatten[Double].toArray
-        Array.copy(latestArgs,0,currentArgs,0,currentArgs.length)
-        latestArgs
-
-      }
-      def apply(d:Array[Double])={
-        var pointer =0
-        val subIter = sub.elements
-        val lenIter=subLengths.elements
-        for (i<- 0 until numSub){
-          val len = lenIter.next
-          val s =  subIter.next
-          s(d.slice(pointer,pointer + len))
-          pointer = pointer + len
-        }
-      }
-      override def toString = sub.map{_.toString}.mkString(" ")
-    }
-  }
-
 
   def paramSetterVector(p:ActorParamComponent)(startParam:Vector)={
     class APSetter extends PSetter[Vector]{
@@ -1383,31 +1330,7 @@ class ActorModel(t:Tree,components:ActorModelComponent,val paramMap:Map[ParamNam
 
   override def toString = paramString + "\nlog-likelihood: " + logLikelihood
 
-  def optimise(params:ParamName*):Double={
-    optimise(params.toList)
-  }
-  def optimise(params:List[ParamName],tolfx:Double,tolx:Double):Double={
-    import ModelOptimiser._
-    ModelOptimiser.optimise(getConjugateDirection,params,this,tolfx,tolx)
-  }
-  def optimiseQuick(params:List[ParamName]):Double=optimise(params,1E-1,1E-1)
-  def optimise(params:List[ParamName]):Double={
-    import ModelOptimiser._
-    ModelOptimiser.optimise(getConjugateDirection,params,this)
-  }
-  def optimise(params:List[List[ParamName]])(implicit m:Manifest[List[List[ParamName]]]):Double={
-    var end = logLikelihood
-    var start = end
-    do {
-      start=end
-      params.foreach{pset=>
-        optimise(pset) 
-      }
-      end = logLikelihood
-    } while (end - start > 0.001)
-    end
-  }
-  def optimiseCustom(params:List[List[ParamName]],tolfx:Double,tolx:Double)(implicit m:Manifest[List[List[ParamName]]]):Double={
+ def optimiseCustom(params:List[List[ParamName]],tolfx:Double,tolx:Double)(implicit m:Manifest[List[List[ParamName]]]):Double={
   var end = logLikelihood
     var start = end
     do {
@@ -1471,3 +1394,112 @@ object NewMatReq{
 
 
 
+class MixtureModel(components:Seq[ActorModel],priors:ActorPiComponent) extends SimpleModel{
+  val size = components.length
+  def logLikelihood = components.zip(currentPriors.toArray).map{t=> t._1.logLikelihood * t._2}.foldLeft(0.0D){_+_}
+  def currentPriors = (priors !? RequestParam) match {case d:Vector=>d}
+
+ 
+
+  def getParam(p:ParamName)={
+    p match {
+      case priors.name => priors
+      case x => components.foldLeft[Option[ActorParamComponent]](None){(ans,c)=>
+     if (ans.isEmpty){
+      try{
+        Some(c.getParam(x))
+      }catch{
+        case e=>ans
+      }
+     }else {
+       ans
+     }
+     }.get
+    }
+
+
+    }
+}
+abstract class SimpleModel{
+  def logLikelihood:Double
+  def getParam(p:ParamName):ActorParamComponent
+
+  def optSetter(p:List[ParamName]):OptPSetter={
+    new OptPSetter{
+      val numSub=p.length
+      val sub = p.map{optSetter}
+      val lower = sub.map{_.lower.toList}.flatten[Double].toArray
+      val upper = sub.map{_.upper.toList}.flatten[Double].toArray
+      val subLengths = sub.map{_.numArguments}
+      val numArguments=subLengths.foldLeft(0){_+_}
+
+      val currentArgs = sub.map{_.currentArgs.toList}.flatten[Double].toArray
+      def latestArgs={
+        val latestArgs = sub.map{_.latestArgs.toList}.flatten[Double].toArray
+        Array.copy(latestArgs,0,currentArgs,0,currentArgs.length)
+        latestArgs
+
+      }
+      def apply(d:Array[Double])={
+        var pointer =0
+        val subIter = sub.elements
+        val lenIter=subLengths.elements
+        for (i<- 0 until numSub){
+          val len = lenIter.next
+          val s =  subIter.next
+          s(d.slice(pointer,pointer + len))
+          pointer = pointer + len
+        }
+      }
+      override def toString = sub.map{_.toString}.mkString(" ")
+    }
+  }
+  def optSetter(p:ParamName):OptPSetter={
+    new OptPSetter{
+      val param = getParam(p) 
+      lazy val lower = (param !? Lower).asInstanceOf[Array[Double]]
+      lazy val upper = (param !? Upper).asInstanceOf[Array[Double]]
+      lazy val numArguments=lower.length
+      lazy val currentArgs=(param !? RequestOpt).asInstanceOf[Array[Double]]
+      def latestArgs={
+        val latestArgs=(param !? RequestOpt).asInstanceOf[Array[Double]]
+        Array.copy(latestArgs,0,currentArgs,0,currentArgs.length)
+        latestArgs
+      }
+      def apply(d:Array[Double])={
+        if (d.zip(currentArgs).foldLeft(false){(bool,t)=> bool || t._1!=t._2}){
+          Array.copy(d,0,currentArgs,0,d.length)
+          param !? OptUpdate(d)
+        }
+      }
+      def paramString=latestArgs.mkString(" ")
+      override def toString = p + " : (" +paramString+")"
+    }
+  }
+  def optimise(params:ParamName*):Double={
+    optimise(params.toList)
+  }
+  def optimise(params:List[ParamName],tolfx:Double,tolx:Double):Double={
+    import ModelOptimiser._
+    ModelOptimiser.optimise(getConjugateDirection,params,this,tolfx,tolx)
+  }
+  def optimiseQuick(params:List[ParamName]):Double=optimise(params,1E-1,1E-1)
+  def optimise(params:List[ParamName]):Double={
+    import ModelOptimiser._
+    ModelOptimiser.optimise(getConjugateDirection,params,this)
+  }
+  def optimise(params:List[List[ParamName]])(implicit m:Manifest[List[List[ParamName]]]):Double={
+    var end = logLikelihood
+    var start = end
+    do {
+      start=end
+      params.foreach{pset=>
+        optimise(pset) 
+      }
+      end = logLikelihood
+    } while (end - start > 0.001)
+    end
+  }
+ 
+
+}

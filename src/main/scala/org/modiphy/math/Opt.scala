@@ -17,7 +17,8 @@ abstract class Gradient extends MultivariateVectorialFunction{
   def apply(point:Array[Double]):Array[Double]
   def value(point:Array[Double])=apply(point)
 }
-class FuncWrapper(model:ActorModel,p:OptPSetter) extends MultivariateFunction with MultivariateRealFunction with Logging{
+
+class FuncWrapper(f:()=>Double,p:OptPSetter) extends MultivariateFunction with MultivariateRealFunction with Logging{
   def setBest=apply(best)
   var best:Array[Double]=p.latestArgs
   var bestLnL = -1E100
@@ -34,7 +35,7 @@ class FuncWrapper(model:ActorModel,p:OptPSetter) extends MultivariateFunction wi
     val t1 = System.currentTimeMillis
     finest{"out " + (t1 - logT1)}
     p(point)
-    val ans = model.logLikelihood
+    val ans = f()
     val t2 = System.currentTimeMillis
     if (ans > bestLnL){
       best = point.clone
@@ -80,17 +81,16 @@ class FuncWrapper(model:ActorModel,p:OptPSetter) extends MultivariateFunction wi
 }
 
 object ModelOptimiser extends Logging{
-
   
-  def optimise(optFactory: => MultivariateMinimum,p:ParamName,model:ActorModel):Double={
+  def optimise(optFactory: => MultivariateMinimum,p:ParamName,model:SimpleModel):Double={
     optimise(optFactory,p::Nil,model)
   }
-  def optimise(optFactory: => MultivariateMinimum,pList:List[ParamName],model:ActorModel):Double={
+  def optimise(optFactory: => MultivariateMinimum,pList:List[ParamName],model:SimpleModel):Double={
     optimise(optFactory,pList,model,1E-4,1E-3)
   }
-  def optimise(optFactory: => MultivariateMinimum,pList:List[ParamName],model:ActorModel,tolfx:Double,tolx:Double):Double={
+  def optimise(optFactory: => MultivariateMinimum,pList:List[ParamName],model:SimpleModel,tolfx:Double,tolx:Double):Double={
     val startParams = model.optSetter(pList)
-      val func = new FuncWrapper(model,startParams)
+      val func = new FuncWrapper({()=>model.logLikelihood},startParams)
       if (func.length==1){
         getNelderMead.optimize(func,MAXIMIZE,func.latestArgs)
       }else {
@@ -98,7 +98,7 @@ object ModelOptimiser extends Logging{
       }
       func.setBest 
   }
-  def optimiseSequential(optFactory: => MultivariateMinimum,pListList:List[List[ParamName]],model:ActorModel):Double={
+  def optimiseSequential(optFactory: => MultivariateMinimum,pListList:List[List[ParamName]],model:SimpleModel):Double={
      var start = model.logLikelihood
      var end = start
      do {
